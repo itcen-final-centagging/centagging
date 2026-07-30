@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────────
+# KOSA PoC — 전체 파이프라인 통합 실행
+#
+#   docker compose up --build            # 세 앱 동시 기동
+#   docker compose up embedding          # Stage 1 만 기동          (8501)
+#   docker compose up vlm-tagging        # Stage 2 만 기동          (8502)
+#   docker compose up image-generation   # 이미지 생성 앱만 기동     (8503)
+#
+# API 키는 루트 .env 파일에서 읽습니다 (.env.example 참고).
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # Stage 1 — 임베딩 유사도 스크리닝
+  embedding:
+    container_name: kosa-embedding
+    build:
+      context: ./embedding
+      dockerfile: Dockerfile
+    ports:
+      - "${EMBEDDING_PORT:-8501}:8501"
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Stage 2 — VLM 다중 객체 태깅 & XAI 검증
+  vlm-tagging:
+    container_name: kosa-vlm-tagging
+    build:
+      context: ./vlm-tagging
+      dockerfile: Dockerfile
+    ports:
+      - "${VLM_PORT:-8502}:8501"
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # 가구 이미지 생성 — 스타일링 / 단품 / 디테일 컷
+  image-generation:
+    container_name: kosa-image-generation
+    build:
+      context: ./image-generation
+      dockerfile: Dockerfile
+    ports:
+      - "${IMAGE_GEN_PORT:-8503}:8501"
+    env_file:
+      - .env
+    # 생성 결과물이 컨테이너와 함께 사라지지 않도록 호스트에 남깁니다.
+    volumes:
+      - ./image-generation/output:/app/output
+      - ./image-generation/results:/app/results
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

@@ -1,0 +1,15 @@
+# 이미지에 넣을 필요 없는 산출물 / 캐시
+output/
+results/
+test/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# 로컬 환경
+.venv/
+venv/
+.env
+.idea/
+.vscode/
+.DS_Store

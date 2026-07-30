@@ -1,0 +1,8 @@
+# 실제 import 되는 패키지만 명시합니다 (전이 의존성은 pip 가 해결).
+# 확인 방법: grep -rhE "^\s*(import|from) " --include="*.py" app.py common services
+
+streamlit==1.52.2        # 웹 UI (app.py)
+pillow==11.3.0           # 이미지 처리 (PIL)
+google-genai==1.56.0     # Gemini API 클라이언트 (common/gemini.py)
+python-dotenv==1.2.1     # .env 로드 (common/gemini.py)
+colorlog==6.10.1         # 컬러 로깅 (common/logger.py)

@@ -1,0 +1,40 @@
+# ── Secrets (절대 커밋 금지) ──────────────────────────────
+.env
+.env.*
+!.env.example
+key.txt
+*.key
+*.pem
+
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+*.egg-info/
+
+# ── Streamlit ────────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ── 도구 / IDE / OS ──────────────────────────────────────
+.omc/
+.claude/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ── 산출물 ───────────────────────────────────────────────
+*.tar.gz
+
+# 앱 실행 중 생성되는 디렉토리 (코드가 os.makedirs 로 자동 생성)
+#   input/   : 업로드된 이미지 사본
+#   output/  : 생성된 이미지 및 메타데이터
+#   results/ : billing.csv 등 실행 로그
+#   test/    : 테스트 실행 산출물
+image-generation/input/
+image-generation/output/
+image-generation/results/
+image-generation/test/

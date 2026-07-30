@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Streamlit
+.streamlit/
+
+# API Keys & Secrets (보안상 깃허브 업로드 제외)
+./key.txt
+*.key
+*.pem
+*.json
+
+# OS
+.DS_Store
+Thumbs.db
