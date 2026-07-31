@@ -64,7 +64,10 @@ async def verify_gemini_connection() -> GeminiVerifyResponse:
     except gemini_service.GeminiApiError as error:
         raise fastapi.HTTPException(
             status_code=fastapi.status.HTTP_502_BAD_GATEWAY,
-            detail="Gemini API call failed. Check the API key, model access, and quota.",
+            detail=(
+                "Gemini API call failed. Check the API key, model access, "
+                "and quota."
+            ),
         ) from error
 
     return GeminiVerifyResponse(status="ok", **result)

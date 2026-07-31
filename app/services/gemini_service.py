@@ -1,4 +1,7 @@
-"""Gemini Developer API 실제 호출 서비스입니다. / Service for live Gemini Developer API calls."""
+"""Gemini Developer API 실제 호출 서비스입니다.
+
+Service for live Gemini Developer API calls.
+"""
 
 import typing
 
@@ -8,7 +11,10 @@ from app.core import config
 
 
 class GeminiConfigurationError(RuntimeError):
-    """Gemini API 키가 누락된 경우 발생합니다. / Raised when the Gemini API key is missing."""
+    """Gemini API 키가 누락된 경우 발생합니다.
+
+    Raised when the Gemini API key is missing.
+    """
 
 
 class GeminiApiError(RuntimeError):
@@ -51,7 +57,8 @@ class GeminiService:
         """
         if not self.is_configured:
             raise GeminiConfigurationError(
-                "GEMINI_API_KEY is not configured. Create .env from .env.example."
+                "GEMINI_API_KEY is not configured. "
+                "Create .env from .env.example."
             )
 
         try:
@@ -69,11 +76,15 @@ class GeminiService:
             )
             embeddings = embedding_response.embeddings
             if not embeddings:
-                raise RuntimeError("Gemini embedding model returned no embedding.")
+                raise RuntimeError(
+                    "Gemini embedding model returned no embedding."
+                )
             embedding_values = embeddings[0].values
             if not embedding_values:
                 raise RuntimeError("Gemini embedding values are empty.")
-        except Exception as error:  # External SDK boundary; re-raise a domain error.
+        except (
+            Exception
+        ) as error:  # External SDK boundary; re-raise a domain error.
             raise GeminiApiError("Gemini API call failed.") from error
 
         return {

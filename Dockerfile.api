@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # 의존성을 먼저 설치해 Docker 빌드 캐시를 활용합니다. / Install dependencies first to use Docker build cache.
-COPY requirements.txt ./
+COPY requirements.txt pyproject.toml ./
 RUN pip install -r requirements.txt
 
 # FastAPI 애플리케이션 복사 / Copy the FastAPI application
