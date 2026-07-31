@@ -1,0 +1,23 @@
+# Git 및 CI 설정 / Git and CI configuration
+.git
+.github
+
+# 환경 변수와 로컬 가상환경 / Environment variables and local virtual environments
+.env
+.env.*
+.venv
+venv
+env
+.conda
+
+# Python 캐시와 품질 도구 산출물 / Python caches and quality-tool artifacts
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# 로컬 실행 결과 및 참고 샘플 / Local runtime files and reference sample
+uploads
+outputs
+kosa-poc-main

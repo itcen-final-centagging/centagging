@@ -1,0 +1,22 @@
+# Python 3.10.20 기반 API 이미지 / Python 3.10.20 base image for the API
+# digest를 함께 고정해 같은 이미지를 사용합니다. / The digest pins the exact same image.
+FROM python:3.10.20-slim-bookworm@sha256:9643927a6fc74bd81b0f1bbb5cce3cb4a491f46b4c5dbee770f28e575f180015
+
+# Python 실행 환경 설정 / Python runtime settings
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# 의존성을 먼저 설치해 Docker 빌드 캐시를 활용합니다. / Install dependencies first to use Docker build cache.
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+# FastAPI 애플리케이션 복사 / Copy the FastAPI application
+COPY app ./app
+
+EXPOSE 8000
+
+# 컨테이너 외부에서 접근할 수 있도록 0.0.0.0으로 실행합니다. / Bind to 0.0.0.0 for container access.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

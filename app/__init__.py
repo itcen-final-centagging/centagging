@@ -1,0 +1,1 @@
+"""Centagging FastAPI application package."""

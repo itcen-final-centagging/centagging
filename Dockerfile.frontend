@@ -1,0 +1,22 @@
+# Python 3.10.20 기반 Streamlit 이미지 / Python 3.10.20 base image for Streamlit
+# digest를 함께 고정해 같은 이미지를 사용합니다. / The digest pins the exact same image.
+FROM python:3.10.20-slim-bookworm@sha256:9643927a6fc74bd81b0f1bbb5cce3cb4a491f46b4c5dbee770f28e575f180015
+
+# Python 실행 환경 설정 / Python runtime settings
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# API와 동일한 고정 의존성 사용 / Use the same pinned dependencies as the API
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+# Streamlit 애플리케이션 복사 / Copy the Streamlit application
+COPY frontend ./frontend
+
+EXPOSE 8501
+
+# 컨테이너 외부에서 접근할 수 있도록 0.0.0.0으로 실행합니다. / Bind to 0.0.0.0 for container access.
+CMD ["streamlit", "run", "frontend/app.py", "--server.address=0.0.0.0", "--server.port=8501"]

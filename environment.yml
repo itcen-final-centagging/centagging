@@ -1,0 +1,14 @@
+# Conda 환경 이름 / Conda environment name
+name: centagging
+
+# 패키지 채널 / Package channels
+channels:
+  - conda-forge
+
+# Python 3.10.20 및 프로젝트 의존성 / Python 3.10.20 and project dependencies
+dependencies:
+  - python=3.10.20
+  - pip
+  - pip:
+      # requirements.txt를 단일 의존성 목록으로 사용 / Use requirements.txt as the single dependency list
+      - -r requirements.txt
