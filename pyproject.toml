@@ -1,0 +1,27 @@
+[tool.black]
+line-length = 80
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 80
+known_first_party = ["app"]
+
+[tool.pylint.main]
+py-version = "3.10"
+
+[tool.pylint.format]
+max-line-length = 80
+
+[tool.mypy]
+python_version = "3.10"
+files = ["app"]
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pydocstyle]
+convention = "google"
+match-dir = "^(?!tests).*"

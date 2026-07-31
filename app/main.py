@@ -1,10 +1,16 @@
-from fastapi import FastAPI
+"""Centagging FastAPI 애플리케이션 진입점입니다. / FastAPI application entry point."""
 
-app = FastAPI(
+import fastapi
+
+from app.api import gemini
+
+app = fastapi.FastAPI(
     title="Centagging API",
     description="VLM 기반 가구 자동 태깅 및 SKU 매칭 API",
     version="0.1.0",
 )
+
+app.include_router(gemini.router)
 
 
 @app.get("/health", tags=["health"])

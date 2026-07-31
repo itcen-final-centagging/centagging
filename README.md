@@ -1,5 +1,27 @@
 # Centagging Backend
 
+## Gemini API 연동 확인
+
+이 프로젝트는 Mock 없이 실제 Gemini API를 사용합니다. 실행 전 `.env.example`을 `.env`로 복사한 뒤, 개인 API 키를 입력합니다. `.env`는 Git에 커밋하지 않습니다.
+
+```env
+GEMINI_API_KEY=your-gemini-api-key-here
+GEMINI_VLM_MODEL=gemini-3.5-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2
+```
+
+Docker Compose 실행 후 다음 API로 설정과 실제 호출을 확인합니다.
+
+```powershell
+# API 키 노출 없이 설정 여부와 모델명 확인
+Invoke-RestMethod http://localhost:8000/api/v1/gemini/status
+
+# Gemini VLM과 임베딩 모델을 실제로 한 번씩 호출
+Invoke-RestMethod -Method Post http://localhost:8000/api/v1/gemini/verify
+```
+
+`/verify`는 실제 API 호출 비용이 발생할 수 있으므로, 필요할 때만 실행합니다. 성공 시 임베딩 차원 `3072`를 반환합니다.
+
 VLM 기반 가구 자동 태깅 및 SKU 매칭 솔루션입니다.
 
 ## 현재 구성

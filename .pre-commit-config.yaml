@@ -1,0 +1,35 @@
+default_stages: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      - id: black-check
+        name: Black format check
+        entry: black --check app
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: isort-check
+        name: isort import check
+        entry: isort --check-only app
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: pylint-check
+        name: Pylint check
+        entry: pylint app
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: mypy-check
+        name: mypy type check
+        entry: mypy app
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: pydocstyle-check
+        name: pydocstyle check
+        entry: pydocstyle app
+        language: system
+        pass_filenames: false
+        always_run: true
