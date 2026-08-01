@@ -1,4 +1,4 @@
-# 환경 변수와 민감 정보 / Environment variables and secrets
+# Git이 추적하지 않을 파일을 지정합니다. / Excludes files from Git tracking.
 .env
 .env.*
 !.env.example

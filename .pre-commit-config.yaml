@@ -1,3 +1,4 @@
+# 커밋 전 Python 코드 품질 검사를 실행하는 pre-commit 설정입니다. / Runs Python quality checks before commits.
 default_stages: [pre-commit]
 
 repos:

@@ -1,4 +1,4 @@
-# 팀 공통 로컬 개발 환경 / Shared local development environment
+# API·프론트엔드·DB를 함께 실행하는 팀 공통 Docker Compose 설정입니다. / Shared Docker Compose configuration.
 services:
   # PostgreSQL + PGVector 데이터베이스 / PostgreSQL + PGVector database
   db:

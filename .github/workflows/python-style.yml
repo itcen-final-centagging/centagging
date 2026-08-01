@@ -1,3 +1,4 @@
+# main·dev 대상 PR과 푸시에서 Python 코드 품질을 검사하는 GitHub Actions 설정입니다. / Checks Python style on main and dev changes.
 name: Python Style
 
 on:

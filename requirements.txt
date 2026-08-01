@@ -1,4 +1,4 @@
-# Docker Python 3.10.20 환경에서 실제 설치·검증한 전체 의존성 목록입니다. / Full dependency list verified in the Docker Python 3.10.20 environment.
+# 프로젝트 실행과 코드 품질 검사에 필요한 고정 Python 의존성 목록입니다. / Pinned dependencies for runtime and quality checks.
 # 버전 변경은 Docker Compose 빌드와 실행 검증 후에만 수행합니다. / Change versions only after Docker Compose build and runtime verification.
 altair==6.2.2
 annotated-doc==0.0.5

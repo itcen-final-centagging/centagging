@@ -1,4 +1,4 @@
-# Git 및 CI 설정 / Git and CI configuration
+# Docker 이미지 빌드에 포함하지 않을 파일을 지정합니다. / Excludes files from the Docker build context.
 .git
 .github
 

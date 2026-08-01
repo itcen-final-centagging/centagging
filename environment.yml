@@ -1,4 +1,4 @@
-# Conda 환경 이름 / Conda environment name
+# 로컬 Python 도구 사용을 위한 Conda 환경 정의입니다. / Defines the Conda environment for local Python tools.
 name: centagging
 
 # 패키지 채널 / Package channels
