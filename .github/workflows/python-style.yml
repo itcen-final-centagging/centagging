@@ -1,11 +1,11 @@
-# main·dev 대상 PR과 푸시에서 Python 코드 품질을 검사하는 GitHub Actions 설정입니다. / Checks Python style on main and dev changes.
+# main·dev·deploy 대상 PR과 푸시에서 Python 코드 품질을 검사하는 GitHub Actions 설정입니다. / Checks Python style on main, dev, and deploy changes.
 name: Python Style
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [main, dev, deploy]
   push:
-    branches: [main, dev]
+    branches: [main, dev, deploy]
   workflow_dispatch:
 
 permissions:
