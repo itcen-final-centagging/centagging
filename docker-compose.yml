@@ -28,6 +28,8 @@ services:
       APP_ENV: ${APP_ENV:-local}
       API_HOST: 0.0.0.0
       API_PORT: 8000
+      LOGIN_ID: ${LOGIN_ID:-}
+      LOGIN_PASSWORD: ${LOGIN_PASSWORD:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
