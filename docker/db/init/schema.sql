@@ -157,9 +157,11 @@ CREATE TABLE sku_image (
 );
 
 CREATE INDEX idx_skuimg_sku ON sku_image(sku_id);
--- 색인이 끝난 행만 대상으로 하는 부분 HNSW 인덱스
+-- 원본 VECTOR(3072)는 유지하고 검색 인덱스만 halfvec으로 변환한다.
+-- pgvector의 halfvec HNSW 인덱스는 최대 4,000차원을 지원한다.
 CREATE INDEX idx_skuimg_hnsw ON sku_image
-    USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
+    USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops)
+    WHERE embedding IS NOT NULL;
 -- 미색인 이미지 조회용 (색인 배치가 사용)
 CREATE INDEX idx_skuimg_pending ON sku_image(sku_image_id) WHERE embedding IS NULL;
 
@@ -238,12 +240,13 @@ COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 
 --
 -- SELECT DISTINCT ON (si.sku_id)
 --        si.sku_id, si.sku_image_id, sc.sku_code, sc.product_name,
---        1 - (si.embedding <=> $1) AS similarity
+--        1 - (si.embedding::halfvec(3072) <=> $1::halfvec(3072)) AS similarity
 --   FROM sku_image si
 --   JOIN sku_catalog sc ON sc.sku_id = si.sku_id
 --  WHERE si.embedding IS NOT NULL
 --    AND sc.category = $2                    -- 소분류는 필터에 쓰지 않음
---  ORDER BY si.sku_id, si.embedding <=> $1
+--  ORDER BY si.sku_id,
+--           si.embedding::halfvec(3072) <=> $1::halfvec(3072)
 --  LIMIT 30;   -- 넉넉히 뽑아 SKU 단위 중복 제거 후 상위 5건 사용
 
 -- [2] 대표 이미지 조회 (image_type='MAIN' 중 최소 id)

@@ -5,21 +5,33 @@ import os
 
 
 @dataclasses.dataclass(frozen=True)
+class DatabaseSettings:
+    """PostgreSQL connection settings."""
+
+    name: str
+    username: str
+    password: str = dataclasses.field(repr=False)
+    host: str
+    port: int
+
+
+@dataclasses.dataclass(frozen=True)
 class Settings:
-    """실행 환경에서 읽는 설정값입니다. / Settings read from the runtime environment."""
+    """Application settings read from the runtime environment."""
 
     gemini_api_key: str
     gemini_vlm_model: str
     gemini_embedding_model: str
     mvp_login_id: str
     mvp_login_password: str = dataclasses.field(repr=False)
+    database: DatabaseSettings
 
 
 def get_settings() -> Settings:
-    """컨테이너 또는 로컬 환경변수에서 Gemini 설정을 읽습니다.
+    """컨테이너 또는 로컬 환경변수에서 애플리케이션 설정을 읽습니다.
 
     Returns:
-        Gemini API 키와 모델명이 담긴 Settings 객체입니다.
+        AI, 로그인, PostgreSQL 설정이 담긴 Settings 객체입니다.
     """
     return Settings(
         gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
@@ -29,4 +41,11 @@ def get_settings() -> Settings:
         ),
         mvp_login_id=os.getenv("LOGIN_ID", ""),
         mvp_login_password=os.getenv("LOGIN_PASSWORD", ""),
+        database=DatabaseSettings(
+            name=os.getenv("POSTGRES_DB", "centagging"),
+            username=os.getenv("POSTGRES_USER", "centagging"),
+            password=os.getenv("POSTGRES_PASSWORD", "change-me"),
+            host=os.getenv("POSTGRES_HOST", "localhost"),
+            port=int(os.getenv("POSTGRES_PORT", "5432")),
+        ),
     )
