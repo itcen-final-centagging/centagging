@@ -20,4 +20,13 @@ __pycache__
 # 로컬 실행 결과 및 참고 샘플 / Local runtime files and reference sample
 uploads
 outputs
-kosa-poc-main
+kosa-poc-main/*
+!kosa-poc-main/vlm-tagging/
+kosa-poc-main/vlm-tagging/*
+!kosa-poc-main/vlm-tagging/images/
+!kosa-poc-main/vlm-tagging/images/**
+
+# React 프론트엔드의 로컬 의존성과 빌드 산출물 / React local artifacts
+frontend/node_modules
+frontend/dist
+frontend/.eslintcache
