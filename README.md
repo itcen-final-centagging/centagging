@@ -1,6 +1,7 @@
 # Centagging
 
 AI 기반 인테리어 연출 이미지 가구 자동 태깅 솔루션
+## 0. 기술 스택
 
 - 백엔드: FastAPI
 - 프론트엔드: Streamlit
@@ -198,14 +199,47 @@ docker compose up -d --force-recreate
 ## 9. 주요 파일
 
 ```text
-app/                    FastAPI 애플리케이션
-frontend/               Streamlit 애플리케이션
-docker/                 DB 초기화 스크립트
-docker-compose.yml       팀 공통 Docker 실행 구성
-Dockerfile.api           FastAPI 이미지 구성
-Dockerfile.frontend      Streamlit 이미지 구성
-.env.example             개인 환경 변수 예시
-environment.yml          Conda 환경 구성
-requirements.txt         고정된 Python 의존성 목록
-kosa-poc-main/           수정하지 않는 참고 샘플
+centagging-backend/
+├─ .github/
+│  ├─ workflows/
+│  │  └─ python-style.yml       # Python 스타일 검사 GitHub Actions(dev,main 브랜치에 PR하면, CI 동작)
+│  └─ pull_request_template.md  # PR 작성 템플릿
+│
+├─ app/                         # FastAPI 백엔드
+│  ├─ api/
+│  │  └─ gemini.py              # Gemini 연결·검증 API
+│  ├─ core/
+│  │  └─ config.py              # 환경 변수·설정 관리
+│  ├─ services/
+│  │  └─ gemini_service.py      # Gemini API 호출 로직
+│  └─ main.py                   # FastAPI 애플리케이션 시작점
+│
+├─ frontend/                    # Streamlit 프론트엔드
+│  └─ app.py                    # Streamlit 시작점
+│
+├─ docker/
+│  └─ db/
+│     └─ init/
+│        └─ 01-enable-vector.sql # PostgreSQL pgvector 확장 활성화
+│
+├─ docs/
+│  └─ CODING_CONVENTION.md      # Google Python Style 기반 협업 규칙
+│
+├─ kosa-poc-main/               # 받은 샘플 코드 - 참고용, 수정 금지
+│  ├─ embedding/
+│  ├─ image-generation/
+│  └─ vlm-tagging/
+│
+├─ .env                         # 개인 로컬 비밀값 - Git 제외
+├─ .env.example                 # 팀 공유용 환경 변수 템플릿
+├─ .gitignore                   # 비밀값·캐시·가상환경 제외 규칙
+├─ .pre-commit-config.yaml      # 로컬 커밋 전 코드 검사 설정
+├─ .dockerignore                # Docker 빌드 제외 규칙
+├─ docker-compose.yml           # API·Frontend·DB 통합 실행
+├─ Dockerfile.api               # FastAPI 컨테이너 이미지 정의
+├─ Dockerfile.frontend          # Streamlit 컨테이너 이미지 정의
+├─ requirements.txt             # Python 패키지 정확 버전 고정
+├─ environment.yml              # Conda 환경 정의
+├─ pyproject.toml               # Black 등 Python 도구 설정
+└─ README.md                    # 팀 공통 설치·실행 가이드
 ```
