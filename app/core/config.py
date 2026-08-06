@@ -11,6 +11,8 @@ class Settings:
     gemini_api_key: str
     gemini_vlm_model: str
     gemini_embedding_model: str
+    mvp_login_id: str
+    mvp_login_password: str = dataclasses.field(repr=False)
 
 
 def get_settings() -> Settings:
@@ -25,4 +27,6 @@ def get_settings() -> Settings:
         gemini_embedding_model=os.getenv(
             "GEMINI_EMBEDDING_MODEL", "gemini-embedding-2"
         ),
+        mvp_login_id=os.getenv("LOGIN_ID", ""),
+        mvp_login_password=os.getenv("LOGIN_PASSWORD", ""),
     )
