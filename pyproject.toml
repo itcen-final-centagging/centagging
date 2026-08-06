@@ -6,7 +6,7 @@ target-version = ["py310"]
 [tool.isort]
 profile = "black"
 line_length = 80
-known_first_party = ["app"]
+known_first_party = ["app", "crawl"]
 
 [tool.pylint.main]
 py-version = "3.10"
@@ -16,7 +16,7 @@ max-line-length = 80
 
 [tool.mypy]
 python_version = "3.10"
-files = ["app"]
+files = ["app", "crawl"]
 check_untyped_defs = true
 disallow_untyped_defs = true
 no_implicit_optional = true

@@ -34,16 +34,16 @@ jobs:
         run: python -m pip check
 
       - name: Check code formatting
-        run: black --check app
+        run: black --check app crawl
 
       - name: Check import order
-        run: isort --check-only app
+        run: isort --check-only app crawl
 
       - name: Run Pylint
-        run: pylint app
+        run: pylint app crawl
 
       - name: Run mypy
-        run: mypy app
+        run: mypy app crawl
 
       - name: Check Google-style docstrings
-        run: pydocstyle app
+        run: pydocstyle app crawl

@@ -6,31 +6,31 @@ repos:
     hooks:
       - id: black-check
         name: Black format check
-        entry: black --check app
+        entry: black --check app crawl
         language: system
         pass_filenames: false
         always_run: true
       - id: isort-check
         name: isort import check
-        entry: isort --check-only app
+        entry: isort --check-only app crawl
         language: system
         pass_filenames: false
         always_run: true
       - id: pylint-check
         name: Pylint check
-        entry: pylint app
+        entry: pylint app crawl
         language: system
         pass_filenames: false
         always_run: true
       - id: mypy-check
         name: mypy type check
-        entry: mypy app
+        entry: mypy app crawl
         language: system
         pass_filenames: false
         always_run: true
       - id: pydocstyle-check
         name: pydocstyle check
-        entry: pydocstyle app
+        entry: pydocstyle app crawl
         language: system
         pass_filenames: false
         always_run: true
