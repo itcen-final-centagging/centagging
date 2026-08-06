@@ -15,6 +15,8 @@ RUN pip install -r requirements.txt
 
 # FastAPI 애플리케이션 복사 / Copy the FastAPI application
 COPY app ./app
+# Reuse the existing PoC SKU reference images for first-time catalog indexing.
+COPY kosa-poc-main/vlm-tagging/images ./reference_assets
 
 EXPOSE 8000
 

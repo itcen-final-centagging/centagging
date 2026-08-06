@@ -11,6 +11,9 @@ class Settings:
     gemini_api_key: str
     gemini_vlm_model: str
     gemini_embedding_model: str
+    gemini_embedding_dimensions: int
+    database_url: str
+    catalog_top_k: int
 
 
 def get_settings() -> Settings:
@@ -25,4 +28,18 @@ def get_settings() -> Settings:
         gemini_embedding_model=os.getenv(
             "GEMINI_EMBEDDING_MODEL", "gemini-embedding-2"
         ),
+        gemini_embedding_dimensions=int(
+            os.getenv("GEMINI_EMBEDDING_DIMENSIONS", "768")
+        ),
+        database_url=os.getenv(
+            "DATABASE_URL",
+            "postgresql://{user}:{password}@{host}:{port}/{database}".format(
+                user=os.getenv("POSTGRES_USER", "centagging"),
+                password=os.getenv("POSTGRES_PASSWORD", "1234"),
+                host=os.getenv("POSTGRES_HOST", "localhost"),
+                port=os.getenv("POSTGRES_PORT", "5432"),
+                database=os.getenv("POSTGRES_DB", "centagging"),
+            ),
+        ),
+        catalog_top_k=int(os.getenv("CATALOG_TOP_K", "5")),
     )

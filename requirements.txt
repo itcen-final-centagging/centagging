@@ -58,6 +58,7 @@ pyasn1_modules==0.4.2
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
+psycopg[binary]==3.2.10
 pydeck==0.9.3
 pydocstyle==6.3.0
 pylint==4.0.6

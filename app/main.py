@@ -2,7 +2,7 @@
 
 import fastapi
 
-from app.api import gemini
+from app.api import gemini, tagging
 
 app = fastapi.FastAPI(
     title="Centagging API",
@@ -11,6 +11,7 @@ app = fastapi.FastAPI(
 )
 
 app.include_router(gemini.router)
+app.include_router(tagging.router)
 
 
 @app.get("/health", tags=["health"])
