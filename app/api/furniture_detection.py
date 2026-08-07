@@ -6,11 +6,6 @@ from PIL import Image
 import fastapi
 import pydantic
 
-
-class FurnitureDetectionRequest(pydantic.BaseModel):
-    """가구 감지 API 요청 모델입니다."""
-    image_url: str
-
 router = fastapi.APIRouter(prefix="/api/v1/scene-images", tags=["furniture-detection"])
 
 @router.post("/api/centagging/images/{scene_image_id}/detect", response_model=GeminiDetectionResult)
