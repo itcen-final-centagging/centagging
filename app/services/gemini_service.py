@@ -3,9 +3,12 @@
 Service for live Gemini Developer API calls.
 """
 
+import json
 import typing
 
 from google import genai
+from google.genai import types
+from PIL import Image
 
 from app.core import config
 
@@ -92,3 +95,74 @@ class GeminiService:
             "embedding_model": self._settings.gemini_embedding_model,
             "embedding_dimensions": len(embedding_values),
         }
+
+    def generate_vlm_json(
+        self,
+        images: list[Image.Image],
+        prompt: str,
+    ) -> dict:
+        """여러 이미지를 함께 분석하고 JSON 응답을 반환합니다.
+
+        정답 SKU 메타데이터 추출처럼
+        여러 장의 상품 이미지를 Gemini VLM에 전달하고
+        구조화된 JSON 응답을 받아야 할 때 사용합니다.
+
+        Args:
+            images:
+                Gemini에 전달할 PIL 이미지 목록입니다.
+
+            prompt:
+                이미지와 함께 전달할 VLM 프롬프트입니다.
+
+        Returns:
+            Gemini가 반환한 JSON을 Python dict로 변환한 결과입니다.
+
+        Raises:
+            GeminiConfigurationError:
+                Gemini API 키가 설정되지 않은 경우입니다.
+
+            GeminiApiError:
+                Gemini API 호출 또는 JSON 응답 파싱에 실패한 경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "GEMINI_API_KEY is not configured. "
+                "Create .env from .env.example."
+            )
+
+        if not images:
+            raise ValueError("At least one image is required.")
+
+        if not prompt.strip():
+            raise ValueError("Prompt must not be empty.")
+
+        try:
+            client = genai.Client(api_key=self._settings.gemini_api_key)
+
+            # 이미지들을 먼저 전달하고 마지막에 prompt를 전달합니다.
+            contents = [
+                *images,
+                prompt,
+            ]
+
+            response = client.models.generate_content(
+                model=self._settings.gemini_vlm_model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                ),
+            )
+
+            if not response.text:
+                raise RuntimeError("Gemini VLM returned an empty response.")
+
+            return json.loads(response.text)
+
+        except json.JSONDecodeError as error:
+            raise GeminiApiError("Gemini VLM returned invalid JSON.") from error
+
+        except Exception as error:
+            # External SDK boundary; re-raise a domain error.
+            raise GeminiApiError(
+                "Gemini VLM JSON generation failed."
+            ) from error
