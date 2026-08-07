@@ -19,7 +19,11 @@ async def initialize_user() -> int:
     """환경변수의 고정 계정을 app_user에 생성하거나 갱신합니다."""
     settings = config.get_settings()
     if not settings.mvp_login_id or not settings.mvp_login_password:
-        raise RuntimeError("LOGIN_ID와 LOGIN_PASSWORD를 설정해야 합니다.")
+        raise RuntimeError(
+            "MVP_LOGIN_ID와 MVP_LOGIN_PASSWORD를 설정해야 합니다."
+        )
+    if len(settings.session_secret) < 32:
+        raise RuntimeError("SESSION_SECRET은 32자 이상이어야 합니다.")
     async with database.database_session_factory.begin() as session:
         user_id = typing.cast(
             int | None,
