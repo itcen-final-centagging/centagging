@@ -19,6 +19,7 @@ async def lifespan(_: fastapi.FastAPI) -> collections.abc.AsyncIterator[None]:
     finally:
         await database.database_engine.dispose()
 
+
 app = fastapi.FastAPI(
     title="Centagging API",
     description="VLM 기반 가구 자동 태깅 및 SKU 매칭 API",

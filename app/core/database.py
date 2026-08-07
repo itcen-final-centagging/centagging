@@ -1,6 +1,7 @@
 """비동기 PostgreSQL 엔진과 세션을 관리합니다."""
 
 import collections.abc
+
 from sqlalchemy.engine import url as sqlalchemy_url
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
@@ -62,4 +63,3 @@ async def get_database_session() -> (
     """
     async with database_session_factory() as session:
         yield session
-

@@ -6,15 +6,13 @@ import sqlalchemy
 
 from app.core import config, database
 
-_UPSERT_USER = sqlalchemy.text(
-    """
+_UPSERT_USER = sqlalchemy.text("""
     INSERT INTO app_user (login_id, user_name, password_hash, is_active)
     VALUES (:login_id, :user_name, NULL, TRUE)
     ON CONFLICT (login_id)
     DO UPDATE SET user_name = EXCLUDED.user_name, is_active = TRUE
     RETURNING user_id
-    """
-)
+    """)
 
 
 async def initialize_user() -> int:

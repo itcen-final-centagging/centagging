@@ -18,7 +18,9 @@ def create_session_token(user_id: int) -> str:
     secret = config.get_settings().session_secret
     if len(secret) < 32:
         raise RuntimeError("SESSION_SECRET은 32자 이상이어야 합니다.")
-    serializer = itsdangerous.URLSafeTimedSerializer(secret, salt="centagging-mvp")
+    serializer = itsdangerous.URLSafeTimedSerializer(
+        secret, salt="centagging-mvp"
+    )
     return serializer.dumps({"user_id": user_id})
 
 
@@ -27,7 +29,9 @@ def get_user_id_from_session(token: str) -> int | None:
     secret = config.get_settings().session_secret
     if len(secret) < 32:
         return None
-    serializer = itsdangerous.URLSafeTimedSerializer(secret, salt="centagging-mvp")
+    serializer = itsdangerous.URLSafeTimedSerializer(
+        secret, salt="centagging-mvp"
+    )
     try:
         data = serializer.loads(token, max_age=MAX_AGE_SECONDS)
     except itsdangerous.BadSignature:
@@ -42,26 +46,32 @@ async def get_current_user(
     database_session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
-    session_cookie: str | None = fastapi.Cookie(default=None, alias=COOKIE_NAME),
+    session_cookie: str | None = fastapi.Cookie(
+        default=None, alias=COOKIE_NAME
+    ),
 ) -> auth_schema.UserResponse:
     """세션 쿠키와 DB를 확인해 현재 사용자를 반환합니다."""
-    user_id = get_user_id_from_session(session_cookie) if session_cookie else None
+    user_id = (
+        get_user_id_from_session(session_cookie) if session_cookie else None
+    )
     if user_id is None:
-        raise fastapi.HTTPException(status_code=401, detail="로그인이 필요합니다.")
+        raise fastapi.HTTPException(
+            status_code=401, detail="로그인이 필요합니다."
+        )
 
     result = await database_session.execute(
-        sqlalchemy.text(
-            """
+        sqlalchemy.text("""
             SELECT user_id, login_id, user_name, is_active
             FROM app_user
             WHERE user_id = :user_id
-            """
-        ),
+            """),
         {"user_id": user_id},
     )
     user = result.mappings().one_or_none()
     if user is None or not user["is_active"]:
-        raise fastapi.HTTPException(status_code=401, detail="로그인이 필요합니다.")
+        raise fastapi.HTTPException(
+            status_code=401, detail="로그인이 필요합니다."
+        )
     return auth_schema.UserResponse(
         user_id=int(user["user_id"]),
         login_id=str(user["login_id"]),
@@ -87,18 +97,18 @@ async def login(
             status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다."
         )
     result = await database_session.execute(
-        sqlalchemy.text(
-            """
+        sqlalchemy.text("""
             SELECT user_id, login_id, user_name, is_active
             FROM app_user
             WHERE login_id = :login_id
-            """
-        ),
+            """),
         {"login_id": request.login_id},
     )
     user = result.mappings().one_or_none()
     if user is None or not user["is_active"]:
-        raise fastapi.HTTPException(status_code=401, detail="로그인이 필요합니다.")
+        raise fastapi.HTTPException(
+            status_code=401, detail="로그인이 필요합니다."
+        )
     response.set_cookie(
         key=COOKIE_NAME,
         value=create_session_token(user["user_id"]),
