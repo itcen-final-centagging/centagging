@@ -25,7 +25,6 @@ class Settings:
     mvp_login_id: str
     database: DatabaseSettings
     mvp_login_password: str = dataclasses.field(repr=False)
-    session_secret: str = dataclasses.field(repr=False, default="")
 
 
 def get_settings() -> Settings:
@@ -42,7 +41,6 @@ def get_settings() -> Settings:
         ),
         mvp_login_id=os.getenv("MVP_LOGIN_ID", ""),
         mvp_login_password=os.getenv("MVP_LOGIN_PASSWORD", ""),
-        session_secret=os.getenv("SESSION_SECRET", ""),
         database=DatabaseSettings(
             name=os.getenv("POSTGRES_DB", "centagging"),
             username=os.getenv("POSTGRES_USER", "centagging"),

@@ -45,21 +45,19 @@ cd centagging-backend
 Copy-Item .env.example .env
 ```
 
-`.env`에서 MVP 로그인 계정, 세션 비밀값, Gemini API 키를 입력합니다.
+`.env`에서 MVP 로그인 계정과 Gemini API 키를 입력합니다.
 
 ```env
 MVP_LOGIN_ID=your-mvp-login-id
 MVP_LOGIN_PASSWORD=your-mvp-login-password
-SESSION_SECRET=replace-with-at-least-32-random-characters
-
 GEMINI_API_KEY=your-gemini-api-key-here
 GEMINI_VLM_MODEL=gemini-3.5-flash
 GEMINI_EMBEDDING_MODEL=gemini-embedding-2
 ```
 
-`MVP_LOGIN_ID`와 `MVP_LOGIN_PASSWORD`는 PoC에서만 사용하는 고정 로그인 계정입니다. `SESSION_SECRET`에는 세션 쿠키의 서명에 사용할 32자 이상의 임의 문자열을 입력합니다. `.env.example`의 예시값을 실제 환경에서 그대로 사용하지 마세요.
+`MVP_LOGIN_ID`와 `MVP_LOGIN_PASSWORD`는 PoC에서만 사용하는 고정 로그인 계정입니다. `.env.example`의 예시값을 실제 환경에서 그대로 사용하지 마세요.
 
-`.env`는 개인별 설정 파일이며 Git에서 제외됩니다. 실제 로그인 비밀번호, 세션 비밀값, API 키를 `.env.example`, 소스 코드, 커밋, 메신저에 넣으면 안 됩니다.
+`.env`는 개인별 설정 파일이며 Git에서 제외됩니다. 실제 로그인 비밀번호와 API 키를 `.env.example`, 소스 코드, 커밋, 메신저에 넣으면 안 됩니다.
 
 > **주의:** Windows 시스템 환경 변수 또는 터미널 환경 변수에 `GEMINI_API_KEY`가 있으면 Docker Compose가 `.env`보다 그 값을 우선할 수 있습니다. 프로젝트에서는 시스템 변수 대신 `.env`만 사용하세요.
 
@@ -92,13 +90,7 @@ docker compose up -d
 
 ## 5. MVP 로그인 API 확인
 
-FastAPI Docs(http://localhost:8000/docs)에서 아래 순서로 실행하거나 PowerShell 명령으로 확인합니다.
-
-1. `POST /api/centagging/auth/login`
-2. `GET /api/centagging/auth/me`
-3. `POST /api/centagging/auth/logout`
-
-`.env`에 설정한 계정값으로 로그인합니다.
+FastAPI Docs(http://localhost:8000/docs) 또는 PowerShell에서 `.env`에 설정한 계정값으로 `POST /api/centagging/auth/login`을 한 번 호출합니다.
 
 ```powershell
 $loginBody = @{
@@ -109,27 +101,10 @@ $loginBody = @{
 Invoke-RestMethod -Method Post `
   -Uri http://localhost:8000/api/centagging/auth/login `
   -ContentType "application/json" `
-  -Body $loginBody `
-  -SessionVariable centaggingSession
+  -Body $loginBody
 ```
 
-발급된 세션 쿠키로 현재 로그인 사용자를 확인합니다.
-
-```powershell
-Invoke-RestMethod `
-  -Uri http://localhost:8000/api/centagging/auth/me `
-  -WebSession $centaggingSession
-```
-
-로그아웃하여 세션 쿠키를 삭제합니다.
-
-```powershell
-Invoke-RestMethod -Method Post `
-  -Uri http://localhost:8000/api/centagging/auth/logout `
-  -WebSession $centaggingSession
-```
-
-로그아웃 후 동일한 세션으로 `/api/centagging/auth/me`를 호출하면 `401 Unauthorized`가 반환되어야 합니다.
+성공하면 사용자 정보가 반환되며 쿠키나 토큰은 발급되지 않습니다. 프론트엔드는 성공 응답을 받은 뒤 다음 페이지로 이동합니다. 백엔드는 이후 요청의 로그인 상태를 확인하지 않으므로 보호 API 인증 방식은 별도로 결정해야 합니다.
 
 > **주의:** MVP 로그인 계정은 프로토타입 검증용입니다. 운영 환경에서는 고정 계정 대신 SSO·IAM 등의 인증 체계로 교체해야 합니다.
 

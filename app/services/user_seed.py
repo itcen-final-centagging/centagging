@@ -22,8 +22,6 @@ async def initialize_user() -> int:
         raise RuntimeError(
             "MVP_LOGIN_ID와 MVP_LOGIN_PASSWORD를 설정해야 합니다."
         )
-    if len(settings.session_secret) < 32:
-        raise RuntimeError("SESSION_SECRET은 32자 이상이어야 합니다.")
     async with database.database_session_factory.begin() as session:
         user_id = typing.cast(
             int | None,
