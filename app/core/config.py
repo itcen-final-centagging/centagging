@@ -40,8 +40,8 @@ def get_settings() -> Settings:
         gemini_embedding_model=os.getenv(
             "GEMINI_EMBEDDING_MODEL", "gemini-embedding-2"
         ),
-        mvp_login_id=os.getenv("LOGIN_ID") or os.getenv("MVP_LOGIN_ID", ""),
-        mvp_login_password=os.getenv("LOGIN_PASSWORD") or os.getenv("MVP_LOGIN_PASSWORD", ""),
+        mvp_login_id=os.getenv("MVP_LOGIN_ID", ""),
+        mvp_login_password=os.getenv("MVP_LOGIN_PASSWORD", ""),
         session_secret=os.getenv("SESSION_SECRET", ""),
         database=DatabaseSettings(
             name=os.getenv("POSTGRES_DB", "centagging"),

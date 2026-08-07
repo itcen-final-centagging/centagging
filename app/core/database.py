@@ -1,9 +1,6 @@
 """비동기 PostgreSQL 엔진과 세션을 관리합니다."""
 
 import collections.abc
-import typing
-
-import sqlalchemy
 from sqlalchemy.engine import url as sqlalchemy_url
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
@@ -66,16 +63,3 @@ async def get_database_session() -> (
     async with database_session_factory() as session:
         yield session
 
-
-async def check_database_connection() -> bool:
-    """PostgreSQL에서 최소 확인 쿼리를 실행할 수 있는지 검사합니다.
-
-    Returns:
-        PostgreSQL이 예상한 값을 반환하면 True입니다.
-    """
-    async with database_engine.connect() as connection:
-        result = typing.cast(
-            int | None,
-            await connection.scalar(sqlalchemy.text("SELECT 1")),
-        )
-    return result == 1
