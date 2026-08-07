@@ -3,23 +3,68 @@
 Service for live Gemini Developer API calls.
 """
 
+import logging
 import typing
+import time
+from google.genai import errors, types
 
 from google import genai
+from PIL import Image
+
+from pydantic import ValidationError
 
 from app.core import config
+from app.schemas.gemini_detection import GeminiDetectionResult, GeminiRawDetection
 
 
+Furniture_detection_prompt = (
+    """
+    Analyze the image and locate all visible furniture objects.
+    Return only JSON in the following format:
+    {
+        "detections": [
+            {
+                "label": "sofa",
+                "box_2d": [ymin, xmin, ymax, xmax]
+            },
+            {
+                "label": "chair",
+                "box_2d": [ymin, xmin, ymax, xmax]
+            }
+            ...
+        ]
+    }
+
+    Rules:
+    - box_2d must use [ymin, xmin, ymax, xmax].
+    - Every coordinate must be normalized to the range zero to one thousand.
+    - Include all visible furniture, not only office furniture.
+    - If no furniture is found, return {"detections":[]}.
+    """
+)
+
+# 오류 클래스들 모음
 class GeminiConfigurationError(RuntimeError):
     """Gemini API 키가 누락된 경우 발생합니다.
-
     Raised when the Gemini API key is missing.
     """
+    code = "DETECTION_NOT_CONFIGURED"
 
 
 class GeminiApiError(RuntimeError):
     """Gemini API 호출이 실패한 경우 발생합니다. / Raised when a Gemini API call fails."""
 
+
+class GeminiAuthenticationError(GeminiApiError):
+    code = "DETECTION_AUTH_FAILED"
+
+
+class GeminiInferenceError(GeminiApiError):
+    code = "DETECTION_INFERENCE_FAILED"
+
+
+class GeminiResponseInvalidError(GeminiApiError):
+    code = "DETECTION_RESPONSE_INVALID"
 
 class GeminiVerificationResult(typing.TypedDict):
     """Gemini 실제 호출 검증 결과입니다. / Result of a live Gemini verification call."""
@@ -92,3 +137,78 @@ class GeminiService:
             "embedding_model": self._settings.gemini_embedding_model,
             "embedding_dimensions": len(embedding_values),
         }
+
+    def detect_furniture(self, image: Image.Image) -> list[GeminiRawDetection]:
+        """이미지에서 가구를 감지합니다. / Detect furniture in an image.
+
+        Args:
+            image: PIL 이미지 객체입니다.
+
+        Returns:
+            GeminiRawDetection 객체 리스트입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "GEMINI_API_KEY is not configured."
+            )
+
+        started_at = time.perf_counter()
+        object_count = 0
+
+        try:
+            client = genai.Client(
+                api_key=self._settings.gemini_api_key
+            )
+
+            response = client.models.generate_content(
+                model=self._settings.gemini_vlm_model,
+                contents=[image,Furniture_detection_prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=GeminiDetectionResult,
+            ),
+        )
+            if not response.text:
+                raise GeminiResponseInvalidError("Gemini VLM returned an empty response.")
+
+            result = GeminiDetectionResult.model_validate_json(response.text)
+
+            object_count = len(result.detections)
+            return result.detections
+        
+        except GeminiResponseInvalidError:
+            raise
+
+        except ValidationError as error:
+            raise GeminiResponseInvalidError(
+                "Gemini detection response is invalid."
+            ) from error
+
+        except errors.ClientError as error:
+            if getattr(error, "code", None) in (401, 403):
+                raise GeminiAuthenticationError(
+                    "Gemini authentication failed."
+                ) from error
+
+            raise GeminiInferenceError(
+                "Gemini detection request failed."
+            ) from error
+
+        except Exception as error:
+            raise GeminiInferenceError(
+                "Gemini detection request failed."
+            ) from error
+
+        finally:
+            processing_time_ms = round(
+                (time.perf_counter() - started_at) * 1000
+            )
+
+            logging.getLogger(__name__).info(
+                "Gemini furniture detection finished: "
+                "model=%s, processing_time_ms=%d, object_count=%d",
+
+                self._settings.gemini_vlm_model,
+                processing_time_ms,
+                object_count, 
+            )
