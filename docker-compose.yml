@@ -28,8 +28,6 @@ services:
       APP_ENV: ${APP_ENV:-local}
       API_HOST: 0.0.0.0
       API_PORT: 8000
-      LOGIN_ID: ${LOGIN_ID:-}
-      LOGIN_PASSWORD: ${LOGIN_PASSWORD:-}
       MVP_LOGIN_ID: ${MVP_LOGIN_ID:-}
       MVP_LOGIN_PASSWORD: ${MVP_LOGIN_PASSWORD:-}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
