@@ -23,8 +23,9 @@ class Settings:
     gemini_vlm_model: str
     gemini_embedding_model: str
     mvp_login_id: str
-    mvp_login_password: str = dataclasses.field(repr=False)
     database: DatabaseSettings
+    mvp_login_password: str = dataclasses.field(repr=False)
+    session_secret: str = dataclasses.field(repr=False, default="")
 
 
 def get_settings() -> Settings:
@@ -39,8 +40,9 @@ def get_settings() -> Settings:
         gemini_embedding_model=os.getenv(
             "GEMINI_EMBEDDING_MODEL", "gemini-embedding-2"
         ),
-        mvp_login_id=os.getenv("LOGIN_ID", ""),
-        mvp_login_password=os.getenv("LOGIN_PASSWORD", ""),
+        mvp_login_id=os.getenv("MVP_LOGIN_ID", ""),
+        mvp_login_password=os.getenv("MVP_LOGIN_PASSWORD", ""),
+        session_secret=os.getenv("SESSION_SECRET", ""),
         database=DatabaseSettings(
             name=os.getenv("POSTGRES_DB", "centagging"),
             username=os.getenv("POSTGRES_USER", "centagging"),
