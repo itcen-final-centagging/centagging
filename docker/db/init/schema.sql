@@ -52,9 +52,17 @@ CREATE TABLE scene_image (
     origin_name    VARCHAR(255) NOT NULL,
     mime_type      VARCHAR(20)  NOT NULL,
     file_size      INT          NOT NULL,
+    width_px       INT          NOT NULL,
+    height_px      INT          NOT NULL,
+    analysis_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    analysis_error TEXT,
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_scene_mime CHECK (mime_type IN ('image/jpeg','image/png')),
-    CONSTRAINT ck_scene_size CHECK (file_size > 0 AND file_size <= 10485760)
+    CONSTRAINT ck_scene_size CHECK (file_size > 0 AND file_size <= 10485760),
+    CONSTRAINT ck_scene_dimensions CHECK (width_px > 0 AND height_px > 0),
+    CONSTRAINT ck_scene_analysis_status CHECK (
+        analysis_status IN ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED')
+    )
 );
 
 CREATE INDEX idx_scene_user_created ON scene_image(user_id, created_at DESC);
@@ -64,6 +72,10 @@ COMMENT ON COLUMN scene_image.image_url   IS '원본 이미지 경로/URL';
 COMMENT ON COLUMN scene_image.origin_name IS '사용자가 올린 원래 파일명';
 COMMENT ON COLUMN scene_image.mime_type   IS 'image/jpeg | image/png';
 COMMENT ON COLUMN scene_image.file_size   IS 'byte, 10MB 이하';
+COMMENT ON COLUMN scene_image.width_px     IS '원본 이미지 너비(pixel)';
+COMMENT ON COLUMN scene_image.height_px    IS '원본 이미지 높이(pixel)';
+COMMENT ON COLUMN scene_image.analysis_status IS '이미지 분석 상태';
+COMMENT ON COLUMN scene_image.analysis_error  IS '이미지 분석 실패 사유';
 
 -- ------------------------------------------------------------
 -- 3. detected_object : 탐지된 가구 객체 (크롭 패치 단위)

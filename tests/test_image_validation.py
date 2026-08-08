@@ -1,7 +1,10 @@
 """이미지 업로드 유효성 검증 서비스 테스트입니다."""
 
 import io
+import pathlib
+import tempfile
 import unittest
+import unittest.mock
 
 import fastapi
 import PIL.Image
@@ -9,6 +12,7 @@ import starlette.datastructures
 import starlette.testclient
 
 from app.api import scene_images
+from app.core import config, database
 from app.services import image_validation
 
 
@@ -112,20 +116,111 @@ class ValidateImageTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.status_code, 413)
 
 
+class _FakeResult:
+    """업로드 API 테스트용 INSERT 결과입니다."""
+
+    def __init__(
+        self,
+        scene_image_id: int = 42,
+        user_id: int | None = 7,
+    ) -> None:
+        self.scene_image_id = scene_image_id
+        self.user_id = user_id
+
+    def scalar_one(self) -> int:
+        """저장된 이미지 ID를 반환합니다."""
+        return self.scene_image_id
+
+    def scalar_one_or_none(self) -> int | None:
+        """로그인 ID로 조회한 사용자 ID를 반환합니다."""
+        return self.user_id
+
+
+class _FakeSession:
+    """업로드 API 테스트용 비동기 DB 세션입니다."""
+
+    def __init__(
+        self,
+        execute_error: Exception | None = None,
+        commit_error: Exception | None = None,
+        user_id: int | None = 7,
+    ) -> None:
+        self.execute_error = execute_error
+        self.commit_error = commit_error
+        self.user_id = user_id
+        self.execute_parameters: dict[str, object] | None = None
+        self.user_lookup_parameters: dict[str, object] | None = None
+        self.rollback_called = False
+
+    async def execute(
+        self, _statement: object, parameters: dict[str, object]
+    ) -> _FakeResult:
+        """사용자를 조회하거나 INSERT를 기록하고 설정된 오류를 발생시킵니다."""
+        if "SELECT user_id" in str(_statement):
+            self.user_lookup_parameters = parameters
+            return _FakeResult(user_id=self.user_id)
+        self.execute_parameters = parameters
+        if self.execute_error is not None:
+            raise self.execute_error
+        return _FakeResult()
+
+    async def commit(self) -> None:
+        """commit을 수행하거나 설정된 커밋 오류를 발생시킵니다."""
+        if self.commit_error is not None:
+            raise self.commit_error
+
+    async def rollback(self) -> None:
+        """rollback 호출 여부를 기록합니다."""
+        self.rollback_called = True
+
+
 class UploadSceneImageApiTest(unittest.TestCase):
     """multipart 이미지 업로드 API 계약을 검증합니다."""
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        """DB 생명주기 없이 업로드 라우터만 포함한 앱을 생성합니다."""
-        app = fastapi.FastAPI()
-        app.include_router(scene_images.router)
-        cls.client = starlette.testclient.TestClient(app)
+    def setUp(self) -> None:
+        """격리된 저장소와 테스트용 DB 세션을 준비합니다."""
+        self.storage_directory = tempfile.TemporaryDirectory()
+        self.session = _FakeSession()
+        self.app = fastapi.FastAPI()
+        self.app.include_router(scene_images.router)
 
-    def test_returns_metadata_for_valid_multipart_upload(self) -> None:
-        """유효한 multipart 업로드에 검증 결과를 반환합니다."""
-        response = self.client.post(
+        async def override_database_session():
+            yield self.session
+
+        self.app.dependency_overrides[database.get_database_session] = (
+            override_database_session
+        )
+        settings = config.Settings(
+            gemini_api_key="",
+            gemini_vlm_model="",
+            gemini_embedding_model="",
+            mvp_login_id="",
+            mvp_login_password="",
+            image_storage_root=self.storage_directory.name,
+            database=config.DatabaseSettings(
+                name="",
+                username="",
+                password="",
+                host="",
+                port=5432,
+            ),
+        )
+        self.settings_patch = unittest.mock.patch.object(
+            config, "get_settings", return_value=settings
+        )
+        self.settings_patch.start()
+        self.client = starlette.testclient.TestClient(self.app)
+
+    def tearDown(self) -> None:
+        """테스트용 저장소와 설정 패치를 정리합니다."""
+        self.settings_patch.stop()
+        self.storage_directory.cleanup()
+
+    def _post_valid_image(self) -> object:
+        """로그인 ID와 유효한 이미지를 함께 업로드합니다."""
+        return self.client.post(
             "/tagging",
+            data={"user_id": "mvp-user"},
             files={
                 "file": (
                     "scene.png",
@@ -135,18 +230,115 @@ class UploadSceneImageApiTest(unittest.TestCase):
             },
         )
 
+    def test_returns_metadata_for_valid_multipart_upload(self) -> None:
+        """유효한 multipart 업로드에 검증 결과를 반환합니다."""
+        response = self._post_valid_image()
+
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "validated")
         self.assertEqual(response.json()["image"]["mime_type"], "image/png")
+        self.assertEqual(response.json()["scene_image_id"], 42)
+        assert self.session.execute_parameters is not None
+        self.assertEqual(
+            self.session.user_lookup_parameters,
+            {"login_id": "mvp-user"},
+        )
+        self.assertEqual(self.session.execute_parameters["user_id"], 7)
+        self.assertEqual(
+            self.session.execute_parameters["origin_name"], "scene.png"
+        )
+        self.assertEqual(
+            self.session.execute_parameters["mime_type"], "image/png"
+        )
+        self.assertEqual(self.session.execute_parameters["width_px"], 512)
+        self.assertEqual(self.session.execute_parameters["height_px"], 512)
+        image_url = str(self.session.execute_parameters["image_url"])
+        self.assertTrue(image_url.startswith("/uploads/scene-images/"))
+        stored_file = pathlib.Path(
+            self.storage_directory.name
+        ) / image_url.removeprefix("/uploads/")
+        self.assertTrue(stored_file.is_file())
+        self.assertEqual(
+            self.session.execute_parameters["analysis_status"], "PENDING"
+        )
+        self.assertIsNone(self.session.execute_parameters["analysis_error"])
 
     def test_returns_validation_error_for_invalid_upload(self) -> None:
         """디코딩할 수 없는 multipart 업로드를 거부합니다."""
         response = self.client.post(
             "/tagging",
+            data={"user_id": "mvp-user"},
             files={"file": ("fake.jpg", b"not an image", "image/jpeg")},
         )
 
         self.assertEqual(response.status_code, 422)
+        self.assertIsNone(self.session.execute_parameters)
+        self.assertEqual(
+            list(pathlib.Path(self.storage_directory.name).rglob("*")), []
+        )
+
+    def test_rejects_unknown_login_id_before_saving_file(self) -> None:
+        """등록되지 않은 로그인 ID는 파일 저장 전 거부합니다."""
+        self.session = _FakeSession(user_id=None)
+
+        response = self._post_valid_image()
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIsNone(self.session.execute_parameters)
+        self.assertEqual(
+            list(pathlib.Path(self.storage_directory.name).rglob("*")), []
+        )
+
+    def test_returns_500_without_db_registration_when_file_save_fails(
+        self,
+    ) -> None:
+        """파일 저장 실패 시 DB 등록을 시도하지 않습니다."""
+        with unittest.mock.patch.object(
+            scene_images, "_save_image", side_effect=OSError("disk full")
+        ):
+            response = self._post_valid_image()
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(
+            response.json()["detail"], scene_images.UPLOAD_ERROR_MESSAGE
+        )
+        self.assertIsNone(self.session.execute_parameters)
+
+    def test_removes_file_when_db_registration_fails(self) -> None:
+        """DB 등록 실패 시 이미 저장한 파일을 삭제합니다."""
+        self.session = _FakeSession(
+            execute_error=RuntimeError("db unavailable")
+        )
+
+        response = self._post_valid_image()
+
+        self.assertEqual(response.status_code, 500)
+        self.assertTrue(self.session.rollback_called)
+        self.assertEqual(
+            [
+                path
+                for path in pathlib.Path(self.storage_directory.name).rglob("*")
+                if path.is_file()
+            ],
+            [],
+        )
+
+    def test_removes_file_when_db_commit_fails(self) -> None:
+        """DB commit 실패 시 이미 저장한 파일을 삭제합니다."""
+        self.session = _FakeSession(commit_error=RuntimeError("commit failed"))
+
+        response = self._post_valid_image()
+
+        self.assertEqual(response.status_code, 500)
+        self.assertTrue(self.session.rollback_called)
+        self.assertEqual(
+            [
+                path
+                for path in pathlib.Path(self.storage_directory.name).rglob("*")
+                if path.is_file()
+            ],
+            [],
+        )
 
 
 if __name__ == "__main__":

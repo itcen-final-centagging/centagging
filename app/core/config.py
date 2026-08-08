@@ -24,6 +24,7 @@ class Settings:
     gemini_embedding_model: str
     mvp_login_id: str
     database: DatabaseSettings
+    image_storage_root: str
     mvp_login_password: str = dataclasses.field(repr=False)
 
 
@@ -41,6 +42,7 @@ def get_settings() -> Settings:
         ),
         mvp_login_id=os.getenv("MVP_LOGIN_ID", ""),
         mvp_login_password=os.getenv("MVP_LOGIN_PASSWORD", ""),
+        image_storage_root=os.getenv("IMAGE_STORAGE_ROOT", "uploads"),
         database=DatabaseSettings(
             name=os.getenv("POSTGRES_DB", "centagging"),
             username=os.getenv("POSTGRES_USER", "centagging"),
