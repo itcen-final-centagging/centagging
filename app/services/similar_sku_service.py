@@ -1,8 +1,10 @@
+"""크롭 이미지 임베딩을 이용해 유사 SKU를 조회하는 서비스입니다."""
+
 import collections.abc
 
+import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import pydantic
 import sqlalchemy
-from pgvector import sqlalchemy as pgvector_sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 EMBEDDING_DIMENSIONS = 3072
@@ -31,7 +33,7 @@ _SIMILAR_SKU_QUERY = sqlalchemy.text("""
                si.sku_image_id,
                si.image_url,
                si.embedding::halfvec(3072)
-                   <=> :embedding::halfvec(3072) AS distance
+                   <=> CAST(:embedding AS halfvec(3072)) AS distance
           FROM sku_image si
          WHERE si.embedding IS NOT NULL
          ORDER BY distance
@@ -56,7 +58,7 @@ _SIMILAR_SKU_QUERY = sqlalchemy.text("""
     """).bindparams(
     sqlalchemy.bindparam(
         "embedding",
-        type_=pgvector_sqlalchemy.Vector(EMBEDDING_DIMENSIONS),
+        type_=pgvector_sa.Vector(EMBEDDING_DIMENSIONS),
     )
 )
 
