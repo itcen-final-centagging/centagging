@@ -116,7 +116,7 @@ class ValidateImageTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.status_code, 413)
 
 
-class _FakeResult:
+class _FakeInsertResult:
     """업로드 API 테스트용 INSERT 결과입니다."""
 
     def __init__(self, scene_image_id: int = 42) -> None:
@@ -127,6 +127,17 @@ class _FakeResult:
         return self.scene_image_id
 
 
+class _FakeUserLookupResult:
+    """고정 사용자 조회 결과입니다."""
+
+    def __init__(self, user_id: int | None = 7) -> None:
+        self.user_id = user_id
+
+    def scalar_one_or_none(self) -> int | None:
+        """고정 로그인 ID로 조회한 사용자 ID를 반환합니다."""
+        return self.user_id
+
+
 class _FakeSession:
     """업로드 API 테스트용 비동기 DB 세션입니다."""
 
@@ -134,20 +145,26 @@ class _FakeSession:
         self,
         execute_error: Exception | None = None,
         commit_error: Exception | None = None,
+        user_id: int | None = 7,
     ) -> None:
         self.execute_error = execute_error
         self.commit_error = commit_error
+        self.user_id = user_id
         self.execute_parameters: dict[str, object] | None = None
+        self.user_lookup_parameters: dict[str, object] | None = None
         self.rollback_called = False
 
     async def execute(
         self, _statement: object, parameters: dict[str, object]
-    ) -> _FakeResult:
-        """INSERT를 기록하고 설정된 오류를 발생시킵니다."""
+    ) -> _FakeInsertResult | _FakeUserLookupResult:
+        """고정 사용자를 조회하거나 INSERT를 기록합니다."""
+        if "SELECT user_id" in str(_statement):
+            self.user_lookup_parameters = parameters
+            return _FakeUserLookupResult(user_id=self.user_id)
         self.execute_parameters = parameters
         if self.execute_error is not None:
             raise self.execute_error
-        return _FakeResult()
+        return _FakeInsertResult()
 
     async def commit(self) -> None:
         """commit을 수행하거나 설정된 커밋 오류를 발생시킵니다."""
@@ -179,7 +196,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
             gemini_api_key="",
             gemini_vlm_model="",
             gemini_embedding_model="",
-            mvp_login_id="",
+            mvp_login_id="mvp-user",
             mvp_login_password="",
             image_storage_root=self.storage_directory.name,
             database=config.DatabaseSettings(
@@ -202,10 +219,9 @@ class UploadSceneImageApiTest(unittest.TestCase):
         self.storage_directory.cleanup()
 
     def _post_valid_image(self) -> object:
-        """사용자 ID와 유효한 이미지를 함께 업로드합니다."""
+        """유효한 이미지만 업로드합니다."""
         return self.client.post(
             "/tagging",
-            data={"user_id": "7"},
             files={
                 "file": (
                     "scene.png",
@@ -224,6 +240,10 @@ class UploadSceneImageApiTest(unittest.TestCase):
         self.assertEqual(response.json()["image"]["mime_type"], "image/png")
         self.assertEqual(response.json()["scene_image_id"], 42)
         assert self.session.execute_parameters is not None
+        self.assertEqual(
+            self.session.user_lookup_parameters,
+            {"login_id": "mvp-user"},
+        )
         self.assertEqual(self.session.execute_parameters["user_id"], 7)
         self.assertEqual(
             self.session.execute_parameters["origin_name"], "scene.png"
@@ -248,7 +268,6 @@ class UploadSceneImageApiTest(unittest.TestCase):
         """디코딩할 수 없는 multipart 업로드를 거부합니다."""
         response = self.client.post(
             "/tagging",
-            data={"user_id": "7"},
             files={"file": ("fake.jpg", b"not an image", "image/jpeg")},
         )
 
@@ -258,22 +277,17 @@ class UploadSceneImageApiTest(unittest.TestCase):
             list(pathlib.Path(self.storage_directory.name).rglob("*")), []
         )
 
-    def test_rejects_login_id_in_user_id_field(self) -> None:
-        """user_id 필드에 로그인 ID 문자열을 전달하면 거부합니다."""
-        response = self.client.post(
-            "/tagging",
-            data={"user_id": "mvp-user"},
-            files={
-                "file": (
-                    "scene.png",
-                    _image_bytes("PNG"),
-                    "image/png",
-                )
-            },
-        )
+    def test_rejects_missing_fixed_user_before_saving_file(self) -> None:
+        """서버의 고정 사용자를 찾을 수 없으면 파일을 저장하지 않습니다."""
+        self.session = _FakeSession(user_id=None)
 
-        self.assertEqual(response.status_code, 422)
+        response = self._post_valid_image()
+
+        self.assertEqual(response.status_code, 500)
         self.assertIsNone(self.session.execute_parameters)
+        self.assertEqual(
+            list(pathlib.Path(self.storage_directory.name).rglob("*")), []
+        )
 
     def test_returns_500_without_db_registration_when_file_save_fails(
         self,

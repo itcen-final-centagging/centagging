@@ -22,6 +22,12 @@ _IMAGE_EXTENSIONS = {
     "image/jpeg": "jpg",
     "image/png": "png",
 }
+_SELECT_FIXED_USER_ID = sqlalchemy.text("""
+    SELECT user_id
+    FROM app_user
+    WHERE login_id = :login_id
+      AND is_active = TRUE
+    """)
 _INSERT_SCENE_IMAGE = sqlalchemy.text("""
     INSERT INTO scene_image (
         user_id,
@@ -85,7 +91,6 @@ async def _rollback(
 @router.post("/tagging", response_model=ImageValidationResponse)
 async def upload_scene_image(
     file: fastapi.UploadFile = fastapi.File(...),
-    user_id: int = fastapi.Form(..., gt=0),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
@@ -94,7 +99,6 @@ async def upload_scene_image(
 
     Args:
         file: multipart/form-data의 이미지 파일입니다.
-        user_id: scene_image의 FK로 저장할 사용자 ID입니다.
         database_session: 요청 범위에서 사용하는 PostgreSQL 세션입니다.
 
     Returns:
@@ -114,6 +118,18 @@ async def upload_scene_image(
             ) from error
 
         settings = config.get_settings()
+        user_result = await database_session.execute(
+            _SELECT_FIXED_USER_ID,
+            {"login_id": settings.mvp_login_id},
+        )
+        user_id = user_result.scalar_one_or_none()
+        if user_id is None:
+            _LOGGER.error("활성 MVP 사용자의 ID를 확인할 수 없습니다.")
+            raise fastapi.HTTPException(
+                status_code=500,
+                detail=UPLOAD_ERROR_MESSAGE,
+            )
+
         extension = _IMAGE_EXTENSIONS[validated.metadata.mime_type]
         filename = f"{uuid.uuid4()}.{extension}"
         saved_path = (
@@ -127,7 +143,7 @@ async def upload_scene_image(
         result = await database_session.execute(
             _INSERT_SCENE_IMAGE,
             {
-                "user_id": user_id,
+                "user_id": int(user_id),
                 "image_url": image_url,
                 "origin_name": validated.metadata.origin_name,
                 "mime_type": validated.metadata.mime_type,
