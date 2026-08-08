@@ -1,27 +1,3 @@
--- ============================================================
--- CenTagging MVP — 물리 스키마 v6 (PostgreSQL 16 + pgvector)
--- 총 6개 테이블 · 프로토타입 v4 기준 확정본
---
--- 실행
---   psql -U <user> -d <db> -f schema.sql
---   psql -U <user> -d <db> -f seed.sql      (데모 데이터, 선택)
---
--- v6 변경점
---   · xai_result 구조 확정 (프로토타입 루브릭 반영)
---       structure 30 / color 30 / detail 20 / context 20 = 100
---       70 이상 MATCH · 55~69 REVIEW · 55 미만 REJECT
---   · sku_image.embedding 을 NULL 허용으로 변경
---       상품·이미지 등록과 임베딩 색인 배치를 분리 실행하기 위함
---       HNSW 는 부분 인덱스(WHERE embedding IS NOT NULL)로 생성
---
--- 전제
---   · 분석은 동기 API (FT-IMG-002, 30s) — 진행 상태를 DB에 남기지 않음
---   · 재탐지 1회 제한은 애플리케이션 상수(MAX_RETRY)로 관리
---   · 카탈로그에 존재 = 사용 가능 (판매 상태 개념 없음)
---   · 대표 이미지는 sku_image.image_type='MAIN' 중 최소 id 사용
---   · 임베딩 유사도(벡터)와 루브릭 총점(VLM 채점)은 별개 신호
--- ============================================================
-
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -46,36 +22,45 @@ COMMENT ON COLUMN app_user.user_name IS '화면에 표시할 작업자 이름';
 --    파일 검증(형식·용량·해상도)은 업로드 시점에 수행, 통과분만 저장
 -- ------------------------------------------------------------
 CREATE TABLE scene_image (
-    scene_image_id BIGSERIAL    PRIMARY KEY,
-    user_id        BIGINT       NOT NULL REFERENCES app_user(user_id),
-    image_url      TEXT         NOT NULL,
-    origin_name    VARCHAR(255) NOT NULL,
-    mime_type      VARCHAR(20)  NOT NULL,
-    file_size      INT          NOT NULL,
-    width_px       INT          NOT NULL,
-    height_px      INT          NOT NULL,
-    analysis_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    analysis_error TEXT,
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    scene_image_id  BIGSERIAL    PRIMARY KEY,
+    user_id         BIGINT       NOT NULL REFERENCES app_user(user_id),
+    image_url       TEXT         NOT NULL,
+    origin_name     VARCHAR(255) NOT NULL,
+    mime_type       VARCHAR(20)  NOT NULL,
+    file_size       INT          NOT NULL,
+    analysis_error  TEXT,
+    analysis_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    bbox_coord      JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    width_px        INT          NOT NULL,
+    height_px       INT          NOT NULL,
     CONSTRAINT ck_scene_mime CHECK (mime_type IN ('image/jpeg','image/png')),
     CONSTRAINT ck_scene_size CHECK (file_size > 0 AND file_size <= 10485760),
     CONSTRAINT ck_scene_dimensions CHECK (width_px > 0 AND height_px > 0),
+    -- 개별 좌표의 길이와 범위는 탐지 결과 저장 단계에서 검증한다.
+    CONSTRAINT ck_scene_bbox_coord_array CHECK (
+        jsonb_typeof(bbox_coord) = 'array'
+    ),
     CONSTRAINT ck_scene_analysis_status CHECK (
-        analysis_status IN ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED')
+        analysis_status IN ('pending', 'running', 'completed', 'failed')
     )
 );
 
 CREATE INDEX idx_scene_user_created ON scene_image(user_id, created_at DESC);
 
-COMMENT ON TABLE  scene_image             IS '업로드된 연출 이미지';
-COMMENT ON COLUMN scene_image.image_url   IS '원본 이미지 경로/URL';
-COMMENT ON COLUMN scene_image.origin_name IS '사용자가 올린 원래 파일명';
-COMMENT ON COLUMN scene_image.mime_type   IS 'image/jpeg | image/png';
-COMMENT ON COLUMN scene_image.file_size   IS 'byte, 10MB 이하';
-COMMENT ON COLUMN scene_image.width_px     IS '원본 이미지 너비(pixel)';
-COMMENT ON COLUMN scene_image.height_px    IS '원본 이미지 높이(pixel)';
-COMMENT ON COLUMN scene_image.analysis_status IS '이미지 분석 상태';
-COMMENT ON COLUMN scene_image.analysis_error  IS '이미지 분석 실패 사유';
+COMMENT ON TABLE  scene_image                      IS '업로드된 연출 이미지';
+COMMENT ON COLUMN scene_image.scene_image_id       IS '연출 이미지 고유 번호';
+COMMENT ON COLUMN scene_image.user_id              IS '업로드한 사용자';
+COMMENT ON COLUMN scene_image.image_url            IS '연출 이미지 경로';
+COMMENT ON COLUMN scene_image.origin_name          IS '업로드된 연출 이미지 파일명';
+COMMENT ON COLUMN scene_image.mime_type            IS '연출 이미지 파일 MIME 타입: image/jpeg | image/png';
+COMMENT ON COLUMN scene_image.file_size            IS '연출 이미지 파일 크기(byte), 10MB 이하';
+COMMENT ON COLUMN scene_image.analysis_error       IS '객체 탐지 실패 사유';
+COMMENT ON COLUMN scene_image.analysis_status      IS '연출 이미지 태깅 처리 상태: pending | running | completed | failed';
+COMMENT ON COLUMN scene_image.created_at           IS '연출 이미지 업로드 일시';
+COMMENT ON COLUMN scene_image.bbox_coord           IS '탐지 객체 좌표 배열 [[ymin,xmin,ymax,xmax], ...], 좌표 검증은 애플리케이션에서 수행';
+COMMENT ON COLUMN scene_image.width_px             IS '이미지 너비(pixel)';
+COMMENT ON COLUMN scene_image.height_px            IS '이미지 높이(pixel)';
 
 -- ------------------------------------------------------------
 -- 3. detected_object : 탐지된 가구 객체 (크롭 패치 단위)
@@ -240,70 +225,3 @@ COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 �
 COMMENT ON COLUMN tagging_result.similarity_score IS '선택 시점의 임베딩 유사도 (0~1)';
 COMMENT ON COLUMN tagging_result.similarity_grade IS '화면 표시용 등급 상/중/하';
 COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 위 주석의 JSON 구조 참고';
-
--- ============================================================
--- 참고 쿼리
--- ============================================================
-
--- [1] Top-K 유사 SKU 조회 (category pre-filter + 벡터 유사도)
---     $1 = 크롭 패치 임베딩, $2 = 크롭에서 추출한 대분류
---
--- SET hnsw.iterative_scan = relaxed_order;   -- 필터로 후보가 비는 것을 완화
---
--- SELECT DISTINCT ON (si.sku_id)
---        si.sku_id, si.sku_image_id, sc.sku_code, sc.product_name,
---        1 - (si.embedding::halfvec(3072) <=> $1::halfvec(3072)) AS similarity
---   FROM sku_image si
---   JOIN sku_catalog sc ON sc.sku_id = si.sku_id
---  WHERE si.embedding IS NOT NULL
---    AND sc.category = $2                    -- 소분류는 필터에 쓰지 않음
---  ORDER BY si.sku_id,
---           si.embedding::halfvec(3072) <=> $1::halfvec(3072)
---  LIMIT 30;   -- 넉넉히 뽑아 SKU 단위 중복 제거 후 상위 5건 사용
-
--- [2] 대표 이미지 조회 (image_type='MAIN' 중 최소 id)
---
--- SELECT DISTINCT ON (sku_id) sku_id, sku_image_id, image_url
---   FROM sku_image WHERE image_type = 'MAIN'
---  ORDER BY sku_id, sku_image_id;
-
--- [3] 태깅 이력 조회 (FT-SAV-003, 본인 건 최신순)
---
--- SELECT tr.result_id, tr.created_at, si.origin_name,
---        do.category, do.crop_url, do.mood_summary,
---        sc.sku_code, sc.product_name,
---        tr.match_source, tr.similarity_score, tr.similarity_grade,
---        (tr.xai_result->>'total')::int   AS rubric_total,
---        tr.xai_result->>'verdict'        AS rubric_verdict,
---        au.user_name
---   FROM tagging_result tr
---   JOIN scene_image     si ON si.scene_image_id = tr.scene_image_id
---   JOIN detected_object do ON do.object_id      = tr.object_id
---   JOIN sku_catalog     sc ON sc.sku_id         = tr.sku_id
---   JOIN app_user        au ON au.user_id        = tr.created_by
---  WHERE tr.created_by = $1
---  ORDER BY tr.created_at DESC;
-
--- [4] 카탈로그 검색 (FT-CAT-002, 부분일치·대소문자 무시·이름 오름차순)
---
--- SELECT sku_id, sku_code, product_name, brand, price, space
---   FROM sku_catalog
---  WHERE lower(sku_code)     LIKE '%' || lower($1) || '%'
---     OR lower(product_name) LIKE '%' || lower($1) || '%'
---  ORDER BY product_name
---  LIMIT 10 OFFSET $2;
-
--- [5] 미색인 SKU 이미지 (임베딩 배치가 처리할 대상)
---
--- SELECT sku_image_id, image_url FROM sku_image
---  WHERE embedding IS NULL AND image_type IN ('MAIN','ANGLE')
---  ORDER BY sku_image_id LIMIT 100;
-
--- [6] 추천 품질 지표 — Top-3 적중률 / 추천 경유 비율
---
--- SELECT count(*)                                                   AS total,
---        count(*) FILTER (WHERE match_source = 'RECOMMEND')          AS via_recommend,
---        count(*) FILTER (WHERE match_rank <= 3)                     AS in_top3,
---        round(avg(similarity_score) FILTER (WHERE match_source='RECOMMEND'), 4) AS avg_sim,
---        round(avg((xai_result->>'total')::int), 1)                  AS avg_rubric
---   FROM tagging_result;

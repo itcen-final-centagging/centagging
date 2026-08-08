@@ -35,10 +35,10 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
         origin_name,
         mime_type,
         file_size,
-        width_px,
-        height_px,
+        analysis_error,
         analysis_status,
-        analysis_error
+        width_px,
+        height_px
     )
     VALUES (
         :user_id,
@@ -46,10 +46,10 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
         :origin_name,
         :mime_type,
         :file_size,
-        :width_px,
-        :height_px,
+        :analysis_error,
         :analysis_status,
-        :analysis_error
+        :width_px,
+        :height_px
     )
     RETURNING scene_image_id
     """)
@@ -148,10 +148,10 @@ async def upload_scene_image(
                 "origin_name": validated.metadata.origin_name,
                 "mime_type": validated.metadata.mime_type,
                 "file_size": validated.metadata.file_size,
+                "analysis_error": None,
+                "analysis_status": "pending",
                 "width_px": validated.metadata.width_px,
                 "height_px": validated.metadata.height_px,
-                "analysis_status": "PENDING",
-                "analysis_error": None,
             },
         )
         scene_image_id = int(result.scalar_one())

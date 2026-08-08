@@ -260,7 +260,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
         ) / image_url.removeprefix("/uploads/")
         self.assertTrue(stored_file.is_file())
         self.assertEqual(
-            self.session.execute_parameters["analysis_status"], "PENDING"
+            self.session.execute_parameters["analysis_status"], "pending"
         )
         self.assertIsNone(self.session.execute_parameters["analysis_error"])
 
