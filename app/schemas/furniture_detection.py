@@ -22,12 +22,11 @@ from pydantic import BaseModel, Field
 
 
 class DetectedObjectResponse(BaseModel):
-    object_key: str
     label: str
-    evidence: str
-    confidence: float | None = None
-    box_2d: tuple[int, int, int, int]
-    attributes: dict[str, object] = Field(default_factory=dict)
+    box_2d: list[int] = Field(
+        min_length=4,
+        max_length=4,
+    )
 
 
 class FurnitureDetectionResponse(BaseModel):

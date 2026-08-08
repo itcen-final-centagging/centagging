@@ -11,13 +11,13 @@ def decode_image(image_bytes: bytes) -> Image.Image:
 
     try:
         with Image.open(io.BytesIO(image_bytes)) as img:
-            if  img.format not in {"JPG", "PNG"}:
+            if  img.format not in {"JPEG", "PNG"}:
                 raise InvalidImageError(
                     "JPEG 이미지나 PNG  이미지만 가능합니다."
                 )
-        img.load()
-        normalized = ImageOps.exif_transpose(img)
-        return normalized.convert("RGB")
+            img.load()
+            normalized = ImageOps.exif_transpose(img)
+            return normalized.convert("RGB")
 
-    except UnidentifiedImageError as error:
+    except (OSError, UnidentifiedImageError) as error:
         raise InvalidImageError("이미지를 열 수 없습니다. 유효한 이미지 파일인지 확인하세요.")

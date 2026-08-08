@@ -10,6 +10,9 @@ import sqlalchemy
 
 from app.core import config, database
 from app.services import image_validation
+from fastapi.concurrency import run_in_threadpool
+from app.services import furniture_detection_service
+from app.schemas.furniture_detection import DetectedObjectResponse
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,6 +64,9 @@ class ImageValidationResponse(pydantic.BaseModel):
     status: str
     scene_image_id: int
     image: image_validation.ImageMetadata
+    detections: list[DetectedObjectResponse] = pydantic.Field(
+        default_factory=list
+    )
 
 
 def _save_image(path: pathlib.Path, content: bytes) -> None:
@@ -170,8 +176,28 @@ async def upload_scene_image(
     finally:
         await file.close()
 
+    try:
+        detection_result = await run_in_threadpool(
+            furniture_detection_service.detect_furniture_from_bytes,
+            validated.content,
+            settings
+        )
+    except Exception as error:
+        raise fastapi.HTTPException(status_code = 502, detail="가구 탐지에 실패했습니다.") from error
+
+
     return ImageValidationResponse(
         status="validated",
         scene_image_id=scene_image_id,
         image=validated.metadata,
+        detections=[
+            DetectedObjectResponse(
+                label=detection.label,
+                box_2d=[
+                    round(coordinate)
+                    for coordinate in detection.box_2d
+                ],
+            )
+            for detection in detection_result.detections
+        ],
     )
