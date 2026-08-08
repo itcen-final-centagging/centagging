@@ -1,14 +1,12 @@
 from app.core import config
-from app.schemas.furniture_detection import FurnitureDetectionResponse, ImageSizeResponse
 from app.schemas.gemini_detection import GeminiDetectionResult
-from app.services import gemini_service, image_processing_service
+from app.services import gemini_service
 from PIL import Image
 import fastapi
-import pydantic
 
-router = fastapi.APIRouter(prefix="/api/v1/scene-images", tags=["furniture-detection"])
+router = fastapi.APIRouter(prefix="/tagging", tags=["furniture-detection"])
 
-@router.post("/api/centagging/images/{scene_image_id}/detect", response_model=GeminiDetectionResult)
+@router.post("/{scene_image_id}", response_model=GeminiDetectionResult)
 def detect_furniture(scene_image_id:int, image: fastapi.UploadFile = fastapi.File(...)) -> GeminiDetectionResult:
     """가구 탐지 API 엔드포인트입니다."""
 
@@ -24,5 +22,4 @@ def detect_furniture(scene_image_id:int, image: fastapi.UploadFile = fastapi.Fil
         pil_image = uploaded_image.convert("RGB")
 
     service = gemini_service.GeminiService(config.get_settings())
-    detections = service.detect_furniture(pil_image)
-    return GeminiDetectionResult(detections=detections)
+    return service.detect_furniture(pil_image)
