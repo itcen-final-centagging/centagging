@@ -62,39 +62,48 @@ _SIMILAR_SKU_QUERY = sqlalchemy.text("""
     )
 )
 
+class SimilarSkuService:
+    """크롭 이미지 임베딩으로 유사 SKU를 조회하는 서비스입니다."""
 
-async def find_similar_skus(
-    session: sqlalchemy_async.AsyncSession,
-    embedding: collections.abc.Sequence[float],
-    limit: int = DEFAULT_RESULT_LIMIT,
-) -> list[SimilarSku]:
-    """임베딩 벡터와 가장 유사한 SKU를 SKU 단위로 중복 없이 조회합니다.
+    def __init__(self, session: sqlalchemy_async.AsyncSession):
+        """서비스가 사용할 비동기 DB 세션을 주입받습니다.
 
-    Args:
-        session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
-        embedding: 검색 기준이 되는 크롭 이미지 임베딩입니다.
-        limit: 반환할 최대 SKU 개수입니다.
+        Args:
+            session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
+        """
+        self.session = session
 
-    Returns:
-        유사도 내림차순으로 정렬된 SKU 목록입니다.
+    async def find_similar_skus(
+        self,
+        embedding: collections.abc.Sequence[float],
+        limit: int = DEFAULT_RESULT_LIMIT,
+    ) -> list[SimilarSku]:
+        """임베딩 벡터와 가장 유사한 SKU를 SKU 단위로 중복 없이 조회합니다.
 
-    Raises:
-        SimilarSkuQueryError: 임베딩 차원이 스키마와 다른 경우입니다.
-    """
-    if len(embedding) != EMBEDDING_DIMENSIONS:
-        raise SimilarSkuQueryError(
-            f"임베딩 벡터 차원은 {EMBEDDING_DIMENSIONS} 차원이어야 합니다. "
-            f"현재 {len(embedding)} 차원입니다."
+        Args:
+            embedding: 검색 기준이 되는 크롭 이미지 임베딩입니다.
+            limit: 반환할 최대 SKU 개수입니다.
+
+        Returns:
+            유사도 내림차순으로 정렬된 SKU 목록입니다.
+
+        Raises:
+            SimilarSkuQueryError: 임베딩 차원이 스키마와 다른 경우입니다.
+        """
+        if len(embedding) != EMBEDDING_DIMENSIONS:
+            raise SimilarSkuQueryError(
+                f"임베딩 벡터 차원은 {EMBEDDING_DIMENSIONS} 차원이어야 합니다. "
+                f"현재 {len(embedding)} 차원입니다."
+            )
+
+        result = await self.session.execute(
+            _SIMILAR_SKU_QUERY,
+            {
+                "embedding": list(embedding),
+                "candidate_limit": CANDIDATE_LIMIT,
+                "result_limit": limit,
+            },
         )
+        rows = result.mappings().all()
 
-    result = await session.execute(
-        _SIMILAR_SKU_QUERY,
-        {
-            "embedding": list(embedding),
-            "candidate_limit": CANDIDATE_LIMIT,
-            "result_limit": limit,
-        },
-    )
-    rows = result.mappings().all()
-
-    return [SimilarSku(**row) for row in rows]
+        return [SimilarSku(**row) for row in rows]
