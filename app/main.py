@@ -5,7 +5,7 @@ import contextlib
 
 import fastapi
 
-from app.api import auth, gemini
+from app.api import auth, gemini, scene_images
 from app.core import database
 from app.services import user_seed
 
@@ -29,6 +29,7 @@ app = fastapi.FastAPI(
 
 app.include_router(gemini.router)
 app.include_router(auth.router)
+app.include_router(scene_images.router)
 
 
 @app.get("/health", tags=["health"])
