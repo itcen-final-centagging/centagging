@@ -4,9 +4,10 @@ import collections.abc
 import contextlib
 
 import fastapi
+import starlette.staticfiles
 
-from app.api import auth, gemini
-from app.core import database
+from app.api import auth, gemini, scene_images
+from app.core import config, database
 from app.services import user_seed
 
 
@@ -29,6 +30,14 @@ app = fastapi.FastAPI(
 
 app.include_router(gemini.router)
 app.include_router(auth.router)
+app.include_router(scene_images.router)
+app.mount(
+    "/uploads",
+    starlette.staticfiles.StaticFiles(
+        directory=config.get_settings().image_storage_root, check_dir=False
+    ),
+    name="uploads",
+)
 
 
 @app.get("/health", tags=["health"])
