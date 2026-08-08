@@ -18,17 +18,10 @@ router = fastapi.APIRouter(
 )
 
 UPLOAD_ERROR_MESSAGE = "이미지 업로드 처리에 실패했습니다."
-UNKNOWN_USER_MESSAGE = "등록되지 않은 로그인 ID입니다."
 _IMAGE_EXTENSIONS = {
     "image/jpeg": "jpg",
     "image/png": "png",
 }
-_SELECT_USER_ID = sqlalchemy.text("""
-    SELECT user_id
-    FROM app_user
-    WHERE login_id = :login_id
-      AND is_active = TRUE
-    """)
 _INSERT_SCENE_IMAGE = sqlalchemy.text("""
     INSERT INTO scene_image (
         user_id,
@@ -92,9 +85,7 @@ async def _rollback(
 @router.post("/tagging", response_model=ImageValidationResponse)
 async def upload_scene_image(
     file: fastapi.UploadFile = fastapi.File(...),
-    login_id: str = fastapi.Form(
-        ..., alias="user_id", min_length=1, max_length=50
-    ),
+    user_id: int = fastapi.Form(..., gt=0),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
@@ -103,7 +94,7 @@ async def upload_scene_image(
 
     Args:
         file: multipart/form-data의 이미지 파일입니다.
-        login_id: USER_ID 필드로 전달받는 로그인 ID입니다.
+        user_id: scene_image의 FK로 저장할 사용자 ID입니다.
         database_session: 요청 범위에서 사용하는 PostgreSQL 세션입니다.
 
     Returns:
@@ -122,17 +113,6 @@ async def upload_scene_image(
                 detail=str(error),
             ) from error
 
-        user_result = await database_session.execute(
-            _SELECT_USER_ID,
-            {"login_id": login_id},
-        )
-        database_user_id = user_result.scalar_one_or_none()
-        if database_user_id is None:
-            raise fastapi.HTTPException(
-                status_code=422,
-                detail=UNKNOWN_USER_MESSAGE,
-            )
-
         settings = config.get_settings()
         extension = _IMAGE_EXTENSIONS[validated.metadata.mime_type]
         filename = f"{uuid.uuid4()}.{extension}"
@@ -147,7 +127,7 @@ async def upload_scene_image(
         result = await database_session.execute(
             _INSERT_SCENE_IMAGE,
             {
-                "user_id": int(database_user_id),
+                "user_id": user_id,
                 "image_url": image_url,
                 "origin_name": validated.metadata.origin_name,
                 "mime_type": validated.metadata.mime_type,
