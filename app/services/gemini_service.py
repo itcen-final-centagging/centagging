@@ -4,6 +4,8 @@ Service for live Gemini Developer API calls.
 """
 
 import typing
+import io
+from PIL import Image
 
 from google import genai
 
@@ -28,6 +30,8 @@ class GeminiVerificationResult(typing.TypedDict):
     embedding_model: str
     embedding_dimensions: int
 
+class GeminiEmbeddingError(RuntimeError):
+    """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
 
 class GeminiService:
     """VLM 및 임베딩 모델을 실제 Gemini API로 호출합니다."""
@@ -92,3 +96,51 @@ class GeminiService:
             "embedding_model": self._settings.gemini_embedding_model,
             "embedding_dimensions": len(embedding_values),
         }
+
+    def embed_image(self, image: Image.Image) -> list[float]:
+        """이미지를 임베딩하여 벡터 값을 반환합니다. / Embed an image and return its vector.
+
+        Args:
+            image: PIL 이미지 객체입니다.
+
+        Returns:
+            임베딩 벡터(float 리스트)입니다.
+
+        Raises:
+            GeminiConfigurationError: Gemini API 키가 설정되지 않은 경우입니다.
+            GeminiApiError: Gemini API 호출 또는 응답 검증에 실패한 경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "GEMINI_API_KEY가 설정되지 않았습니다."
+            )
+
+        try:
+            client = genai.Client(api_key=self._settings.gemini_api_key)
+
+            image_format = (image.format or "PNG").upper()
+            buffer = io.BytesIO()
+            image.save(buffer, format=image_format)
+            image_bytes = buffer.getvalue()
+
+            response = client.models.embed_content(
+                model=self._settings.gemini_embedding_model,
+                contents=[
+                    genai.types.Part.from_bytes(
+                        data=image_bytes,
+                        mime_type=f"image/{image_format.lower()}",
+                    ),
+                ]
+            )
+
+            embeddings = response.embeddings
+            if not embeddings or not embeddings[0].values:
+                raise GeminiEmbeddingError("Gemini 임베딩 응답이 비어 있습니다.")
+
+            return embeddings[0].values
+        except GeminiEmbeddingError:
+            raise
+        except Exception as error:
+            raise GeminiEmbeddingError(
+                "Gemini 이미지 임베딩에 실패했습니다."
+            ) from error
