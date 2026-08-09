@@ -1,4 +1,4 @@
-"""SKU row 검증
+"""SKU row 검증.
 
 `원본 -> 정규화 -> 검증 -> Ground Truth` 순서에서 마지막 관문이다.
 원본에 적혀 있다는 이유만으로 값을 통과시키지 않고, 여기서 한 번 더
@@ -10,20 +10,16 @@ catalog_spec 기준으로 확인한다.
 
 from __future__ import annotations
 
-import pathlib
-import sys
 from typing import Any
-
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.core import catalog_spec
 
 
 def validate_row(row: dict[str, Any]) -> list[str]:
     """SKU row 1건을 검사한다.
-    catalog_spec에 정의된 값만 Ground Truth에 들어가도록 마지막으로 막는 것"""
+
+    catalog_spec에 정의된 값만 Ground Truth에 들어가도록 마지막으로 막는 것
+    """
     errors: list[str] = []
     category = row.get("category")
 
@@ -60,7 +56,7 @@ def validate_row(row: dict[str, Any]) -> list[str]:
 
 
 def validate_rows(rows: list[dict]) -> dict[str, Any]:
-    """전체 SKU 목록을 검사하고 통계를 함께 돌려준다. """
+    """전체 SKU 목록을 검사하고 통계를 함께 돌려준다."""
     errors: dict[str, list[str]] = {}
     filled = 0
     expected = 0
@@ -78,7 +74,6 @@ def validate_rows(rows: list[dict]) -> dict[str, Any]:
         if seen[code] == 2:
             duplicates.append(code)
 
-
         if row.get("category") in catalog_spec.PRODUCT_ATTRIBUTE:
             schema_keys = catalog_spec.attribute_names(row["category"])
             expected += len(schema_keys)
@@ -93,7 +88,5 @@ def validate_rows(rows: list[dict]) -> dict[str, Any]:
         "fill_rate": (filled / expected) if expected else 0.0,
         "filled": filled,
         "expected": expected,
-        "missing": dict(
-            sorted(missing.items(), key=lambda item: -item[1])
-        ),
+        "missing": dict(sorted(missing.items(), key=lambda item: -item[1])),
     }
