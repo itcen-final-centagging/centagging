@@ -26,8 +26,12 @@ import os
 import pathlib
 from typing import Any
 
+from dotenv import load_dotenv
+
 from app.core import catalog_spec
 from scripts.catalog import metadata_builder, storage
+
+load_dotenv(storage.PROJECT_ROOT / ".env", override=True)
 
 # 모델 이름은 배포 환경마다 달라 .env로 주입한다. API 키는 코드에 두지 않는다.
 MODEL_NAME = os.getenv("GEMINI_VLM_MODEL", "gemini-3.5-flash")
@@ -171,18 +175,18 @@ def call_gemini(prompt: str, image_paths: list[str]) -> dict[str, Any]:
         파싱된 응답 딕셔너리입니다.
 
     Raises:
-        RuntimeError: API 키가 없거나 응답이 비어 있는 경우입니다.
+        RuntimeError: Vertex AI API 키가 없거나 응답이 비어 있는 경우입니다.
     """
     # VLM을 쓸 때만 필요한 의존성이라 함수 안에서 임포트한다.
     from google import genai  # pylint: disable=import-outside-toplevel
     from PIL import Image  # pylint: disable=import-outside-toplevel
 
     # 키 값 자체는 로그·예외 메시지에 남기지 않는다.
-    api_key = os.getenv("GEMINI_API_KEY", "")
+    api_key = os.getenv("VERTEX_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY가 설정되지 않았습니다.")
+        raise RuntimeError("VERTEX_API_KEY가 설정되지 않았습니다.")
 
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(vertexai=True, api_key=api_key)
     images = [Image.open(path) for path in image_paths]
     # 프롬프트와 이미지를 한 리스트에 담아야 해서 원소 타입을 Any로 둔다.
     contents: list[Any] = [prompt, *images]
