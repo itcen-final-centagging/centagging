@@ -29,6 +29,7 @@ class DetectedObject(BaseModel):
     """탐지된 가구 객체 1건과 해당 SKU 후보 목록입니다."""
 
     object_index: int
+    bbox_coord: dict[str, float]
     sku_candidates: list[SkuCandidate]
 
 class DetectionResult(BaseModel):

@@ -99,8 +99,8 @@ class SimilarSkuService:
         self.gemini_service = gemini_service
         self.settings = settings
 
-    async def orchestrate_similar_skus(self, scene_id: int):
-        scene = await self.get_crop_image_coords(scene_id)
+    async def orchestrate_similar_skus(self, scene_id: int, object_index: list[int]):
+        scene = await self.get_crop_image_coords(scene_id, object_index)
 
         image_path = (
             pathlib.Path(self.settings.image_storage_root)
@@ -117,6 +117,7 @@ class SimilarSkuService:
 
                 objects.append(DetectedObject(
                     object_index=object_index,
+                    bbox_coord=coord,
                     sku_candidates=[
                         SkuCandidate(
                             sku_code=sku.sku_code,
@@ -142,16 +143,18 @@ class SimilarSkuService:
             objects=objects
         )
 
-    async def get_crop_image_coords(self, scene_id: int):
+    async def get_crop_image_coords(self, scene_id: int, object_indexes: list[int]):
         result = await self.session.execute(
             _CROP_IMAGE_COORD_QUERY,
             {"scene_image_id": scene_id}
         )
         row = result.mappings().first()
+        coords = row["bbox_coord"]
+        bbox_coords = [coords[i] for i in object_indexes if 0 <= i < len(coords)]
 
         return {
             "image_url": row["image_url"],
-            "bbox_coords": row["bbox_coord"]
+            "bbox_coords": bbox_coords
         }
 
     async def find_similar_skus(

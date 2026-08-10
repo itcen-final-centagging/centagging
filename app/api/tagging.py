@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from app.dependencies import get_similar_sku_service
 
-from app.schemas.tagging import DetectionResponse, DetectionResult
+from app.schemas.tagging import DetectionResponse
 from app.services.similar_sku_service import SimilarSkuService
 
 router = APIRouter(prefix="/tagging", tags=["tagging"])
@@ -9,6 +9,7 @@ router = APIRouter(prefix="/tagging", tags=["tagging"])
 @router.get("/scenes/{scene_id}")
 async def get_recommendation_sku(
     scene_id: int,
+    object_indexes: list[int] = Query(default=[]),
     similar_sku_service: SimilarSkuService= Depends(
         get_similar_sku_service
     ),
@@ -17,12 +18,12 @@ async def get_recommendation_sku(
 
         Args:
             scene_id: 조회할 장면 이미지 ID입니다.
+            object_indexes: 탐지된 객체 인덱스입니다.
             similar_sku_service: 유사 SKU 조회 서비스입니다.
 
         Returns:
-            추천 SKU 목록입니다. detected_object 연동 전까지는 빈 목록을
-            반환합니다.
+            탐지된 객체 별 유사 SKU 후보 정보 목록을 반환합니다.
         """
-    result = await similar_sku_service.orchestrate_similar_skus(scene_id)
+    result = await similar_sku_service.orchestrate_similar_skus(scene_id, object_indexes)
 
     return DetectionResponse(status="success", data=result)
