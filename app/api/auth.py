@@ -7,7 +7,7 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 from app.core import config, database
 from app.schemas import auth as auth_schema
 
-router = fastapi.APIRouter(prefix="/api/centagging/auth", tags=["auth"])
+router = fastapi.APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=auth_schema.UserResponse)
