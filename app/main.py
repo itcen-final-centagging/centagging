@@ -6,7 +6,7 @@ import contextlib
 import fastapi
 import starlette.staticfiles
 
-from app.api import auth, gemini, scene_images, tagging
+from app.api import auth, gemini, scene_images, tagging, sku_search
 from app.core import config, database
 from app.services import user_seed
 
@@ -32,6 +32,8 @@ app.include_router(gemini.router)
 app.include_router(auth.router)
 app.include_router(scene_images.router)
 app.include_router(tagging.router)
+app.include_router(sku_search.router)
+
 app.mount(
     "/uploads",
     starlette.staticfiles.StaticFiles(
