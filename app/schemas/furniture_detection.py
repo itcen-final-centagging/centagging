@@ -36,7 +36,7 @@ class FurnitureDetectionResponse(BaseModel):
     processing_time_ms: int
     width_px: int
     height_px: int
-    detections: list[DetectedObjectResponse] = Field(default_factory=dict)
+    detections: list[DetectedObjectResponse] = Field(default_factory=list)
 
 class FurnitureDetectionRequest(BaseModel):
     target_description: str = Field(

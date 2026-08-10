@@ -7,6 +7,7 @@ import uuid
 import fastapi
 import pydantic
 import sqlalchemy
+import json
 
 from app.core import config, database
 from app.services import image_validation
@@ -56,6 +57,22 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
     )
     RETURNING scene_image_id
     """)
+_UPDATE_ANALYSIS_SUCCESS = sqlalchemy.text("""
+    UPDATE scene_image
+    SET
+        bbox_coord = CAST(:bbox_coord AS jsonb),
+        analysis_status = 'completed',
+        analysis_error = NULL
+    WHERE scene_image_id = :scene_image_id
+""")
+
+_UPDATE_ANALYSIS_FAILURE = sqlalchemy.text("""
+    UPDATE scene_image
+    SET
+        analysis_status = 'failed',
+        analysis_error = :analysis_error
+    WHERE scene_image_id = :scene_image_id
+""")
 
 
 class ImageValidationResponse(pydantic.BaseModel):
@@ -67,7 +84,6 @@ class ImageValidationResponse(pydantic.BaseModel):
     detections: list[DetectedObjectResponse] = pydantic.Field(
         default_factory=list
     )
-
 
 def _save_image(path: pathlib.Path, content: bytes) -> None:
     """검증된 원본 이미지를 로컬 저장소에 기록합니다."""
@@ -93,6 +109,45 @@ async def _rollback(
     except Exception:  # pylint: disable=broad-exception-caught
         _LOGGER.exception("이미지 업로드 트랜잭션 rollback에 실패했습니다.")
 
+# 가구 객체 탐지 함수 선언
+def _build_detected_objects(
+    detection_result,
+) -> list[DetectedObjectResponse]:
+    """내부 탐지 결과를 공개 응답 객체로 변환합니다."""
+    return [
+        DetectedObjectResponse(
+            label=detection.label,
+            box_2d=[
+                round(coordinate)
+                for coordinate in detection.box_2d
+            ],
+        )
+        for detection in detection_result.detections
+    ]
+
+# 분석 성공 시 성공 상태 저장
+async def _save_analysis_success(
+    database_session: database.sqlalchemy_async.AsyncSession,
+    scene_image_id: int,
+    detected_objects: list[DetectedObjectResponse],
+) -> None:
+    """탐지 결과와 성공 상태를 저장합니다."""
+    bbox_coord = [
+        detected_object.model_dump(mode="json")
+        for detected_object in detected_objects
+    ]
+
+    await database_session.execute(
+        _UPDATE_ANALYSIS_SUCCESS,
+        {
+            "scene_image_id": scene_image_id,
+            "bbox_coord": json.dumps(
+                bbox_coord,
+                ensure_ascii=False,
+            ),
+        },
+    )
+    await database_session.commit()
 
 @router.post("/tagging", response_model=ImageValidationResponse)
 async def upload_scene_image(
@@ -185,19 +240,17 @@ async def upload_scene_image(
     except Exception as error:
         raise fastapi.HTTPException(status_code = 502, detail="가구 탐지에 실패했습니다.") from error
 
+    detected_objects = _build_detected_objects(detection_result)
+
+    await _save_analysis_success(
+        database_session,
+        scene_image_id,
+        detected_objects,
+    )
 
     return ImageValidationResponse(
         status="validated",
         scene_image_id=scene_image_id,
         image=validated.metadata,
-        detections=[
-            DetectedObjectResponse(
-                label=detection.label,
-                box_2d=[
-                    round(coordinate)
-                    for coordinate in detection.box_2d
-                ],
-            )
-            for detection in detection_result.detections
-        ],
+        detections=detected_objects
     )
