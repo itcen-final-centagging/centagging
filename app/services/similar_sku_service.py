@@ -3,7 +3,7 @@
 import collections.abc
 
 import pgvector.sqlalchemy as pgvector_sa
-import pydantic, typing, sqlalchemy, pathlib
+import pydantic, typing, sqlalchemy, pathlib, asyncio
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 from PIL import Image
 from app.services.gemini_service import GeminiService
@@ -15,10 +15,8 @@ EMBEDDING_DIMENSIONS = 3072
 CANDIDATE_LIMIT = 30
 DEFAULT_RESULT_LIMIT = 5
 
-
-class SimilarSkuQueryError(RuntimeError):
-    """유사 SKU 검색 중 발생한 오류입니다."""
-
+class SceneImageNotFoundError(RuntimeError):
+    """존재하지 않는 scene_image_id로 조회한 경우입니다."""
 
 class SimilarSku(pydantic.BaseModel):
     """유사도 검색으로 조회한 SKU 1건입니다."""
@@ -99,8 +97,8 @@ class SimilarSkuService:
         self.gemini_service = gemini_service
         self.settings = settings
 
-    async def orchestrate_similar_skus(self, scene_id: int, object_index: list[int]):
-        scene = await self.get_crop_image_coords(scene_id, object_index)
+    async def orchestrate_similar_skus(self, scene_id: int, object_indexes: list[int]):
+        scene = await self.get_crop_image_coords(scene_id, object_indexes)
 
         image_path = (
             pathlib.Path(self.settings.image_storage_root)
@@ -110,9 +108,11 @@ class SimilarSkuService:
         objects = []
 
         with Image.open(image_path, "r") as scene_image:
-            for object_index, coord in enumerate(scene["bbox_coords"]):
+            for object_index, coord in scene["indexed_coords"]:
                 crop_image = get_crop_image(scene_image, coord)
-                embedding = self.gemini_service.embed_image(crop_image)
+                embedding = await asyncio.to_thread(
+                    self.gemini_service.embed_image, crop_image
+                )
                 similar_skus = await self.find_similar_skus(embedding)
 
                 objects.append(DetectedObject(
@@ -149,12 +149,16 @@ class SimilarSkuService:
             {"scene_image_id": scene_id}
         )
         row = result.mappings().first()
+        if row is None:
+            raise SceneImageNotFoundError(scene_id)
         coords = row["bbox_coord"]
-        bbox_coords = [coords[i] for i in object_indexes if 0 <= i < len(coords)]
+        indexed_coords = [
+            (i, coords[i]) for i in object_indexes if 0 <= i < len(coords)
+        ]
 
         return {
             "image_url": row["image_url"],
-            "bbox_coords": bbox_coords
+            "indexed_coords": indexed_coords
         }
 
     async def find_similar_skus(
@@ -170,15 +174,7 @@ class SimilarSkuService:
 
         Returns:
             유사도 내림차순으로 정렬된 SKU 목록입니다.
-
-        Raises:
-            SimilarSkuQueryError: 임베딩 차원이 스키마와 다른 경우입니다.
         """
-        if len(embedding) != EMBEDDING_DIMENSIONS:
-            raise SimilarSkuQueryError(
-                f"임베딩 벡터 차원은 {EMBEDDING_DIMENSIONS} 차원이어야 합니다. "
-                f"현재 {len(embedding)} 차원입니다."
-            )
 
         result = await self.session.execute(
             _SIMILAR_SKU_QUERY,

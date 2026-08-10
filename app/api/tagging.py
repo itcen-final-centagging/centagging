@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from app.dependencies import get_similar_sku_service
 
 from app.schemas.tagging import DetectionResponse
-from app.services.similar_sku_service import SimilarSkuService
+from app.services.similar_sku_service import SimilarSkuService, SceneImageNotFoundError
 
 router = APIRouter(prefix="/tagging", tags=["tagging"])
 
@@ -24,6 +24,9 @@ async def get_recommendation_sku(
         Returns:
             탐지된 객체 별 유사 SKU 후보 정보 목록을 반환합니다.
         """
-    result = await similar_sku_service.orchestrate_similar_skus(scene_id, object_indexes)
+    try:
+        result = await similar_sku_service.orchestrate_similar_skus(scene_id, object_indexes)
+    except SceneImageNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
     return DetectionResponse(status="success", data=result)
