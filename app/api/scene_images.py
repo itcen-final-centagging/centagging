@@ -57,19 +57,19 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
     )
     RETURNING scene_image_id
     """)
-_UPDATE_ANALYSIS_SUCCESS = sqlalchemy.text("""
+_UPDATE_DETECTION_SUCCESS = sqlalchemy.text("""
     UPDATE scene_image
     SET
         bbox_coord = CAST(:bbox_coord AS jsonb),
-        analysis_status = 'completed',
-        analysis_error = NULL
+        analysis_status = :analysis_status,
+        analysis_error = :analysis_error
     WHERE scene_image_id = :scene_image_id
 """)
 
 _UPDATE_ANALYSIS_FAILURE = sqlalchemy.text("""
     UPDATE scene_image
     SET
-        analysis_status = 'failed',
+        analysis_status = :analysis_status,
         analysis_error = :analysis_error
     WHERE scene_image_id = :scene_image_id
 """)
@@ -126,7 +126,7 @@ def _build_detected_objects(
 
 
 # 분석 성공 시 성공 상태 저장
-async def _save_analysis_success(
+async def _save_detection_success(
     database_session: database.sqlalchemy_async.AsyncSession,
     scene_image_id: int,
     detected_objects: list[DetectedObjectResponse],
@@ -145,13 +145,32 @@ async def _save_analysis_success(
         )
 
     await database_session.execute(
-        _UPDATE_ANALYSIS_SUCCESS,
+        _UPDATE_DETECTION_SUCCESS,
         {
             "scene_image_id": scene_image_id,
+            "analysis_status": "detected",
+            "analysis_error": None,
             "bbox_coord": json.dumps(
                 bbox_coord,
                 ensure_ascii=False,
             ),
+        },
+    )
+    await database_session.commit()
+
+
+async def _save_analysis_failure(
+    database_session: database.sqlalchemy_async.AsyncSession,
+    scene_image_id: int,
+    analysis_error: str,
+) -> None:
+    """분석 실패 상태와 오류 원인을 저장합니다."""
+    await database_session.execute(
+        _UPDATE_ANALYSIS_FAILURE,
+        {
+            "scene_image_id": scene_image_id,
+            "analysis_status": "failed",
+            "analysis_error": analysis_error,
         },
     )
     await database_session.commit()
@@ -245,18 +264,29 @@ async def upload_scene_image(
             validated.content,
             settings,
         )
-    except Exception as error:
+        detected_objects = _build_detected_objects(detection_result)
+
+        await _save_detection_success(
+            database_session,
+            scene_image_id,
+            detected_objects,
+        )
+    # 탐지와 결과 저장의 외부 예외를 동일한 failed 상태로 기록합니다.
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        await _rollback(database_session)
+        try:
+            await _save_analysis_failure(
+                database_session,
+                scene_image_id,
+                str(error) or error.__class__.__name__,
+            )
+        # 원래 탐지 오류를 보존하므로 상태 저장 오류는 로그로 남깁니다.
+        except Exception:  # pylint: disable=broad-exception-caught
+            await _rollback(database_session)
+            _LOGGER.exception("객체 탐지 실패 상태 저장에 실패했습니다.")
         raise fastapi.HTTPException(
             status_code=502, detail="가구 탐지에 실패했습니다."
         ) from error
-
-    detected_objects = _build_detected_objects(detection_result)
-
-    await _save_analysis_success(
-        database_session,
-        scene_image_id,
-        detected_objects,
-    )
 
     return ImageValidationResponse(
         status="validated",

@@ -2,6 +2,7 @@
 
 import asyncio
 import collections.abc
+import logging
 import pathlib
 import typing
 
@@ -103,6 +104,15 @@ _CROP_IMAGE_COORD_QUERY = sqlalchemy.text("""
      WHERE scene_image_id = :scene_image_id
     """)
 
+_UPDATE_ANALYSIS_STATUS = sqlalchemy.text("""
+    UPDATE scene_image
+       SET analysis_status = :analysis_status,
+           analysis_error = :analysis_error
+     WHERE scene_image_id = :scene_image_id
+    """)
+
+_LOGGER = logging.getLogger(__name__)
+
 
 class SimilarSkuService:
     """크롭 이미지 임베딩으로 유사 SKU를 조회하는 서비스입니다."""
@@ -142,20 +152,32 @@ class SimilarSkuService:
             SceneImageNotFoundError: scene_id에 해당하는 장면 이미지가
                 없는 경우입니다.
         """
-        scene = await self.get_crop_image_coords(scene_id, object_indexes)
+        try:
+            scene = await self.get_crop_image_coords(scene_id, object_indexes)
 
-        image_path = pathlib.Path(self.settings.image_storage_root) / scene[
-            "image_url"
-        ].removeprefix("/uploads/")
-
-        objects = []
-
-        with Image.open(image_path, "r") as scene_image:
-            for object_index, coord in scene["indexed_coords"]:
-                crop_image = get_crop_image(scene_image, coord)
-                embedding = await asyncio.to_thread(
-                    self.gemini_service.embed_image, crop_image
+            if not scene["indexed_coords"]:
+                return DetectionResult(
+                    processing_status="detected",
+                    objects=[],
                 )
+
+            image_path = pathlib.Path(self.settings.image_storage_root) / scene[
+                "image_url"
+            ].removeprefix("/uploads/")
+
+            embedded_objects = []
+            with Image.open(image_path, "r") as scene_image:
+                for object_index, coord in scene["indexed_coords"]:
+                    crop_image = get_crop_image(scene_image, coord)
+                    embedding = await asyncio.to_thread(
+                        self.gemini_service.embed_image, crop_image
+                    )
+                    embedded_objects.append((object_index, coord, embedding))
+
+            await self._update_analysis_status(scene_id, "embedded")
+
+            objects = []
+            for object_index, coord, embedding in embedded_objects:
                 similar_skus = await self.find_similar_skus(embedding)
 
                 objects.append(
@@ -189,10 +211,57 @@ class SimilarSkuService:
                         ],
                     )
                 )
-        return DetectionResult(
-            processing_status="DETECTED",
-            objects=objects,
+
+            await self._update_analysis_status(scene_id, "completed")
+
+            return DetectionResult(
+                processing_status="completed",
+                objects=objects,
+            )
+        except SceneImageNotFoundError:
+            raise
+        # 이미지·Gemini·DB 경계의 예외를 동일한 failed 상태로 기록합니다.
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            await self._save_analysis_failure(scene_id, error)
+            raise
+
+    async def _update_analysis_status(
+        self,
+        scene_id: int,
+        analysis_status: typing.Literal["embedded", "completed", "failed"],
+        analysis_error: str | None = None,
+    ) -> None:
+        """장면 이미지의 분석 상태와 오류 원인을 저장합니다."""
+        await self.session.execute(
+            _UPDATE_ANALYSIS_STATUS,
+            {
+                "scene_image_id": scene_id,
+                "analysis_status": analysis_status,
+                "analysis_error": analysis_error,
+            },
         )
+        await self.session.commit()
+
+    async def _save_analysis_failure(
+        self,
+        scene_id: int,
+        error: Exception,
+    ) -> None:
+        """현재 트랜잭션을 정리하고 분석 실패 상태를 기록합니다."""
+        await self.session.rollback()
+        try:
+            await self._update_analysis_status(
+                scene_id,
+                "failed",
+                str(error) or error.__class__.__name__,
+            )
+        # 원래 처리 오류를 보존하므로 상태 저장 오류는 로그로 남깁니다.
+        except Exception:  # pylint: disable=broad-exception-caught
+            await self.session.rollback()
+            _LOGGER.exception(
+                "scene_image 분석 실패 상태 저장에 실패했습니다: %s",
+                scene_id,
+            )
 
     async def get_crop_image_coords(
         self,

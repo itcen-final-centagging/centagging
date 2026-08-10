@@ -103,21 +103,43 @@ class _FakeSimilarSkuSession:
         self,
         scene_row: dict[str, object] | None,
         similar_rows: list[dict[str, object]] | None = None,
+        scene_query_error: Exception | None = None,
+        similar_query_error: Exception | None = None,
     ) -> None:
         self._scene_row = scene_row
         self._similar_rows = similar_rows if similar_rows is not None else []
+        self._scene_query_error = scene_query_error
+        self._similar_query_error = similar_query_error
         self.similar_query_embeddings: list[list[float]] = []
+        self.status_updates: list[dict[str, object]] = []
+        self.commit_count = 0
+        self.rollback_count = 0
 
     async def execute(
         self, statement: object, parameters: dict[str, object]
     ) -> _FakeMappingsResult:
         """쿼리 텍스트로 scene_image 조회와 유사 SKU 조회를 구분합니다."""
         if "FROM scene_image" in str(statement):
+            if self._scene_query_error is not None:
+                raise self._scene_query_error
             rows = [self._scene_row] if self._scene_row is not None else []
             return _FakeMappingsResult(rows)
+        if "UPDATE scene_image" in str(statement):
+            self.status_updates.append(parameters)
+            return _FakeMappingsResult([])
 
         self.similar_query_embeddings.append(parameters["embedding"])
+        if self._similar_query_error is not None:
+            raise self._similar_query_error
         return _FakeMappingsResult(self._similar_rows)
+
+    async def commit(self) -> None:
+        """상태 변경 커밋 횟수를 기록합니다."""
+        self.commit_count += 1
+
+    async def rollback(self) -> None:
+        """오류 발생 시 롤백 횟수를 기록합니다."""
+        self.rollback_count += 1
 
 
 class _FakeGeminiService:
@@ -130,6 +152,14 @@ class _FakeGeminiService:
         """전달받은 크롭 이미지를 기록하고 고정 임베딩을 반환합니다."""
         self.received_images.append(image.copy())
         return [0.1] * similar_sku_service.EMBEDDING_DIMENSIONS
+
+
+class _FailingGeminiService(_FakeGeminiService):
+    """임베딩 단계 오류를 발생시키는 가짜 서비스입니다."""
+
+    def embed_image(self, image: PIL.Image.Image) -> list[float]:
+        """임베딩 실패 상황을 재현합니다."""
+        raise RuntimeError("embedding failed")
 
 
 def _test_settings(image_storage_root: str) -> config.Settings:
@@ -285,6 +315,23 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             result.objects[0].sku_candidates[0].similarity_score, 87
         )
+        self.assertEqual(result.processing_status, "completed")
+        self.assertEqual(
+            session.status_updates,
+            [
+                {
+                    "scene_image_id": 1,
+                    "analysis_status": "embedded",
+                    "analysis_error": None,
+                },
+                {
+                    "scene_image_id": 1,
+                    "analysis_status": "completed",
+                    "analysis_error": None,
+                },
+            ],
+        )
+        self.assertEqual(session.commit_count, 2)
 
     async def test_returns_empty_objects_when_no_indexes_requested(
         self,
@@ -315,6 +362,102 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.objects, [])
         self.assertEqual(gemini_service.received_images, [])
+        self.assertEqual(result.processing_status, "detected")
+        self.assertEqual(session.status_updates, [])
+
+    async def test_marks_failed_when_embedding_fails(self) -> None:
+        """임베딩 오류가 발생하면 failed 상태와 원인을 저장합니다."""
+        scene_row = {
+            "image_url": "/uploads/scene-images/scene.png",
+            "bbox_coord": [
+                {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0}
+            ],
+        }
+        session = _FakeSimilarSkuSession(scene_row=scene_row)
+        service = similar_sku_service.SimilarSkuService(
+            session=session,
+            gemini_service=_FailingGeminiService(),
+            settings=self.settings,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "embedding failed"):
+            await service.orchestrate_similar_skus(
+                scene_id=1, object_indexes=[0]
+            )
+
+        self.assertEqual(session.rollback_count, 1)
+        self.assertEqual(
+            session.status_updates,
+            [
+                {
+                    "scene_image_id": 1,
+                    "analysis_status": "failed",
+                    "analysis_error": "embedding failed",
+                }
+            ],
+        )
+
+    async def test_marks_failed_when_scene_query_fails(self) -> None:
+        """장면 조회 오류가 발생해도 failed 상태와 원인을 저장합니다."""
+        session = _FakeSimilarSkuSession(
+            scene_row=None,
+            scene_query_error=RuntimeError("scene query failed"),
+        )
+        service = similar_sku_service.SimilarSkuService(
+            session=session,
+            gemini_service=_FakeGeminiService(),
+            settings=self.settings,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "scene query failed"):
+            await service.orchestrate_similar_skus(
+                scene_id=1, object_indexes=[0]
+            )
+
+        self.assertEqual(
+            session.status_updates,
+            [
+                {
+                    "scene_image_id": 1,
+                    "analysis_status": "failed",
+                    "analysis_error": "scene query failed",
+                }
+            ],
+        )
+
+    async def test_marks_embedded_then_failed_when_candidate_query_fails(
+        self,
+    ) -> None:
+        """후보 생성 오류는 embedded 이후 failed 상태로 전환합니다."""
+        scene_row = {
+            "image_url": "/uploads/scene-images/scene.png",
+            "bbox_coord": [
+                {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0}
+            ],
+        }
+        session = _FakeSimilarSkuSession(
+            scene_row=scene_row,
+            similar_query_error=RuntimeError("candidate query failed"),
+        )
+        service = similar_sku_service.SimilarSkuService(
+            session=session,
+            gemini_service=_FakeGeminiService(),
+            settings=self.settings,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "candidate query failed"):
+            await service.orchestrate_similar_skus(
+                scene_id=1, object_indexes=[0]
+            )
+
+        self.assertEqual(
+            [update["analysis_status"] for update in session.status_updates],
+            ["embedded", "failed"],
+        )
+        self.assertEqual(
+            session.status_updates[-1]["analysis_error"],
+            "candidate query failed",
+        )
 
 
 class TaggingApiTest(unittest.TestCase):
@@ -362,7 +505,7 @@ class TaggingApiTest(unittest.TestCase):
                 captured["scene_id"] = scene_id
                 captured["object_indexes"] = object_indexes
                 return tagging_schemas.DetectionResult(
-                    processing_status="DETECTED", objects=[]
+                    processing_status="completed", objects=[]
                 )
 
         self._override_service(_RecordingService())
@@ -378,7 +521,7 @@ class TaggingApiTest(unittest.TestCase):
             response.json(),
             {
                 "status": "success",
-                "data": {"processing_status": "DETECTED", "objects": []},
+                "data": {"processing_status": "completed", "objects": []},
             },
         )
 

@@ -159,6 +159,7 @@ class _FakeSession:
         self.analysis_update_parameters: dict[str, object] | None = None
         self.user_lookup_parameters: dict[str, object] | None = None
         self.rollback_called = False
+        self.commit_count = 0
 
     async def execute(
         self, _statement: object, parameters: dict[str, object]
@@ -179,6 +180,7 @@ class _FakeSession:
         """commit을 수행하거나 설정된 커밋 오류를 발생시킵니다."""
         if self.commit_error is not None:
             raise self.commit_error
+        self.commit_count += 1
 
     async def rollback(self) -> None:
         """rollback 호출 여부를 기록합니다."""
@@ -236,7 +238,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
             "detect_furniture_from_bytes",
             return_value=detection_result,
         )
-        self.detection_patch.start()
+        self.detection_mock = self.detection_patch.start()
         self.client = starlette.testclient.TestClient(self.app)
 
     def tearDown(self) -> None:
@@ -304,6 +306,32 @@ class UploadSceneImageApiTest(unittest.TestCase):
                 }
             ],
         )
+        self.assertEqual(
+            self.session.analysis_update_parameters["analysis_status"],
+            "detected",
+        )
+        self.assertIsNone(
+            self.session.analysis_update_parameters["analysis_error"]
+        )
+        self.assertEqual(self.session.commit_count, 2)
+
+    def test_marks_failed_when_detection_fails(self) -> None:
+        """객체 탐지 오류가 발생하면 failed 상태와 원인을 저장합니다."""
+        self.detection_mock.side_effect = RuntimeError("detection failed")
+
+        response = self._post_valid_image()
+
+        self.assertEqual(response.status_code, 502)
+        assert self.session.analysis_update_parameters is not None
+        self.assertEqual(
+            self.session.analysis_update_parameters,
+            {
+                "scene_image_id": 42,
+                "analysis_status": "failed",
+                "analysis_error": "detection failed",
+            },
+        )
+        self.assertEqual(self.session.commit_count, 2)
 
     def test_returns_validation_error_for_invalid_upload(self) -> None:
         """디코딩할 수 없는 multipart 업로드를 거부합니다."""
