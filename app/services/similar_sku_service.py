@@ -5,7 +5,7 @@ import collections.abc
 import pathlib
 import typing
 
-import pgvector.sqlalchemy as pgvector_sa
+import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import pydantic
 import sqlalchemy
 from PIL import Image
