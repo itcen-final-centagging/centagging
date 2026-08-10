@@ -1,0 +1,1725 @@
+[
+  {
+    "sku_id": 1,
+    "sku_code": "TBL-DD0F4FA7",
+    "product_name": "콰트로 홈오피스 컴퓨터책상 800 1000 1200 1400 1600 1800 2000",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "홈오피스에 추천해요",
+      "100% 국내 제작·E0급 상판과 견고한 스틸 프레임의 미니멀 데스크",
+      "18mm PB, 양면LPM마감, 1.5T ABS엣지, 스틸프레임 분체도장 마감",
+      "구성품: 책상 1개 (사이즈 택1)"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "미니멀",
+      "pattern": "무지",
+      "shape": "사각형",
+      "top_material": "가공목(MDF 외)",
+      "frame_material": "철제/스틸",
+      "leg_type": "4다리",
+      "has_storage": false
+    }
+  },
+  {
+    "sku_id": 2,
+    "sku_code": "TBL-A606D90C",
+    "product_name": "콰트로 홈오피스 컴퓨터책상 800 1000 1200 1400 1600 1800 2000",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "홈오피스에 추천해요",
+      "100% 국내 제작·E0급 상판과 견고한 스틸 프레임의 미니멀 데스크",
+      "18mm PB, 양면LPM마감, 1.5T ABS엣지, 스틸프레임 분체도장 마감",
+      "구성품: 책상 1개 (사이즈 택1)"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "미니멀",
+      "pattern": "우드그레인",
+      "shape": "사각형",
+      "top_material": "가공목(MDF 외)",
+      "frame_material": "철제/스틸",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "wood_tone": "밝은 우드톤"
+    }
+  },
+  {
+    "sku_id": 3,
+    "sku_code": "TBL-3F816828",
+    "product_name": "콰트로 홈오피스 컴퓨터책상 800 1000 1200 1400 1600 1800 2000",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "홈오피스에 추천해요",
+      "100% 국내 제작·E0급 상판과 견고한 스틸 프레임의 미니멀 데스크",
+      "18mm PB, 양면LPM마감, 1.5T ABS엣지, 스틸프레임 분체도장 마감",
+      "구성품: 책상 1개 (사이즈 택1)"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "미니멀",
+      "pattern": "우드그레인",
+      "shape": "사각형",
+      "top_material": "가공목(MDF 외)",
+      "frame_material": "철제/스틸",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "wood_tone": "어두운 우드톤"
+    }
+  },
+  {
+    "sku_id": 4,
+    "sku_code": "TBL-580A44AB",
+    "product_name": "콰트로 홈오피스 컴퓨터책상 800 1000 1200 1400 1600 1800 2000",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "홈오피스에 추천해요",
+      "100% 국내 제작·E0급 상판과 견고한 스틸 프레임의 미니멀 데스크",
+      "18mm PB, 양면LPM마감, 1.5T ABS엣지, 스틸프레임 분체도장 마감",
+      "구성품: 책상 1개 (사이즈 택1)"
+    ],
+    "attributes": {
+      "color": "블랙",
+      "style": "미니멀",
+      "pattern": "우드그레인",
+      "shape": "사각형",
+      "top_material": "가공목(MDF 외)",
+      "frame_material": "철제/스틸",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "wood_tone": "어두운 우드톤"
+    }
+  },
+  {
+    "sku_id": 5,
+    "sku_code": "SOFA-154E0892",
+    "product_name": "에코 아쿠아텍스 3인용 소파",
+    "category": "소파",
+    "sub_category": "일반소파",
+    "key_features": [
+      "2인 가구에 추천해요",
+      "탄력 있는 쿠션과 아쿠아텍스 원단으로 물티슈로 닦아 관리 쉬운 소파.",
+      "아쿠아텍스 패브릭, 분체도장 철재 다리, HR골드스펀지, 캐시미론, S자 스프링, 엘라스틱 밴드",
+      "구성품: 3인용 소파 단품",
+      "크기 W1900 x D800 x H750mm"
+    ],
+    "attributes": {
+      "color": "옐로우",
+      "style": "내추럴",
+      "target_customer": "신혼부부",
+      "pattern": "무지",
+      "sofa_type": "기본형(일자형)",
+      "material": "패브릭",
+      "has_legs": true,
+      "has_armrest": true,
+      "has_headrest": false,
+      "has_stool": false
+    }
+  },
+  {
+    "sku_id": 6,
+    "sku_code": "SOFA-F7B74CCB",
+    "product_name": "에코 아쿠아텍스 3인용 소파",
+    "category": "소파",
+    "sub_category": "일반소파",
+    "key_features": [
+      "2인 가구에 추천해요",
+      "탄력 있는 쿠션과 아쿠아텍스 원단으로 물티슈로 닦아 관리 쉬운 소파.",
+      "아쿠아텍스 패브릭, 분체도장 철재 다리, HR골드스펀지, 캐시미론, S자 스프링, 엘라스틱 밴드",
+      "구성품: 3인용 소파 단품",
+      "크기 W1900 x D800 x H750mm"
+    ],
+    "attributes": {
+      "color": "블루",
+      "style": "내추럴",
+      "target_customer": "신혼부부",
+      "pattern": "무지",
+      "sofa_type": "기본형(일자형)",
+      "material": "패브릭",
+      "has_legs": true,
+      "has_armrest": true,
+      "has_headrest": false,
+      "has_stool": false
+    }
+  },
+  {
+    "sku_id": 7,
+    "sku_code": "SOFA-B5A8C95F",
+    "product_name": "에코 아쿠아텍스 3인용 소파",
+    "category": "소파",
+    "sub_category": "일반소파",
+    "key_features": [
+      "2인 가구에 추천해요",
+      "탄력 있는 쿠션과 아쿠아텍스 원단으로 물티슈로 닦아 관리 쉬운 소파.",
+      "아쿠아텍스 패브릭, 분체도장 철재 다리, HR골드스펀지, 캐시미론, S자 스프링, 엘라스틱 밴드",
+      "구성품: 3인용 소파 단품",
+      "크기 W1900 x D800 x H750mm"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "내추럴",
+      "target_customer": "신혼부부",
+      "pattern": "무지",
+      "sofa_type": "기본형(일자형)",
+      "material": "패브릭",
+      "has_legs": true,
+      "has_armrest": true,
+      "has_headrest": false,
+      "has_stool": false
+    }
+  },
+  {
+    "sku_id": 8,
+    "sku_code": "BED-42BC398F",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "어두운 우드톤",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 9,
+    "sku_code": "BED-BA82AF04",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 10,
+    "sku_code": "BED-EC1B48A1",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "밝은 우드톤",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 11,
+    "sku_code": "BED-E61677AA",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 12,
+    "sku_code": "BED-E12F5983",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "어두운 우드톤",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 13,
+    "sku_code": "BED-FB924AE4",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 14,
+    "sku_code": "BED-5D9AD08A",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "밝은 우드톤",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 15,
+    "sku_code": "BED-45F3F62E",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": false,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 16,
+    "sku_code": "BED-8F9C7FED",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "어두운 우드톤",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 17,
+    "sku_code": "BED-689ADB53",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 18,
+    "sku_code": "BED-65297881",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "밝은 우드톤",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 19,
+    "sku_code": "BED-E26FDE14",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 20,
+    "sku_code": "BED-8E56AEEB",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "어두운 우드톤",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 21,
+    "sku_code": "BED-CA577B9D",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 22,
+    "sku_code": "BED-85F6C009",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "wood_tone": "밝은 우드톤",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 23,
+    "sku_code": "BED-E60284A6",
+    "product_name": "에디트 헤드리스 평상형침대프레임 SS/Q,K 호환",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "저상형 평상 프레임",
+      "허니콤 깔판과 50T 프레임으로 견고하고 매트리스 밀림방지."
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "내추럴",
+      "pattern": "무지",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": true,
+      "frame_type": "하단오픈형",
+      "material": "가공목(MDF 외)",
+      "head_type": "패널형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 24,
+    "sku_code": "MATT-D047980C",
+    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "처음 매트리스로 추천해요",
+      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "mattress_type": "스프링",
+      "size": "싱글(S)",
+      "thickness": "21~30cm",
+      "features": "통풍"
+    }
+  },
+  {
+    "sku_id": 25,
+    "sku_code": "MATT-CA5DABB9",
+    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "처음 매트리스로 추천해요",
+      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "mattress_type": "스프링",
+      "size": "슈퍼싱글(SS)",
+      "thickness": "21~30cm",
+      "features": "통풍"
+    }
+  },
+  {
+    "sku_id": 26,
+    "sku_code": "MATT-A5461C75",
+    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "처음 매트리스로 추천해요",
+      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "mattress_type": "스프링",
+      "size": "퀸(Q)",
+      "thickness": "21~30cm",
+      "features": "통풍"
+    }
+  },
+  {
+    "sku_id": 27,
+    "sku_code": "MATT-8FEAF2C6",
+    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "처음 매트리스로 추천해요",
+      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "mattress_type": "스프링",
+      "size": "킹(K)",
+      "thickness": "21~30cm",
+      "features": "통풍"
+    }
+  },
+  {
+    "sku_id": 28,
+    "sku_code": "MATT-5327CD27",
+    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "처음 매트리스로 추천해요",
+      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "mattress_type": "스프링",
+      "size": "라지킹(LK)",
+      "thickness": "21~30cm",
+      "features": "통풍"
+    }
+  },
+  {
+    "sku_id": 29,
+    "sku_code": "SHLF-4597C855",
+    "product_name": "철제 선반 경량랙 펜트리 베란다 선반장 무볼트 조립식 앵글 본사직영",
+    "category": "선반",
+    "sub_category": "앵글·조립식선반",
+    "key_features": [
+      "좁은 공간 수납에 좋아요",
+      "무볼트 조립으로 5분 완성, 단당 150kg 견딥니다",
+      "MDF, STEEL",
+      "구성품: 프레임, 합판"
+    ],
+    "attributes": {
+      "color": "블랙",
+      "style": "인더스트리얼",
+      "pattern": "우드그레인",
+      "shelf_type": "앵글·조립식선반",
+      "material": "가공목(MDF 외)",
+      "frame_material": "철제/스틸",
+      "shelf_count": "2단"
+    }
+  },
+  {
+    "sku_id": 30,
+    "sku_code": "SHLF-8C5A19FA",
+    "product_name": "철제 선반 경량랙 펜트리 베란다 선반장 무볼트 조립식 앵글 본사직영",
+    "category": "선반",
+    "sub_category": "앵글·조립식선반",
+    "key_features": [
+      "좁은 공간 수납에 좋아요",
+      "무볼트 조립으로 5분 완성, 단당 150kg 견딥니다",
+      "MDF, STEEL",
+      "구성품: 프레임, 합판"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "인더스트리얼",
+      "pattern": "우드그레인",
+      "shelf_type": "앵글·조립식선반",
+      "material": "가공목(MDF 외)",
+      "frame_material": "철제/스틸",
+      "shelf_count": "2단"
+    }
+  },
+  {
+    "sku_id": 31,
+    "sku_code": "DRW-6618815C",
+    "product_name": "데이지 5단 서랍장",
+    "category": "서랍·수납장",
+    "sub_category": "서랍장",
+    "key_features": [
+      "방·거실 수납에 추천해요",
+      "LPM 마감과 스틸 다리로 튼튼하고 깔끔한 화이트 서랍장.",
+      "15t PB+LPM, 피니싱포일",
+      "구성품: 5단서랍장 1개",
+      "크기 W994 x D500 x H1140mm"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "우드그레인",
+      "storage_type": "서랍장",
+      "drawer_count": "5단 이상",
+      "material": "가공목",
+      "wood_tone": "밝은 우드톤",
+      "has_legs": true,
+      "has_wheels": false,
+      "has_drawer": true
+    }
+  },
+  {
+    "sku_id": 32,
+    "sku_code": "MATT-58947CF4",
+    "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "허리 지지 필요한 분께 추천해요",
+      "독립 포켓스프링·필로우탑으로 탄탄하고 포근해요.",
+      "상품상세페이지 참조",
+      "구성품: 침대매트리스 1EA"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "패브릭 텍스처",
+      "mattress_type": "스프링",
+      "size": "싱글(S)",
+      "firmness": "미디엄",
+      "thickness": "21~30cm"
+    }
+  },
+  {
+    "sku_id": 33,
+    "sku_code": "MATT-B3952725",
+    "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "허리 지지 필요한 분께 추천해요",
+      "독립 포켓스프링·필로우탑으로 탄탄하고 포근해요.",
+      "상품상세페이지 참조",
+      "구성품: 침대매트리스 1EA"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "패브릭 텍스처",
+      "mattress_type": "스프링",
+      "size": "슈퍼싱글(SS)",
+      "firmness": "미디엄",
+      "thickness": "21~30cm"
+    }
+  },
+  {
+    "sku_id": 34,
+    "sku_code": "MATT-53FDC714",
+    "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "허리 지지 필요한 분께 추천해요",
+      "독립 포켓스프링·필로우탑으로 탄탄하고 포근해요.",
+      "상품상세페이지 참조",
+      "구성품: 침대매트리스 1EA"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "패브릭 텍스처",
+      "mattress_type": "스프링",
+      "size": "퀸(Q)",
+      "firmness": "미디엄",
+      "thickness": "21~30cm"
+    }
+  },
+  {
+    "sku_id": 35,
+    "sku_code": "MATT-8E36B543",
+    "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "허리 지지 필요한 분께 추천해요",
+      "독립 포켓스프링·필로우탑으로 탄탄하고 포근해요.",
+      "상품상세페이지 참조",
+      "구성품: 침대매트리스 1EA"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "패브릭 텍스처",
+      "mattress_type": "스프링",
+      "size": "킹(K)",
+      "firmness": "미디엄",
+      "thickness": "21~30cm"
+    }
+  },
+  {
+    "sku_id": 36,
+    "sku_code": "MATT-A7C15435",
+    "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
+    "category": "매트리스",
+    "sub_category": "매트리스",
+    "key_features": [
+      "허리 지지 필요한 분께 추천해요",
+      "독립 포켓스프링·필로우탑으로 탄탄하고 포근해요.",
+      "상품상세페이지 참조",
+      "구성품: 침대매트리스 1EA"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "패브릭 텍스처",
+      "mattress_type": "스프링",
+      "size": "라지킹(LK)",
+      "firmness": "미디엄",
+      "thickness": "21~30cm"
+    }
+  },
+  {
+    "sku_id": 37,
+    "sku_code": "CHR-5508CBA6",
+    "product_name": "뮤즈 편한 팔걸이 컴퓨터 메쉬 사무용 책상 의자",
+    "category": "의자",
+    "sub_category": "학생·사무용의자",
+    "key_features": [
+      "재택근무·공부용으로 추천해요",
+      "통기성 좋은 메쉬와 푹신한 방석으로 장시간 편안해요.",
+      "스틸, 메쉬천, 스펀지, PP, 우레탄 외",
+      "구성품: 등판,좌판,플레이트,중심봉,오발,바퀴 외 의자 1세트"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "학생·사무용의자",
+      "material": "메쉬",
+      "has_wheels": true,
+      "has_backrest": true,
+      "has_armrest": true
+    }
+  },
+  {
+    "sku_id": 38,
+    "sku_code": "CHR-139E3048",
+    "product_name": "뮤즈 편한 팔걸이 컴퓨터 메쉬 사무용 책상 의자",
+    "category": "의자",
+    "sub_category": "학생·사무용의자",
+    "key_features": [
+      "재택근무·공부용으로 추천해요",
+      "통기성 좋은 메쉬와 푹신한 방석으로 장시간 편안해요.",
+      "스틸, 메쉬천, 스펀지, PP, 우레탄 외",
+      "구성품: 등판,좌판,플레이트,중심봉,오발,바퀴 외 의자 1세트"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "학생·사무용의자",
+      "material": "메쉬",
+      "has_wheels": true,
+      "has_backrest": true,
+      "has_armrest": true
+    }
+  },
+  {
+    "sku_id": 39,
+    "sku_code": "SOFA-FFB60C77",
+    "product_name": "바움 천연면피 가죽 4인용 소파 (스툴선택)",
+    "category": "소파",
+    "sub_category": "일반소파",
+    "key_features": [
+      "온가족이 편히 쉴 수 있는 넓은 좌방석",
+      "천연면피가죽과 오리털의 포근한 착석감."
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "모던",
+      "target_customer": "가족",
+      "pattern": "무지",
+      "sofa_type": "기본형(일자형)",
+      "material": "천연가죽",
+      "has_legs": true,
+      "has_armrest": true,
+      "has_headrest": false,
+      "has_stool": false
+    }
+  },
+  {
+    "sku_id": 40,
+    "sku_code": "SOFA-F37C2F1D",
+    "product_name": "바움 천연면피 가죽 4인용 소파 (스툴선택)",
+    "category": "소파",
+    "sub_category": "일반소파",
+    "key_features": [
+      "온가족이 편히 쉴 수 있는 넓은 좌방석",
+      "천연면피가죽과 오리털의 포근한 착석감."
+    ],
+    "attributes": {
+      "color": "베이지",
+      "style": "모던",
+      "target_customer": "가족",
+      "pattern": "무지",
+      "sofa_type": "기본형(일자형)",
+      "material": "천연가죽",
+      "has_legs": true,
+      "has_armrest": true,
+      "has_headrest": false,
+      "has_stool": false
+    }
+  },
+  {
+    "sku_id": 41,
+    "sku_code": "SOFA-70C6E644",
+    "product_name": "바움 천연면피 가죽 4인용 소파 (스툴선택)",
+    "category": "소파",
+    "sub_category": "일반소파",
+    "key_features": [
+      "온가족이 편히 쉴 수 있는 넓은 좌방석",
+      "천연면피가죽과 오리털의 포근한 착석감."
+    ],
+    "attributes": {
+      "color": "블랙",
+      "style": "모던",
+      "target_customer": "가족",
+      "pattern": "무지",
+      "sofa_type": "기본형(일자형)",
+      "material": "천연가죽",
+      "has_legs": true,
+      "has_armrest": true,
+      "has_headrest": false,
+      "has_stool": false
+    }
+  },
+  {
+    "sku_id": 42,
+    "sku_code": "SOFA-11025B36",
+    "product_name": "빈켈 103 아쿠아텍스 4인용소파",
+    "category": "소파",
+    "sub_category": "일반소파",
+    "key_features": [],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "sofa_type": "기본형(일자형)",
+      "material": "패브릭",
+      "has_legs": true,
+      "has_armrest": true,
+      "has_headrest": false,
+      "has_stool": false
+    }
+  },
+  {
+    "sku_id": 43,
+    "sku_code": "MIR-16A2F277",
+    "product_name": "모어 아치형 스탠드 전신거울(비산방지기능)",
+    "category": "거울",
+    "sub_category": "전신거울",
+    "key_features": [
+      "프레임리스 마감의 전신거울로 공간을 넓게 연출하세요",
+      "목재 후면과 비산방지로 안전해요",
+      "E0등급 PB 데코시트마감",
+      "구성품: 전신거울",
+      "크기 W300 x D15 x H1500mm"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "미니멀",
+      "pattern": "무지",
+      "installation_type": "스탠드형",
+      "shape": "아치형",
+      "has_frame": false
+    }
+  },
+  {
+    "sku_id": 44,
+    "sku_code": "WRD-151F1221",
+    "product_name": "퓨리타 키큰옷장 일반도어 화이트 (800/1000)",
+    "category": "행거·옷장",
+    "sub_category": "옷장",
+    "key_features": [
+      "넉넉한 수납을 찾는 분께 추천해요",
+      "E0 보드와 행거봉 25kg으로 튼튼하고 안전해요.",
+      "[상세설명참조]",
+      "구성품: [상세설명참조]"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "미니멀",
+      "pattern": "무지",
+      "wardrobe_type": "이불장",
+      "layout_type": "ㅡ자형",
+      "mobility_type": "고정식",
+      "door_type": "여닫이",
+      "storage_features": "선반 포함",
+      "material": "가공목"
+    }
+  },
+  {
+    "sku_id": 45,
+    "sku_code": "WRD-4B8A8B3C",
+    "product_name": "퓨리타 키큰옷장 일반도어 화이트 (800/1000)",
+    "category": "행거·옷장",
+    "sub_category": "옷장",
+    "key_features": [
+      "넉넉한 수납을 찾는 분께 추천해요",
+      "E0 보드와 행거봉 25kg으로 튼튼하고 안전해요.",
+      "[상세설명참조]",
+      "구성품: [상세설명참조]"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "미니멀",
+      "pattern": "무지",
+      "wardrobe_type": "긴 옷장",
+      "layout_type": "ㅡ자형",
+      "mobility_type": "고정식",
+      "door_type": "여닫이",
+      "storage_features": "선반 포함",
+      "material": "가공목"
+    }
+  },
+  {
+    "sku_id": 46,
+    "sku_code": "WRD-D2C34CD2",
+    "product_name": "퓨리타 키큰옷장 일반도어 화이트 (800/1000)",
+    "category": "행거·옷장",
+    "sub_category": "옷장",
+    "key_features": [
+      "넉넉한 수납을 찾는 분께 추천해요",
+      "E0 보드와 행거봉 25kg으로 튼튼하고 안전해요.",
+      "[상세설명참조]",
+      "구성품: [상세설명참조]"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "미니멀",
+      "pattern": "무지",
+      "layout_type": "ㅡ자형",
+      "mobility_type": "고정식",
+      "door_type": "여닫이",
+      "storage_features": "선반 포함",
+      "material": "가공목"
+    }
+  },
+  {
+    "sku_id": 47,
+    "sku_code": "TBL-72E85237",
+    "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "원목 가구로 튼튼하고 화사해요",
+      "설치 서비스 가능하고 혼자서도 조립됩니다.",
+      "원목(러버우드), 무늬목, MDF",
+      "구성품: 책상 1EA",
+      "크기 W850 x D650 x H740mm"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "내추럴",
+      "pattern": "무지",
+      "shape": "사각형",
+      "top_material": "원목",
+      "frame_material": "원목",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "seating_capacity": "2인"
+    }
+  },
+  {
+    "sku_id": 48,
+    "sku_code": "TBL-563FD10D",
+    "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "원목 가구로 튼튼하고 화사해요",
+      "설치 서비스 가능하고 혼자서도 조립됩니다.",
+      "원목(러버우드), 무늬목, MDF",
+      "구성품: 책상 1EA",
+      "크기 W850 x D650 x H740mm"
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "shape": "사각형",
+      "top_material": "원목",
+      "frame_material": "원목",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "wood_tone": "밝은 우드톤",
+      "seating_capacity": "2인"
+    }
+  },
+  {
+    "sku_id": 49,
+    "sku_code": "TBL-4B7F9E7A",
+    "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "원목 가구로 튼튼하고 화사해요",
+      "설치 서비스 가능하고 혼자서도 조립됩니다.",
+      "원목(러버우드), 무늬목, MDF",
+      "구성품: 책상 1EA",
+      "크기 W850 x D650 x H740mm"
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "shape": "사각형",
+      "top_material": "원목",
+      "frame_material": "원목",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "wood_tone": "어두운 우드톤",
+      "seating_capacity": "2인"
+    }
+  },
+  {
+    "sku_id": 50,
+    "sku_code": "TBL-F39A0778",
+    "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
+    "category": "테이블·식탁·책상",
+    "sub_category": "책상",
+    "key_features": [
+      "원목 가구로 튼튼하고 화사해요",
+      "설치 서비스 가능하고 혼자서도 조립됩니다.",
+      "원목(러버우드), 무늬목, MDF",
+      "구성품: 책상 1EA",
+      "크기 W850 x D650 x H740mm"
+    ],
+    "attributes": {
+      "color": "블랙",
+      "style": "내추럴",
+      "pattern": "무지",
+      "shape": "사각형",
+      "top_material": "원목",
+      "frame_material": "원목",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "seating_capacity": "2인"
+    }
+  },
+  {
+    "sku_id": 51,
+    "sku_code": "BED-81B2648A",
+    "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "호텔식 침대로 공간을 고급스럽게, 정품 조야패브릭과 통판형 파운데이션으로 견고하고 관리 쉬워요.",
+      "조야, E0 원목, 고탄성골드스펀지, 마이크로화이버, 견면, E0 원목, E0 LVL",
+      "구성품: 침대프레임"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "럭셔리",
+      "pattern": "패브릭 텍스처",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": false,
+      "frame_type": "하단밀폐형",
+      "material": "패브릭",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 52,
+    "sku_code": "BED-4C084F4C",
+    "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "호텔식 침대로 공간을 고급스럽게, 정품 조야패브릭과 통판형 파운데이션으로 견고하고 관리 쉬워요.",
+      "조야, E0 원목, 고탄성골드스펀지, 마이크로화이버, 견면, E0 원목, E0 LVL",
+      "구성품: 침대프레임"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "럭셔리",
+      "pattern": "패브릭 텍스처",
+      "bed_type": "성인용",
+      "size": "슈퍼싱글(SS)",
+      "has_headboard": true,
+      "frame_type": "하단밀폐형",
+      "material": "패브릭",
+      "head_type": "곡선형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 53,
+    "sku_code": "BED-6FFAA408",
+    "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "호텔식 침대로 공간을 고급스럽게, 정품 조야패브릭과 통판형 파운데이션으로 견고하고 관리 쉬워요.",
+      "조야, E0 원목, 고탄성골드스펀지, 마이크로화이버, 견면, E0 원목, E0 LVL",
+      "구성품: 침대프레임"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "럭셔리",
+      "pattern": "패브릭 텍스처",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": false,
+      "frame_type": "하단밀폐형",
+      "material": "패브릭",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 54,
+    "sku_code": "BED-D27C2534",
+    "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "호텔식 침대로 공간을 고급스럽게, 정품 조야패브릭과 통판형 파운데이션으로 견고하고 관리 쉬워요.",
+      "조야, E0 원목, 고탄성골드스펀지, 마이크로화이버, 견면, E0 원목, E0 LVL",
+      "구성품: 침대프레임"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "럭셔리",
+      "pattern": "패브릭 텍스처",
+      "bed_type": "성인용",
+      "size": "퀸(Q)",
+      "has_headboard": true,
+      "frame_type": "하단밀폐형",
+      "material": "패브릭",
+      "head_type": "곡선형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 55,
+    "sku_code": "BED-B02FE503",
+    "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "호텔식 침대로 공간을 고급스럽게, 정품 조야패브릭과 통판형 파운데이션으로 견고하고 관리 쉬워요.",
+      "조야, E0 원목, 고탄성골드스펀지, 마이크로화이버, 견면, E0 원목, E0 LVL",
+      "구성품: 침대프레임"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "럭셔리",
+      "pattern": "패브릭 텍스처",
+      "bed_type": "성인용",
+      "size": "라지킹(LK)",
+      "has_headboard": false,
+      "frame_type": "하단밀폐형",
+      "material": "패브릭",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 56,
+    "sku_code": "BED-61955F5B",
+    "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
+    "category": "침대",
+    "sub_category": "침대프레임",
+    "key_features": [
+      "호텔식 침대로 공간을 고급스럽게, 정품 조야패브릭과 통판형 파운데이션으로 견고하고 관리 쉬워요.",
+      "조야, E0 원목, 고탄성골드스펀지, 마이크로화이버, 견면, E0 원목, E0 LVL",
+      "구성품: 침대프레임"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "럭셔리",
+      "pattern": "패브릭 텍스처",
+      "bed_type": "성인용",
+      "size": "라지킹(LK)",
+      "has_headboard": true,
+      "frame_type": "하단밀폐형",
+      "material": "패브릭",
+      "head_type": "곡선형",
+      "base_type": "통깔판",
+      "product_type": "프레임만"
+    }
+  },
+  {
+    "sku_id": 57,
+    "sku_code": "TV-E200EFEC",
+    "product_name": "윈스턴 1800 수납 높은거실장 티비장 tv선반 EAN-CS006",
+    "category": "거실장·TV장",
+    "sub_category": "일반거실장",
+    "key_features": [
+      "소파형 거실에 딱 맞는 600mm 높이 TV장",
+      "템바보드 디자인과 넉넉한 8칸 수납으로 깔끔하게 정리돼요."
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "tv_stand_type": "높은형",
+      "length": "161~200cm",
+      "material": "가공목(MDF 외)",
+      "level_count": "2단",
+      "has_legs": false
+    }
+  },
+  {
+    "sku_id": 58,
+    "sku_code": "CHR-38582B8A",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "인테리어의자",
+      "material": "패브릭",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 59,
+    "sku_code": "CHR-24204C8E",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "옐로우",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "인테리어의자",
+      "material": "패브릭",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 60,
+    "sku_code": "CHR-20325EE9",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "옐로우",
+      "style": "모던",
+      "pattern": "그래픽",
+      "chair_type": "인테리어의자",
+      "material": "패브릭",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 61,
+    "sku_code": "CHR-E5C1AEB9",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "블랙",
+      "style": "모던",
+      "pattern": "그래픽",
+      "chair_type": "인테리어의자",
+      "material": "패브릭",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 62,
+    "sku_code": "CHR-B9A71F90",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "인테리어의자",
+      "material": "가죽",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 63,
+    "sku_code": "CHR-55913970",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "인테리어의자",
+      "material": "가죽",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 64,
+    "sku_code": "CHR-7580248F",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "베이지",
+      "style": "모던",
+      "pattern": "패브릭 텍스처",
+      "chair_type": "인테리어의자",
+      "material": "패브릭",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 65,
+    "sku_code": "CHR-B93C17C1",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "그레이",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "인테리어의자",
+      "material": "패브릭",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 66,
+    "sku_code": "CHR-A936B5D6",
+    "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
+    "category": "의자",
+    "sub_category": "인테리어의자",
+    "key_features": [
+      "식탁·책상 의자에 추천해요",
+      "좌석 46cm·7cm 쿠션으로 편안하고 완제품으로 바로 사용 가능.",
+      "패브릭,실리콘레더,스틸(크롬 도금)",
+      "구성품: 의자 1EA",
+      "크기 W430 x D500 x H820mm"
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "모던",
+      "pattern": "무지",
+      "chair_type": "인테리어의자",
+      "material": "패브릭",
+      "has_wheels": false,
+      "has_backrest": true,
+      "has_armrest": false
+    }
+  },
+  {
+    "sku_id": 67,
+    "sku_code": "SHLF-FBE4A941",
+    "product_name": "studio / 페이브 리버서블 선반, 2단, 800",
+    "category": "선반",
+    "sub_category": "스탠드선반",
+    "key_features": [
+      "좁은 공간 수납에 추천해요",
+      "리버서블 컬러와 LPM 마감, 칸당 10kg 내하중."
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "shelf_type": "스탠드선반",
+      "material": "가공목(MDF 외)",
+      "frame_material": "철제/스틸",
+      "shelf_count": "2단"
+    }
+  },
+  {
+    "sku_id": 68,
+    "sku_code": "DRW-B26090A8",
+    "product_name": "미카엘 4단서랍장 800",
+    "category": "서랍·수납장",
+    "sub_category": "서랍장",
+    "key_features": [
+      "구성품: 서랍장 1개"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "클래식",
+      "pattern": "무지",
+      "storage_type": "서랍장",
+      "drawer_count": "4단",
+      "material": "가공목",
+      "has_legs": true,
+      "has_wheels": false,
+      "has_drawer": true
+    }
+  },
+  {
+    "sku_id": 69,
+    "sku_code": "BOOK-FFB8D5BE",
+    "product_name": "아틀로 실버엣지 1000 일반/높은책장 수납장",
+    "category": "진열장·책장",
+    "sub_category": "책장",
+    "key_features": [
+      "조립 없이 바로 사용 가능",
+      "무광·헤어라인 실버 엣지로 내구성 높은 1000 책장.",
+      "PB, LPM",
+      "구성품: 일반책장(높이 753mm) / 높은책장(높이 1090mm)"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "storage_type": "책장",
+      "material": "가공목(MDF 외)",
+      "frame_material": "가공목(MDF 외)",
+      "door_type": "오픈형"
+    }
+  },
+  {
+    "sku_id": 70,
+    "sku_code": "BOOK-F4A23B97",
+    "product_name": "아틀로 실버엣지 1000 일반/높은책장 수납장",
+    "category": "진열장·책장",
+    "sub_category": "책장",
+    "key_features": [
+      "조립 없이 바로 사용 가능",
+      "무광·헤어라인 실버 엣지로 내구성 높은 1000 책장.",
+      "PB, LPM",
+      "구성품: 일반책장(높이 753mm) / 높은책장(높이 1090mm)"
+    ],
+    "attributes": {
+      "color": "블랙",
+      "style": "모던",
+      "pattern": "무지",
+      "storage_type": "책장",
+      "material": "가공목(MDF 외)",
+      "frame_material": "가공목(MDF 외)",
+      "door_type": "오픈형"
+    }
+  },
+  {
+    "sku_id": 71,
+    "sku_code": "BOOK-60D56046",
+    "product_name": "아틀로 실버엣지 1000 일반/높은책장 수납장",
+    "category": "진열장·책장",
+    "sub_category": "책장",
+    "key_features": [
+      "조립 없이 바로 사용 가능",
+      "무광·헤어라인 실버 엣지로 내구성 높은 1000 책장.",
+      "PB, LPM",
+      "구성품: 일반책장(높이 753mm) / 높은책장(높이 1090mm)"
+    ],
+    "attributes": {
+      "color": "그린",
+      "style": "모던",
+      "pattern": "무지",
+      "storage_type": "책장",
+      "material": "가공목(MDF 외)",
+      "frame_material": "가공목(MDF 외)",
+      "door_type": "오픈형"
+    }
+  },
+  {
+    "sku_id": 72,
+    "sku_code": "TBL-EF34CAD4",
+    "product_name": "센트 4인용 6인용 1400/1600/1800 타원 포세린 세라믹 식탁 테이블 세트",
+    "category": "테이블·식탁·책상",
+    "sub_category": "식탁",
+    "key_features": [
+      "포세린 세라믹, MDF, 스테인리스(무광/분체도장)",
+      "구성품: 포세린 세라믹 식탁"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "shape": "타원형",
+      "top_material": "세라믹",
+      "frame_material": "철제/스틸",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "seating_capacity": "4인"
+    }
+  },
+  {
+    "sku_id": 73,
+    "sku_code": "TBL-24200538",
+    "product_name": "센트 4인용 6인용 1400/1600/1800 타원 포세린 세라믹 식탁 테이블 세트",
+    "category": "테이블·식탁·책상",
+    "sub_category": "식탁",
+    "key_features": [
+      "포세린 세라믹, MDF, 스테인리스(무광/분체도장)",
+      "구성품: 포세린 세라믹 식탁"
+    ],
+    "attributes": {
+      "color": "화이트",
+      "style": "모던",
+      "pattern": "무지",
+      "shape": "타원형",
+      "top_material": "세라믹",
+      "frame_material": "철제/스틸",
+      "leg_type": "4다리",
+      "has_storage": false,
+      "seating_capacity": "6인"
+    }
+  },
+  {
+    "sku_id": 74,
+    "sku_code": "VAN-11813F80",
+    "product_name": "아일라 고무나무 원목 수납 화장대 거울포함 800/1000",
+    "category": "화장대·콘솔",
+    "sub_category": "수납화장대",
+    "key_features": [
+      "좁은 공간에 추천해요",
+      "행잉 구조와 숨김 수납의 슬림 원목 콘솔.",
+      "고무나무",
+      "구성품: 화장대, 거울"
+    ],
+    "attributes": {
+      "color": "브라운",
+      "style": "내추럴",
+      "pattern": "우드그레인",
+      "vanity_type": "수납형",
+      "has_mirror": true,
+      "storage_type": "복합형",
+      "material": "원목"
+    }
+  }
+]
