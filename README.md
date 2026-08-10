@@ -4,7 +4,7 @@ AI 기반 인테리어 연출 이미지 가구 자동 태깅 솔루션
 ## 0. 기술 스택
 
 - 백엔드: FastAPI
-- 프론트엔드: Streamlit
+- 프론트엔드: React 19 + TypeScript + Vite, Nginx
 - 데이터베이스: PostgreSQL + pgvector
 - AI: Gemini VLM 및 이미지 임베딩
 - 팀 공통 실행 환경: Docker Compose
@@ -79,7 +79,7 @@ docker compose ps
 | --- | --- | --- |
 | FastAPI | http://localhost:8000 | 백엔드 API 포트 |
 | FastAPI Docs | http://localhost:8000/docs | API 스웨거 테스트 화면 |
-| Streamlit | http://localhost:8501 | 프론트앤드 포트 |
+| React | http://localhost:8501 | 프론트엔드 포트 |
 | PostgreSQL + pgvector | localhost:5432 | 로컬 데이터베이스 |
 
 소스 코드만 변경했다면 볼륨 마운트와 `--reload`가 적용되어 API 컨테이너가 자동으로 갱신됩니다. 일반적인 재실행은 아래 명령으로 충분합니다.
@@ -212,7 +212,7 @@ docker compose up -d --force-recreate --no-deps api
 
 ```env
 API_PORT=8001
-STREAMLIT_PORT=8502
+FRONTEND_PORT=8502
 POSTGRES_PORT=5433
 ```
 
@@ -238,8 +238,9 @@ centagging-backend/
 │  │  └─ gemini_service.py      # Gemini API 호출 로직
 │  └─ main.py                   # FastAPI 애플리케이션 시작점
 │
-├─ frontend/                    # Streamlit 프론트엔드
-│  └─ app.py                    # Streamlit 시작점
+├─ frontend/                    # React 프론트엔드
+│  ├─ src/                      # React 애플리케이션 코드
+│  └─ nginx.conf                # API 프록시 및 정적 파일 설정
 │
 ├─ docker/
 │  └─ db/
@@ -261,7 +262,7 @@ centagging-backend/
 ├─ .dockerignore                # Docker 빌드 제외 규칙
 ├─ docker-compose.yml           # API·Frontend·DB 통합 실행
 ├─ Dockerfile.api               # FastAPI 컨테이너 이미지 정의
-├─ Dockerfile.frontend          # Streamlit 컨테이너 이미지 정의
+├─ Dockerfile.frontend          # React 빌드 및 Nginx 컨테이너 이미지 정의
 ├─ requirements.txt             # Python 패키지 정확 버전 고정
 ├─ environment.yml              # Conda 환경 정의
 ├─ pyproject.toml               # Black 등 Python 도구 설정

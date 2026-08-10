@@ -66,8 +66,8 @@
 | `APP_ENV`                | 일반 설정     | 실행 환경 구분                | `.env`                     | Cloud Run 환경 변수                      |
 | `API_HOST`               | 일반 설정     | API 바인딩 호스트             | `.env`                     | 배포 구조 확정 후 결정                   |
 | `API_PORT`               | 일반 설정     | API 포트                      | `.env`                     | Cloud Run 런타임 기준 적용               |
-| `STREAMLIT_PORT`         | 일반 설정     | Streamlit 포트                | `.env`                     | Cloud Run 런타임 기준 적용               |
-| `API_BASE_URL`           | 일반 설정     | Streamlit에서 호출할 API 주소 | Docker Compose 또는 `.env` | 서비스 통신 구조 확정 후 결정            |
+| `FRONTEND_PORT`          | 일반 설정     | React/Nginx 포트              | `.env`                     | Cloud Run 런타임 기준 적용               |
+| `VITE_API_BASE_URL`      | 일반 설정     | React에서 호출할 API 주소     | 빌드 환경 또는 `.env`      | 미설정 시 동일 출처 프록시 사용          |
 | `GEMINI_VLM_MODEL`       | 일반 설정     | Gemini VLM 모델명             | `.env`                     | Cloud Run 환경 변수                      |
 | `GEMINI_EMBEDDING_MODEL` | 일반 설정     | Gemini 임베딩 모델명          | `.env`                     | Cloud Run 환경 변수                      |
 | `POSTGRES_DB`            | 일반 설정     | DB 이름                       | `.env`                     | Cloud Run 환경 변수                      |
@@ -150,7 +150,7 @@ centagging-prod-login-password
 - Cloud Run 런타임 서비스 계정과 배포용 계정을 분리한다.
 - 가능하면 서비스별 런타임 서비스 계정을 사용한다.
 - FastAPI 서비스에는 Gemini와 DB 등 실제로 사용하는 시크릿만 허용한다.
-- Streamlit 서비스에는 `API_BASE_URL` 등 필요한 일반 설정만 제공하며 Gemini 및 DB 시크릿을 직접 제공하지 않는다.
+- React/Nginx 서비스에는 API 연결에 필요한 일반 설정만 제공하며 Gemini 및 DB 시크릿을 직접 제공하지 않는다.
 - 배치 서비스가 도입되면 해당 배치가 사용하는 시크릿에만 접근하게 한다.
 - 런타임 서비스 계정에는 `Owner`, `Editor` 등 광범위한 역할을 부여하지 않는다.
 - Secret Manager 조회 권한은 가능한 한 프로젝트 전체가 아닌 개별 시크릿 리소스에 부여한다.
@@ -161,7 +161,7 @@ centagging-prod-login-password
 
 | 주체                         | 허용 대상                                                             |
 | ---------------------------- | --------------------------------------------------------------------- |
-| Streamlit 런타임 서비스 계정 | 일반 설정 및 FastAPI 호출에 필요한 구성                               |
+| React/Nginx 런타임 서비스 계정 | 일반 설정 및 FastAPI 호출에 필요한 구성                            |
 | FastAPI 런타임 서비스 계정   | Gemini, DB 및 서버 로그인 처리에 필요한 시크릿                        |
 | SKU 임베딩 배치 서비스 계정  | Gemini와 DB 중 배치 실행에 필요한 시크릿                              |
 | 배포 주체                    | 배포에 필요한 최소 권한. 런타임 시크릿 값 직접 조회는 원칙적으로 금지 |
@@ -173,7 +173,7 @@ centagging-prod-login-password
 
 구체적인 GCP 통신 경로는 미확정이지만 다음 경계를 적용한다.
 
-- 브라우저 또는 Streamlit은 DB와 Secret Manager에 직접 접근하지 않는다.
+- 브라우저 또는 React/Nginx는 DB와 Secret Manager에 직접 접근하지 않는다.
 - FastAPI가 Gemini 호출, DB 접근 및 업무 처리를 담당한다.
 - 서비스 간 호출은 HTTPS와 GCP에서 승인한 인증 방식을 사용한다.
 - 공개 접근, 내부 접근, Cloud Run 인증 및 네트워크 경로는 배포 아키텍처 확정 후 문서화한다.
