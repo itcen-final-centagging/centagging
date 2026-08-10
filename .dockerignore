@@ -24,3 +24,8 @@ kosa-poc-main
 
 # 카탈로그 산출물은 볼륨으로 마운트하므로 이미지에 넣지 않습니다.
 data
+
+# React 프론트엔드의 로컬 의존성과 빌드 산출물 / React local artifacts
+frontend/node_modules
+frontend/dist
+frontend/.eslintcache
