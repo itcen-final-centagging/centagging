@@ -1,5 +1,6 @@
 """연출 이미지 업로드, 저장 및 유효성 검증 API입니다."""
 
+import json
 import logging
 import pathlib
 import uuid
@@ -7,9 +8,12 @@ import uuid
 import fastapi
 import pydantic
 import sqlalchemy
+from fastapi.concurrency import run_in_threadpool
 
 from app.core import config, database
-from app.services import image_validation
+from app.schemas.furniture_detection import DetectedObjectResponse
+from app.schemas.gemini_detection import GeminiDetectionResult
+from app.services import furniture_detection_service, image_validation
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +57,22 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
     )
     RETURNING scene_image_id
     """)
+_UPDATE_DETECTION_SUCCESS = sqlalchemy.text("""
+    UPDATE scene_image
+    SET
+        bbox_coord = CAST(:bbox_coord AS jsonb),
+        analysis_status = :analysis_status,
+        analysis_error = :analysis_error
+    WHERE scene_image_id = :scene_image_id
+""")
+
+_UPDATE_ANALYSIS_FAILURE = sqlalchemy.text("""
+    UPDATE scene_image
+    SET
+        analysis_status = :analysis_status,
+        analysis_error = :analysis_error
+    WHERE scene_image_id = :scene_image_id
+""")
 
 
 class ImageValidationResponse(pydantic.BaseModel):
@@ -61,6 +81,9 @@ class ImageValidationResponse(pydantic.BaseModel):
     status: str
     scene_image_id: int
     image: image_validation.ImageMetadata
+    detections: list[DetectedObjectResponse] = pydantic.Field(
+        default_factory=list
+    )
 
 
 def _save_image(path: pathlib.Path, content: bytes) -> None:
@@ -86,6 +109,71 @@ async def _rollback(
     # 원래 업로드 오류를 유지하되 rollback 실패도 로그로 남깁니다.
     except Exception:  # pylint: disable=broad-exception-caught
         _LOGGER.exception("이미지 업로드 트랜잭션 rollback에 실패했습니다.")
+
+
+# 가구 객체 탐지 함수 선언
+def _build_detected_objects(
+    detection_result: GeminiDetectionResult,
+) -> list[DetectedObjectResponse]:
+    """내부 탐지 결과를 공개 응답 객체로 변환합니다."""
+    return [
+        DetectedObjectResponse(
+            label=detection.label,
+            box_2d=[round(coordinate) for coordinate in detection.box_2d],
+        )
+        for detection in detection_result.detections
+    ]
+
+
+# 분석 성공 시 성공 상태 저장
+async def _save_detection_success(
+    database_session: database.sqlalchemy_async.AsyncSession,
+    scene_image_id: int,
+    detected_objects: list[DetectedObjectResponse],
+) -> None:
+    """탐지 결과와 성공 상태를 저장합니다."""
+    bbox_coord = []
+    for detected_object in detected_objects:
+        ymin, xmin, ymax, xmax = detected_object.box_2d
+        bbox_coord.append(
+            {
+                "xmin": xmin,
+                "ymin": ymin,
+                "xmax": xmax,
+                "ymax": ymax,
+            }
+        )
+
+    await database_session.execute(
+        _UPDATE_DETECTION_SUCCESS,
+        {
+            "scene_image_id": scene_image_id,
+            "analysis_status": "detected",
+            "analysis_error": None,
+            "bbox_coord": json.dumps(
+                bbox_coord,
+                ensure_ascii=False,
+            ),
+        },
+    )
+    await database_session.commit()
+
+
+async def _save_analysis_failure(
+    database_session: database.sqlalchemy_async.AsyncSession,
+    scene_image_id: int,
+    analysis_error: str,
+) -> None:
+    """분석 실패 상태와 오류 원인을 저장합니다."""
+    await database_session.execute(
+        _UPDATE_ANALYSIS_FAILURE,
+        {
+            "scene_image_id": scene_image_id,
+            "analysis_status": "failed",
+            "analysis_error": analysis_error,
+        },
+    )
+    await database_session.commit()
 
 
 @router.post("/tagging", response_model=ImageValidationResponse)
@@ -170,8 +258,39 @@ async def upload_scene_image(
     finally:
         await file.close()
 
+    try:
+        detection_result = await run_in_threadpool(
+            furniture_detection_service.detect_furniture_from_bytes,
+            validated.content,
+            settings,
+        )
+        detected_objects = _build_detected_objects(detection_result)
+
+        await _save_detection_success(
+            database_session,
+            scene_image_id,
+            detected_objects,
+        )
+    # 탐지와 결과 저장의 외부 예외를 동일한 failed 상태로 기록합니다.
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        await _rollback(database_session)
+        try:
+            await _save_analysis_failure(
+                database_session,
+                scene_image_id,
+                str(error) or error.__class__.__name__,
+            )
+        # 원래 탐지 오류를 보존하므로 상태 저장 오류는 로그로 남깁니다.
+        except Exception:  # pylint: disable=broad-exception-caught
+            await _rollback(database_session)
+            _LOGGER.exception("객체 탐지 실패 상태 저장에 실패했습니다.")
+        raise fastapi.HTTPException(
+            status_code=502, detail="가구 탐지에 실패했습니다."
+        ) from error
+
     return ImageValidationResponse(
         status="validated",
         scene_image_id=scene_image_id,
         image=validated.metadata,
+        detections=detected_objects,
     )

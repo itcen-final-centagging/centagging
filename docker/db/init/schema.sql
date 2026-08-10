@@ -42,7 +42,9 @@ CREATE TABLE scene_image (
         jsonb_typeof(bbox_coord) = 'array'
     ),
     CONSTRAINT ck_scene_analysis_status CHECK (
-        analysis_status IN ('pending', 'running', 'completed', 'failed')
+        analysis_status IN (
+            'pending', 'detected', 'embedded', 'completed', 'failed'
+        )
     )
 );
 
@@ -55,10 +57,10 @@ COMMENT ON COLUMN scene_image.image_url            IS '연출 이미지 경로';
 COMMENT ON COLUMN scene_image.origin_name          IS '업로드된 연출 이미지 파일명';
 COMMENT ON COLUMN scene_image.mime_type            IS '연출 이미지 파일 MIME 타입: image/jpeg | image/png';
 COMMENT ON COLUMN scene_image.file_size            IS '연출 이미지 파일 크기(byte), 10MB 이하';
-COMMENT ON COLUMN scene_image.analysis_error       IS '객체 탐지 실패 사유';
-COMMENT ON COLUMN scene_image.analysis_status      IS '연출 이미지 태깅 처리 상태: pending | running | completed | failed';
+COMMENT ON COLUMN scene_image.analysis_error       IS '탐지·임베딩·SKU 후보 생성 실패 사유';
+COMMENT ON COLUMN scene_image.analysis_status      IS '태깅 처리 상태: pending | detected | embedded | completed | failed';
 COMMENT ON COLUMN scene_image.created_at           IS '연출 이미지 업로드 일시';
-COMMENT ON COLUMN scene_image.bbox_coord           IS '탐지 객체 좌표 배열 [[ymin,xmin,ymax,xmax], ...], 좌표 검증은 애플리케이션에서 수행';
+COMMENT ON COLUMN scene_image.bbox_coord           IS '탐지 객체 좌표 배열 [{xmin,ymin,xmax,ymax}, ...]';
 COMMENT ON COLUMN scene_image.width_px             IS '이미지 너비(pixel)';
 COMMENT ON COLUMN scene_image.height_px            IS '이미지 높이(pixel)';
 
