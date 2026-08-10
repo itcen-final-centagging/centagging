@@ -28,3 +28,25 @@ class SkuSearchResponse(BaseModel):
 
     status: typing.Literal["success"] = "success"
     data: SkuSearchData
+
+class SkuImageItem(BaseModel):
+    """SKU 상품 이미지 정보입니다."""
+    sku_image_id: int
+    image_type: typing.Literal["MAIN", "ANGLE", "DETAIL", "STYLING"]
+    image_url: str
+
+class SkuDetailData(BaseModel):
+    """SKU 상품 상세 정보입니다."""
+    sku_code: str
+    product_name: str
+    category: str|None
+    sub_category: str|None
+    key_features: dict[str, typing.Any]
+    description: str|None
+    attrs: dict[str, typing.Any]
+    images: list[SkuImageItem]
+
+
+class SkuDetailResponse(BaseModel):
+    status: typing.Literal["success"] = "success"
+    data: SkuDetailData

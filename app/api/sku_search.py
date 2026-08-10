@@ -40,3 +40,59 @@ async def search_skus(
     )
 
     return sku_search_schema.SkuSearchResponse(data=data)
+
+@router.get("/skus/{sku_code}", response_model=sku_search_schema.SkuDetailResponse)
+async def sku_code_detail(
+    sku_code: str,
+) -> sku_search_schema.SkuDetailResponse:
+    """POC용 CH-2041 SKU 상세 정보를 반환합니다."""
+    normalized_sku_code = sku_code.strip()
+
+    if normalized_sku_code.upper() != "CH-2041":
+        raise fastapi.HTTPException(
+            status_code=404,
+            detail={
+                "code": "SKU_NOT_FOUND",
+                "message": f"SKU를 찾을 수 없습니다: {normalized_sku_code}",
+            },
+        )
+
+    data = sku_search_schema.SkuDetailData(
+        sku_code="CH-2041",
+        product_name="에르고 메쉬 오피스체어 화이트",
+        category="의자",
+        sub_category="오피스체어",
+        key_features={
+            "요약": "높은 통기성과 5년 무상 A/S를 제공하는 홈오피스 체어",
+        },
+        description="메쉬 소재로 통기성이 뛰어난 하이백 오피스체어입니다.",
+        attrs={
+            "소재": "메쉬 · 패브릭 · 알루미늄",
+            "색상": "화이트 / 차콜",
+            "형태": "하이백",
+            "구조": "5스타 캐스터",
+        },
+        images=[
+            sku_search_schema.SkuImageItem(
+                sku_image_id=5501,
+                image_type="MAIN",
+                image_url="<https://cdn.example.com/skus/CH-2041_main.jpg>",
+            ),
+            sku_search_schema.SkuImageItem(
+                sku_image_id=5502,
+                image_type="ANGLE",
+                image_url="<https://cdn.example.com/skus/CH-2041_angle.jpg>",
+            ),
+            sku_search_schema.SkuImageItem(
+                sku_image_id=5503,
+                image_type="DETAIL",
+                image_url="<https://cdn.example.com/skus/CH-2041_detail.jpg>",
+            ),
+            sku_search_schema.SkuImageItem(
+                sku_image_id=5504,
+                image_type="STYLING",
+                image_url="<https://cdn.example.com/skus/CH-2041_styling.jpg>",
+            ),
+        ],
+    )
+    return sku_search_schema.SkuDetailResponse(data=data)

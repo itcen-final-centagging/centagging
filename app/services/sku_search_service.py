@@ -73,3 +73,9 @@ async def search_skus(
         size=size,
         items=items,
     )
+
+async def search_skus_detail(
+        session: sqlalchemy_async.AsyncSession,
+        sku_code: str,
+    ) -> sku_search_schema.SkuDetailData | None:
+    return None
