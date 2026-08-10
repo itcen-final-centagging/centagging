@@ -132,10 +132,17 @@ async def _save_analysis_success(
     detected_objects: list[DetectedObjectResponse],
 ) -> None:
     """탐지 결과와 성공 상태를 저장합니다."""
-    bbox_coord = [
-        detected_object.model_dump(mode="json")
-        for detected_object in detected_objects
-    ]
+    bbox_coord = []
+    for detected_object in detected_objects:
+        ymin, xmin, ymax, xmax = detected_object.box_2d
+        bbox_coord.append(
+            {
+                "xmin": xmin,
+                "ymin": ymin,
+                "xmax": xmax,
+                "ymax": ymax,
+            }
+        )
 
     await database_session.execute(
         _UPDATE_ANALYSIS_SUCCESS,

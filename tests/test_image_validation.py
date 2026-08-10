@@ -1,6 +1,7 @@
 """이미지 업로드 유효성 검증 서비스 테스트입니다."""
 
 import io
+import json
 import pathlib
 import tempfile
 import unittest
@@ -13,6 +14,10 @@ import starlette.testclient
 
 from app.api import scene_images
 from app.core import config, database
+from app.schemas.gemini_detection import (
+    GeminiDetectionResult,
+    GeminiRawDetection,
+)
 from app.services import image_validation
 
 
@@ -151,6 +156,7 @@ class _FakeSession:
         self.commit_error = commit_error
         self.user_id = user_id
         self.execute_parameters: dict[str, object] | None = None
+        self.analysis_update_parameters: dict[str, object] | None = None
         self.user_lookup_parameters: dict[str, object] | None = None
         self.rollback_called = False
 
@@ -161,6 +167,9 @@ class _FakeSession:
         if "SELECT user_id" in str(_statement):
             self.user_lookup_parameters = parameters
             return _FakeUserLookupResult(user_id=self.user_id)
+        if "UPDATE scene_image" in str(_statement):
+            self.analysis_update_parameters = parameters
+            return _FakeInsertResult()
         self.execute_parameters = parameters
         if self.execute_error is not None:
             raise self.execute_error
@@ -211,10 +220,28 @@ class UploadSceneImageApiTest(unittest.TestCase):
             config, "get_settings", return_value=settings
         )
         self.settings_patch.start()
+        detection_result = GeminiDetectionResult(
+            detections=[
+                GeminiRawDetection(
+                    label="chair",
+                    box_2d=[100, 200, 700, 800],
+                    evidence="chair shape",
+                    confidence=0.9,
+                )
+            ],
+            processing_time_ms=10,
+        )
+        self.detection_patch = unittest.mock.patch.object(
+            scene_images.furniture_detection_service,
+            "detect_furniture_from_bytes",
+            return_value=detection_result,
+        )
+        self.detection_patch.start()
         self.client = starlette.testclient.TestClient(self.app)
 
     def tearDown(self) -> None:
         """테스트용 저장소와 설정 패치를 정리합니다."""
+        self.detection_patch.stop()
         self.settings_patch.stop()
         self.storage_directory.cleanup()
 
@@ -263,6 +290,20 @@ class UploadSceneImageApiTest(unittest.TestCase):
             self.session.execute_parameters["analysis_status"], "pending"
         )
         self.assertIsNone(self.session.execute_parameters["analysis_error"])
+        assert self.session.analysis_update_parameters is not None
+        self.assertEqual(
+            json.loads(
+                str(self.session.analysis_update_parameters["bbox_coord"])
+            ),
+            [
+                {
+                    "xmin": 200,
+                    "ymin": 100,
+                    "xmax": 800,
+                    "ymax": 700,
+                }
+            ],
+        )
 
     def test_returns_validation_error_for_invalid_upload(self) -> None:
         """디코딩할 수 없는 multipart 업로드를 거부합니다."""

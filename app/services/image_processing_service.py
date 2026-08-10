@@ -1,4 +1,4 @@
-"""업로드 이미지의 디코딩과 방향 정규화를 제공합니다."""
+"""업로드 이미지 디코딩과 탐지 객체 영역 크롭을 제공합니다."""
 
 import io
 
@@ -38,3 +38,22 @@ def decode_image(image_bytes: bytes) -> Image.Image:
         raise InvalidImageError(
             "이미지를 열 수 없습니다. 유효한 이미지 파일인지 확인하세요."
         ) from error
+
+
+def get_crop_image(image: Image.Image, bbox: dict[str, float]) -> Image.Image:
+    """0~1000 정규화 좌표로 이미지에서 탐지 객체 영역을 잘라냅니다.
+
+    Args:
+        image: 원본 장면 이미지입니다.
+        bbox: `xmin`, `ymin`, `xmax`, `ymax` 키를 가진 0~1000 정규화
+            좌표입니다.
+
+    Returns:
+        bbox 영역만큼 잘라낸 이미지입니다.
+    """
+    left = round(bbox["xmin"] / 1000 * image.width)
+    right = round(bbox["xmax"] / 1000 * image.width)
+    upper = round(bbox["ymin"] / 1000 * image.height)
+    lower = round(bbox["ymax"] / 1000 * image.height)
+
+    return image.crop((left, upper, right, lower))
