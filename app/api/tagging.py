@@ -40,3 +40,28 @@ async def get_recommendation_sku(
         raise HTTPException(status_code=404, detail=str(error)) from error
 
     return DetectionResponse(status="success", data=result)
+
+@router.put("/scenes{scene_id}")
+def update_scene():
+    return {
+      "matching": [
+        {
+          "object_index": 0,
+          "sku_code": "CHR-2041",
+          "similarity_score": 92,
+          "xai_result": {
+            "summary": "등받이 곡률과 헤드레스트 형태가 거의 동일하고 색상까지 일치합니다.",
+            "criteria": [
+              { "label": "구조", "score": 29, "comment": "등받이 곡률·암레스트 각도가 일치합니다." },
+              { "label": "색상", "score": 28, "comment": "화이트 바디와 차콜 메쉬 조합이 같습니다." },
+              { "label": "디테일", "score": 17, "comment": "5스타 캐스터 형태가 유사합니다." },
+              { "label": "맥락", "score": 18, "comment": "홈오피스 연출과 사용 공간이 맞습니다." }
+            ]
+          },
+          "vlm_mood": {
+            "summary": "밝은 자연광이 드는 미니멀한 홈오피스에 어울리는 화이트 톤 워크체어입니다.",
+            "tags": ["미니멀", "내추럴", "홈오피스", "밝은 톤"]
+          }
+        }
+      ]
+    }
