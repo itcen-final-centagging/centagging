@@ -602,15 +602,18 @@ ENUM_KEYWORDS: dict[str, dict[str, list[str]]] = {
 }
 
 
-def normalize_boolean(attribute: str, text: str | None) -> bool | None:
-    """불리언 속성을 텍스트 근거로만 판정한다.
+def normalize_boolean(attribute: str, text: str | None) -> str | None:
+    """존재 여부 속성을 텍스트 근거로만 판정한다.
+
+    catalog_spec은 존재 여부 속성에 bool이 아니라 "있음"/"없음"/"모름"
+    문자열을 쓴다. 그래서 True/False 대신 "있음"/"없음"을 반환한다.
 
     Args:
-        attribute: 불리언 속성 key입니다.
+        attribute: 존재 여부 속성 key입니다.
         text: 판정에 쓸 통합 텍스트입니다.
 
     Returns:
-        True/False입니다. 근거가 없으면 None입니다.
+        "있음"/"없음"입니다. 근거가 없으면 None입니다.
     """
     if not text or attribute not in BOOLEAN_KEYWORDS:
         return None
@@ -619,10 +622,10 @@ def normalize_boolean(attribute: str, text: str | None) -> bool | None:
     positive, negative = BOOLEAN_KEYWORDS[attribute]
     for keyword in negative:
         if keyword.lower() in lowered:
-            return False
+            return "없음"
     for keyword in positive:
         if keyword.lower() in lowered:
-            return True
+            return "있음"
     return None
 
 
