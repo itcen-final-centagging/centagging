@@ -3,11 +3,11 @@
 Service for live Gemini Developer API calls.
 """
 
-import typing
 import io
-from PIL import Image
+import typing
 
 from google import genai
+from PIL import Image
 
 from app.core import config
 
@@ -30,8 +30,10 @@ class GeminiVerificationResult(typing.TypedDict):
     embedding_model: str
     embedding_dimensions: int
 
+
 class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
+
 
 class GeminiService:
     """VLM 및 임베딩 모델을 실제 Gemini API로 호출합니다."""
@@ -125,17 +127,22 @@ class GeminiService:
 
             response = client.models.embed_content(
                 model=self._settings.gemini_embedding_model,
-                contents=[
+                # google-genai의 타입 스텁이 list[Part]를 인식하지 못해
+                # mypy가 오탐하지만, embed_content는 런타임에 list[Part]를
+                # 정상적으로 받아들입니다.
+                contents=[  # type: ignore[arg-type]
                     genai.types.Part.from_bytes(
                         data=image_bytes,
                         mime_type=f"image/{image_format.lower()}",
                     ),
-                ]
+                ],
             )
 
             embeddings = response.embeddings
             if not embeddings or not embeddings[0].values:
-                raise GeminiEmbeddingError("Gemini 임베딩 응답이 비어 있습니다.")
+                raise GeminiEmbeddingError(
+                    "Gemini 임베딩 응답이 비어 있습니다."
+                )
 
             return embeddings[0].values
         except GeminiEmbeddingError:
