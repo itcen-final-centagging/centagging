@@ -26,7 +26,7 @@ class MetadataExtractResponse(pydantic.BaseModel):
     category: typing.Optional[str] = None
     sub_category: typing.Optional[str] = None
     space: typing.Optional[str] = None
-    attributes: dict[str, str] = pydantic.Field(default_factory=dict)
+    attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
 
 
 class SkuSummary(pydantic.BaseModel):

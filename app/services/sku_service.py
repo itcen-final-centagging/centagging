@@ -11,6 +11,7 @@ import pathlib
 import typing
 import uuid
 
+import pydantic
 import sqlalchemy
 from google import genai
 from google.genai import types
@@ -18,50 +19,7 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core import config
 from app.models import sku as sku_models
-
-# 참고: kosa-poc-main/image-generation/common/config.py의 분류 체계를
-# 단순화해 재사용합니다. / Simplified from the kosa-poc-main taxonomy.
-_CATEGORY_TAXONOMY: dict[str, list[str]] = {
-    "침대": ["침대프레임", "침대+매트리스", "침대부속가구"],
-    "테이블·식탁·책상": ["소파테이블", "사이드테이블", "식탁", "책상"],
-    "소파": ["일반소파", "리클라이너", "소파베드", "좌식소파"],
-    "서랍·수납장": ["서랍장", "수납장", "캐비닛", "협탁"],
-    "거실장·TV장": ["일반거실장", "높은거실장", "TV스탠드"],
-    "선반": ["벽선반", "스탠드선반", "조립식선반"],
-    "진열장·책장": ["진열장", "책장", "매거진랙"],
-    "의자": ["인테리어의자", "스툴·벤치", "안락의자", "사무용의자"],
-    "행거·옷장": ["옷장", "붙박이장", "행거"],
-    "조명": ["스탠드조명", "천장조명", "무드등"],
-}
-
-_COLOR_OPTIONS = [
-    "블랙",
-    "화이트",
-    "베이지",
-    "네이비",
-    "카키",
-    "그레이",
-    "브라운",
-    "레드",
-    "옐로우",
-    "블루",
-    "핑크",
-    "퍼플",
-    "그린",
-    "오렌지",
-]
-
-# schema.sql / kosa-poc-main 어디에도 없어 이번에 새로 정의합니다.
-_SPACE_OPTIONS = [
-    "거실",
-    "침실",
-    "주방",
-    "서재·홈오피스",
-    "아이방",
-    "드레스룸",
-    "현관",
-    "발코니·테라스",
-]
+from app.services import sku_attributes
 
 _UPLOAD_ROOT = pathlib.Path("uploads") / "sku"
 
@@ -84,38 +42,74 @@ class ExtractedMetadata(typing.TypedDict):
     category: typing.Optional[str]
     sub_category: typing.Optional[str]
     space: typing.Optional[str]
-    attributes: dict[str, str]
+    attributes: dict[str, typing.Any]
 
 
-def _build_extraction_prompt() -> str:
-    """AI 메타데이터 추출에 사용할 프롬프트를 만듭니다.
+class _CategoryMetadata(pydantic.BaseModel):
+    """1차 호출(category/sub_category/space) 응답 스키마입니다."""
+
+    category: typing.Optional[str] = None
+    sub_category: typing.Optional[str] = None
+    space: typing.Optional[str] = None
+
+
+def _build_category_prompt() -> str:
+    """1차 호출(category/sub_category/space 추출)용 프롬프트를 만듭니다.
 
     Returns:
-        카테고리·공간·색상 후보와 출력 스키마를 담은 프롬프트
+        카테고리·공간 후보 목록을 담은 프롬프트 문자열입니다.
+    """
+    categories = json.dumps(
+        sku_attributes.CATEGORY_TAXONOMY, ensure_ascii=False
+    )
+    spaces = ", ".join(sku_attributes.SPACE_OPTIONS)
+    template = """당신은 가구 상품 이미지를 분석하는 카탈로그 태거입니다.
+이미지 속 가구 1개를 보고 category, sub_category, space를 정하세요.
+category는 다음 목록의 키 중 하나, sub_category는 그 값 목록 중 하나를 고르세요: {categories}
+space는 다음 중 하나를 고르세요: {spaces}
+확신할 수 없는 값은 비워두세요."""
+    return template.format(categories=categories, spaces=spaces)
+
+
+def _build_attributes_prompt(
+    category: str, sub_category: typing.Optional[str]
+) -> str:
+    """2차 호출(category별 attributes 추출)용 프롬프트를 만듭니다.
+
+    Args:
+        category: 1차 호출에서 정해진 대분류입니다.
+        sub_category: 1차 호출에서 정해진 소분류입니다 (있는 경우).
+
+    Returns:
+        해당 category 스키마에 맞는 값을 채우도록 안내하는 프롬프트
         문자열입니다.
     """
-    categories = json.dumps(_CATEGORY_TAXONOMY, ensure_ascii=False)
-    spaces = ", ".join(_SPACE_OPTIONS)
-    colors = ", ".join(_COLOR_OPTIONS)
-    return (
-        "당신은 가구 상품 이미지를 분석하는 카탈로그 태거입니다. "
-        "이미지 속 가구 1개를 보고 아래 스키마의 JSON만 출력하세요.\n"
-        f"category는 다음 목록의 키 중 하나, sub_category는 그 값 "
-        f"목록 중 하나를 고르세요: {categories}\n"
-        f"space는 다음 중 하나를 고르세요: {spaces}\n"
-        f"attributes.색상은 다음 중 가장 가까운 것을 고르세요: {colors}\n"
-        "attributes.주요 소재는 이미지에서 보이는 대로 자유롭게 "
-        "적으세요.\n"
-        "확신할 수 없는 값은 빈 문자열로 두세요. 출력 스키마: "
-        '{"category": "", "sub_category": "", "space": "", '
-        '"attributes": {"색상": "", "주요 소재": ""}}'
-    )
+    colors = ", ".join(sku_attributes.COLOR_OPTIONS)
+    category_template = "category={0}"
+    context = category_template.format(category)
+    if sub_category:
+        sub_category_template = ", sub_category={0}"
+        context += sub_category_template.format(sub_category)
+    template = """
+        당신은 가구 상품 이미지를 분석하는 카탈로그 태거입니다.
+        이미지 속 가구는 {context}입니다.
+        주어진 스키마의 각 필드 값을 이미지를 보고 채우세요.
+        color는 다음 중 하나를 고르세요: {colors}
+        선택(optional) 필드는 확신할 수 없으면 비워두세요.
+    """
+    return template.format(context=context, colors=colors)
 
 
 def extract_metadata(
     settings: config.Settings, image_bytes: bytes, mime_type: str
 ) -> ExtractedMetadata:
     """이미지에서 카테고리·하위카테고리·공간·속성을 추출합니다.
+
+    category/sub_category/space를 먼저 정한 뒤(1차 호출), 그 category에
+    해당하는 :mod:`app.services.sku_attributes` 스키마를
+    ``response_schema``로 강제해 attributes를 채웁니다(2차 호출).
+    카테고리에 맞는 attributes 스키마가 없으면(예: 답안 데이터가 없는
+    카테고리) 2차 호출 없이 attributes를 빈 dict로 둡니다.
 
     Args:
         settings: Gemini API 키와 모델명이 담긴 애플리케이션 설정입니다.
@@ -138,25 +132,56 @@ def extract_metadata(
 
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
-        # google-genai의 Content 유니온 타입 스텁이 리스트 불변성과
-        # 맞지 않아 명시적으로 캐스팅합니다 (외부 SDK 경계).
-        contents = typing.cast(
-            typing.Any,
-            [
-                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                _build_extraction_prompt(),
-            ],
+        image_part = types.Part.from_bytes(
+            data=image_bytes, mime_type=mime_type
         )
-        response = client.models.generate_content(
+
+        category_response = client.models.generate_content(
             model=settings.gemini_vlm_model,
-            contents=contents,
+            # google-genai의 Content 유니온 타입 스텁이 리스트 불변성과
+            # 맞지 않아 명시적으로 캐스팅합니다 (외부 SDK 경계).
+            contents=typing.cast(
+                typing.Any, [image_part, _build_category_prompt()]
+            ),
             config=types.GenerateContentConfig(
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                response_schema=_CategoryMetadata,
             ),
         )
-        if not response.text:
+        if not category_response.text:
             raise RuntimeError("Gemini returned an empty response.")
-        data = json.loads(response.text)
+        category_data = _CategoryMetadata.model_validate_json(
+            category_response.text
+        )
+
+        attributes: dict[str, typing.Any] = {}
+        category = category_data.category
+        attribute_model = (
+            sku_attributes.CATEGORY_ATTRIBUTE_MODELS.get(category)
+            if category
+            else None
+        )
+        if category and attribute_model is not None:
+            attributes_response = client.models.generate_content(
+                model=settings.gemini_vlm_model,
+                contents=typing.cast(
+                    typing.Any,
+                    [
+                        image_part,
+                        _build_attributes_prompt(
+                            category, category_data.sub_category
+                        ),
+                    ],
+                ),
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=attribute_model,
+                ),
+            )
+            if attributes_response.text:
+                attributes = attribute_model.model_validate_json(
+                    attributes_response.text
+                ).model_dump(exclude_none=True)
     except (
         Exception
     ) as error:  # External SDK boundary; re-raise a domain error.
@@ -164,12 +189,11 @@ def extract_metadata(
             "Gemini metadata extraction failed."
         ) from error
 
-    attributes = data.get("attributes")
     return {
-        "category": data.get("category") or None,
-        "sub_category": data.get("sub_category") or None,
-        "space": data.get("space") or None,
-        "attributes": attributes if isinstance(attributes, dict) else {},
+        "category": category_data.category,
+        "sub_category": category_data.sub_category,
+        "space": category_data.space,
+        "attributes": attributes,
     }
 
 
