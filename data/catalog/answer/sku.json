@@ -24,7 +24,7 @@
   },
   {
     "sku_id": 2,
-    "sku_code": "TBL-4C481556",
+    "sku_code": "TBL-A606D90C",
     "product_name": "콰트로 홈오피스 컴퓨터책상 800 1000 1200 1400 1600 1800 2000",
     "category": "테이블·식탁·책상",
     "sub_category": "책상",
@@ -35,7 +35,7 @@
       "구성품: 책상 1개 (사이즈 택1)"
     ],
     "attributes": {
-      "color": "브라운",
+      "color": "화이트",
       "style": "미니멀",
       "pattern": "우드그레인",
       "shape": "사각형",
@@ -48,7 +48,7 @@
   },
   {
     "sku_id": 3,
-    "sku_code": "TBL-CF6F1F43",
+    "sku_code": "TBL-3F816828",
     "product_name": "콰트로 홈오피스 컴퓨터책상 800 1000 1200 1400 1600 1800 2000",
     "category": "테이블·식탁·책상",
     "sub_category": "책상",
@@ -59,7 +59,7 @@
       "구성품: 책상 1개 (사이즈 택1)"
     ],
     "attributes": {
-      "color": "브라운",
+      "color": "화이트",
       "style": "미니멀",
       "pattern": "우드그레인",
       "shape": "사각형",
@@ -578,26 +578,6 @@
   },
   {
     "sku_id": 25,
-    "sku_code": "MATT-A2112330",
-    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
-    "category": "매트리스",
-    "sub_category": "매트리스",
-    "key_features": [
-      "처음 매트리스로 추천해요",
-      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
-    ],
-    "attributes": {
-      "color": "화이트",
-      "style": "모던",
-      "pattern": "무지",
-      "mattress_type": "스프링",
-      "size": "싱글(S)",
-      "thickness": "21~30cm",
-      "features": "통풍"
-    }
-  },
-  {
-    "sku_id": 26,
     "sku_code": "MATT-CA5DABB9",
     "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
     "category": "매트리스",
@@ -617,27 +597,7 @@
     }
   },
   {
-    "sku_id": 27,
-    "sku_code": "MATT-3CF42870",
-    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
-    "category": "매트리스",
-    "sub_category": "매트리스",
-    "key_features": [
-      "처음 매트리스로 추천해요",
-      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
-    ],
-    "attributes": {
-      "color": "화이트",
-      "style": "모던",
-      "pattern": "무지",
-      "mattress_type": "스프링",
-      "size": "슈퍼싱글(SS)",
-      "thickness": "21~30cm",
-      "features": "통풍"
-    }
-  },
-  {
-    "sku_id": 28,
+    "sku_id": 26,
     "sku_code": "MATT-A5461C75",
     "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
     "category": "매트리스",
@@ -657,27 +617,7 @@
     }
   },
   {
-    "sku_id": 29,
-    "sku_code": "MATT-2E9FCED1",
-    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
-    "category": "매트리스",
-    "sub_category": "매트리스",
-    "key_features": [
-      "처음 매트리스로 추천해요",
-      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
-    ],
-    "attributes": {
-      "color": "화이트",
-      "style": "모던",
-      "pattern": "무지",
-      "mattress_type": "스프링",
-      "size": "퀸(Q)",
-      "thickness": "21~30cm",
-      "features": "통풍"
-    }
-  },
-  {
-    "sku_id": 30,
+    "sku_id": 27,
     "sku_code": "MATT-8FEAF2C6",
     "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
     "category": "매트리스",
@@ -697,27 +637,7 @@
     }
   },
   {
-    "sku_id": 31,
-    "sku_code": "MATT-39F8E1F6",
-    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
-    "category": "매트리스",
-    "sub_category": "매트리스",
-    "key_features": [
-      "처음 매트리스로 추천해요",
-      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
-    ],
-    "attributes": {
-      "color": "화이트",
-      "style": "모던",
-      "pattern": "무지",
-      "mattress_type": "스프링",
-      "size": "킹(K)",
-      "thickness": "21~30cm",
-      "features": "통풍"
-    }
-  },
-  {
-    "sku_id": 32,
+    "sku_id": 28,
     "sku_code": "MATT-5327CD27",
     "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
     "category": "매트리스",
@@ -737,27 +657,7 @@
     }
   },
   {
-    "sku_id": 33,
-    "sku_code": "MATT-B22BBFB4",
-    "product_name": "편안한 제주 25cm 본넬스프링 매트리스 S/SS/Q/K/LK",
-    "category": "매트리스",
-    "sub_category": "매트리스",
-    "key_features": [
-      "처음 매트리스로 추천해요",
-      "6회전 본넬 스프링·합성 라텍스로 탄탄한 지지와 통기성 제공."
-    ],
-    "attributes": {
-      "color": "화이트",
-      "style": "모던",
-      "pattern": "무지",
-      "mattress_type": "스프링",
-      "size": "라지킹(LK)",
-      "thickness": "21~30cm",
-      "features": "통풍"
-    }
-  },
-  {
-    "sku_id": 34,
+    "sku_id": 29,
     "sku_code": "SHLF-4597C855",
     "product_name": "철제 선반 경량랙 펜트리 베란다 선반장 무볼트 조립식 앵글 본사직영",
     "category": "선반",
@@ -779,7 +679,7 @@
     }
   },
   {
-    "sku_id": 35,
+    "sku_id": 30,
     "sku_code": "SHLF-8C5A19FA",
     "product_name": "철제 선반 경량랙 펜트리 베란다 선반장 무볼트 조립식 앵글 본사직영",
     "category": "선반",
@@ -801,7 +701,7 @@
     }
   },
   {
-    "sku_id": 36,
+    "sku_id": 31,
     "sku_code": "DRW-6618815C",
     "product_name": "데이지 5단 서랍장",
     "category": "서랍·수납장",
@@ -827,7 +727,7 @@
     }
   },
   {
-    "sku_id": 37,
+    "sku_id": 32,
     "sku_code": "MATT-58947CF4",
     "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
     "category": "매트리스",
@@ -849,7 +749,7 @@
     }
   },
   {
-    "sku_id": 38,
+    "sku_id": 33,
     "sku_code": "MATT-B3952725",
     "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
     "category": "매트리스",
@@ -871,7 +771,7 @@
     }
   },
   {
-    "sku_id": 39,
+    "sku_id": 34,
     "sku_code": "MATT-53FDC714",
     "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
     "category": "매트리스",
@@ -893,7 +793,7 @@
     }
   },
   {
-    "sku_id": 40,
+    "sku_id": 35,
     "sku_code": "MATT-8E36B543",
     "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
     "category": "매트리스",
@@ -915,7 +815,7 @@
     }
   },
   {
-    "sku_id": 41,
+    "sku_id": 36,
     "sku_code": "MATT-A7C15435",
     "product_name": "허리가 편안한 포켓스프링 매트리스25cm S/SS/Q/K/LK",
     "category": "매트리스",
@@ -937,7 +837,7 @@
     }
   },
   {
-    "sku_id": 42,
+    "sku_id": 37,
     "sku_code": "CHR-5508CBA6",
     "product_name": "뮤즈 편한 팔걸이 컴퓨터 메쉬 사무용 책상 의자",
     "category": "의자",
@@ -960,7 +860,7 @@
     }
   },
   {
-    "sku_id": 43,
+    "sku_id": 38,
     "sku_code": "CHR-139E3048",
     "product_name": "뮤즈 편한 팔걸이 컴퓨터 메쉬 사무용 책상 의자",
     "category": "의자",
@@ -983,7 +883,7 @@
     }
   },
   {
-    "sku_id": 44,
+    "sku_id": 39,
     "sku_code": "SOFA-FFB60C77",
     "product_name": "바움 천연면피 가죽 4인용 소파 (스툴선택)",
     "category": "소파",
@@ -1006,7 +906,7 @@
     }
   },
   {
-    "sku_id": 45,
+    "sku_id": 40,
     "sku_code": "SOFA-F37C2F1D",
     "product_name": "바움 천연면피 가죽 4인용 소파 (스툴선택)",
     "category": "소파",
@@ -1029,7 +929,7 @@
     }
   },
   {
-    "sku_id": 46,
+    "sku_id": 41,
     "sku_code": "SOFA-70C6E644",
     "product_name": "바움 천연면피 가죽 4인용 소파 (스툴선택)",
     "category": "소파",
@@ -1052,7 +952,7 @@
     }
   },
   {
-    "sku_id": 47,
+    "sku_id": 42,
     "sku_code": "SOFA-11025B36",
     "product_name": "빈켈 103 아쿠아텍스 4인용소파",
     "category": "소파",
@@ -1071,7 +971,7 @@
     }
   },
   {
-    "sku_id": 48,
+    "sku_id": 43,
     "sku_code": "MIR-16A2F277",
     "product_name": "모어 아치형 스탠드 전신거울(비산방지기능)",
     "category": "거울",
@@ -1093,29 +993,7 @@
     }
   },
   {
-    "sku_id": 49,
-    "sku_code": "MIR-C16B7DC5",
-    "product_name": "모어 아치형 스탠드 전신거울(비산방지기능)",
-    "category": "거울",
-    "sub_category": "전신거울",
-    "key_features": [
-      "프레임리스 마감의 전신거울로 공간을 넓게 연출하세요",
-      "목재 후면과 비산방지로 안전해요",
-      "E0등급 PB 데코시트마감",
-      "구성품: 전신거울",
-      "크기 W300 x D15 x H1500mm"
-    ],
-    "attributes": {
-      "color": "브라운",
-      "style": "미니멀",
-      "pattern": "무지",
-      "installation_type": "스탠드형",
-      "shape": "아치형",
-      "has_frame": false
-    }
-  },
-  {
-    "sku_id": 50,
+    "sku_id": 44,
     "sku_code": "WRD-151F1221",
     "product_name": "퓨리타 키큰옷장 일반도어 화이트 (800/1000)",
     "category": "행거·옷장",
@@ -1139,7 +1017,7 @@
     }
   },
   {
-    "sku_id": 51,
+    "sku_id": 45,
     "sku_code": "WRD-4B8A8B3C",
     "product_name": "퓨리타 키큰옷장 일반도어 화이트 (800/1000)",
     "category": "행거·옷장",
@@ -1163,7 +1041,7 @@
     }
   },
   {
-    "sku_id": 52,
+    "sku_id": 46,
     "sku_code": "WRD-D2C34CD2",
     "product_name": "퓨리타 키큰옷장 일반도어 화이트 (800/1000)",
     "category": "행거·옷장",
@@ -1186,7 +1064,7 @@
     }
   },
   {
-    "sku_id": 53,
+    "sku_id": 47,
     "sku_code": "TBL-72E85237",
     "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
     "category": "테이블·식탁·책상",
@@ -1211,7 +1089,7 @@
     }
   },
   {
-    "sku_id": 54,
+    "sku_id": 48,
     "sku_code": "TBL-563FD10D",
     "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
     "category": "테이블·식탁·책상",
@@ -1237,7 +1115,7 @@
     }
   },
   {
-    "sku_id": 55,
+    "sku_id": 49,
     "sku_code": "TBL-4B7F9E7A",
     "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
     "category": "테이블·식탁·책상",
@@ -1263,7 +1141,7 @@
     }
   },
   {
-    "sku_id": 56,
+    "sku_id": 50,
     "sku_code": "TBL-F39A0778",
     "product_name": "앨빈 고무나무 원목 2인/4인 테이블 컴퓨터 책상 식탁",
     "category": "테이블·식탁·책상",
@@ -1288,7 +1166,7 @@
     }
   },
   {
-    "sku_id": 57,
+    "sku_id": 51,
     "sku_code": "BED-81B2648A",
     "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
     "category": "침대",
@@ -1312,7 +1190,7 @@
     }
   },
   {
-    "sku_id": 58,
+    "sku_id": 52,
     "sku_code": "BED-4C084F4C",
     "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
     "category": "침대",
@@ -1337,7 +1215,7 @@
     }
   },
   {
-    "sku_id": 59,
+    "sku_id": 53,
     "sku_code": "BED-6FFAA408",
     "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
     "category": "침대",
@@ -1361,7 +1239,7 @@
     }
   },
   {
-    "sku_id": 60,
+    "sku_id": 54,
     "sku_code": "BED-D27C2534",
     "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
     "category": "침대",
@@ -1386,7 +1264,7 @@
     }
   },
   {
-    "sku_id": 61,
+    "sku_id": 55,
     "sku_code": "BED-B02FE503",
     "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
     "category": "침대",
@@ -1410,7 +1288,7 @@
     }
   },
   {
-    "sku_id": 62,
+    "sku_id": 56,
     "sku_code": "BED-61955F5B",
     "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
     "category": "침대",
@@ -1435,7 +1313,7 @@
     }
   },
   {
-    "sku_id": 63,
+    "sku_id": 57,
     "sku_code": "TV-E200EFEC",
     "product_name": "윈스턴 1800 수납 높은거실장 티비장 tv선반 EAN-CS006",
     "category": "거실장·TV장",
@@ -1456,28 +1334,7 @@
     }
   },
   {
-    "sku_id": 64,
-    "sku_code": "TV-862B2011",
-    "product_name": "윈스턴 1800 수납 높은거실장 티비장 tv선반 EAN-CS006",
-    "category": "거실장·TV장",
-    "sub_category": "일반거실장",
-    "key_features": [
-      "소파형 거실에 딱 맞는 600mm 높이 TV장",
-      "템바보드 디자인과 넉넉한 8칸 수납으로 깔끔하게 정리돼요."
-    ],
-    "attributes": {
-      "color": "브라운",
-      "style": "모던",
-      "pattern": "무지",
-      "tv_stand_type": "높은형",
-      "length": "161~200cm",
-      "material": "가공목(MDF 외)",
-      "level_count": "2단",
-      "has_legs": false
-    }
-  },
-  {
-    "sku_id": 65,
+    "sku_id": 58,
     "sku_code": "CHR-38582B8A",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1501,7 +1358,7 @@
     }
   },
   {
-    "sku_id": 66,
+    "sku_id": 59,
     "sku_code": "CHR-24204C8E",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1525,7 +1382,7 @@
     }
   },
   {
-    "sku_id": 67,
+    "sku_id": 60,
     "sku_code": "CHR-20325EE9",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1549,7 +1406,7 @@
     }
   },
   {
-    "sku_id": 68,
+    "sku_id": 61,
     "sku_code": "CHR-E5C1AEB9",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1573,7 +1430,7 @@
     }
   },
   {
-    "sku_id": 69,
+    "sku_id": 62,
     "sku_code": "CHR-B9A71F90",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1597,7 +1454,7 @@
     }
   },
   {
-    "sku_id": 70,
+    "sku_id": 63,
     "sku_code": "CHR-55913970",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1621,7 +1478,7 @@
     }
   },
   {
-    "sku_id": 71,
+    "sku_id": 64,
     "sku_code": "CHR-7580248F",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1645,7 +1502,7 @@
     }
   },
   {
-    "sku_id": 72,
+    "sku_id": 65,
     "sku_code": "CHR-B93C17C1",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1669,7 +1526,7 @@
     }
   },
   {
-    "sku_id": 73,
+    "sku_id": 66,
     "sku_code": "CHR-A936B5D6",
     "product_name": "오리지널 페블 체어 미드센츄리 모던 식탁 패브릭 부클 가죽 인테리어 디자인 카페 의자",
     "category": "의자",
@@ -1693,7 +1550,7 @@
     }
   },
   {
-    "sku_id": 74,
+    "sku_id": 67,
     "sku_code": "SHLF-FBE4A941",
     "product_name": "studio / 페이브 리버서블 선반, 2단, 800",
     "category": "선반",
@@ -1713,7 +1570,7 @@
     }
   },
   {
-    "sku_id": 75,
+    "sku_id": 68,
     "sku_code": "DRW-B26090A8",
     "product_name": "미카엘 4단서랍장 800",
     "category": "서랍·수납장",
@@ -1734,7 +1591,7 @@
     }
   },
   {
-    "sku_id": 76,
+    "sku_id": 69,
     "sku_code": "BOOK-FFB8D5BE",
     "product_name": "아틀로 실버엣지 1000 일반/높은책장 수납장",
     "category": "진열장·책장",
@@ -1756,7 +1613,7 @@
     }
   },
   {
-    "sku_id": 77,
+    "sku_id": 70,
     "sku_code": "BOOK-F4A23B97",
     "product_name": "아틀로 실버엣지 1000 일반/높은책장 수납장",
     "category": "진열장·책장",
@@ -1778,7 +1635,7 @@
     }
   },
   {
-    "sku_id": 78,
+    "sku_id": 71,
     "sku_code": "BOOK-60D56046",
     "product_name": "아틀로 실버엣지 1000 일반/높은책장 수납장",
     "category": "진열장·책장",
@@ -1800,7 +1657,7 @@
     }
   },
   {
-    "sku_id": 79,
+    "sku_id": 72,
     "sku_code": "TBL-EF34CAD4",
     "product_name": "센트 4인용 6인용 1400/1600/1800 타원 포세린 세라믹 식탁 테이블 세트",
     "category": "테이블·식탁·책상",
@@ -1822,7 +1679,7 @@
     }
   },
   {
-    "sku_id": 80,
+    "sku_id": 73,
     "sku_code": "TBL-24200538",
     "product_name": "센트 4인용 6인용 1400/1600/1800 타원 포세린 세라믹 식탁 테이블 세트",
     "category": "테이블·식탁·책상",
@@ -1844,51 +1701,7 @@
     }
   },
   {
-    "sku_id": 81,
-    "sku_code": "TBL-96F7B4EB",
-    "product_name": "센트 4인용 6인용 1400/1600/1800 타원 포세린 세라믹 식탁 테이블 세트",
-    "category": "테이블·식탁·책상",
-    "sub_category": "식탁",
-    "key_features": [
-      "포세린 세라믹, MDF, 스테인리스(무광/분체도장)",
-      "구성품: 포세린 세라믹 식탁"
-    ],
-    "attributes": {
-      "color": "그레이",
-      "style": "모던",
-      "pattern": "무지",
-      "shape": "타원형",
-      "top_material": "세라믹",
-      "frame_material": "철제/스틸",
-      "leg_type": "4다리",
-      "has_storage": false,
-      "seating_capacity": "4인"
-    }
-  },
-  {
-    "sku_id": 82,
-    "sku_code": "TBL-F342B3FE",
-    "product_name": "센트 4인용 6인용 1400/1600/1800 타원 포세린 세라믹 식탁 테이블 세트",
-    "category": "테이블·식탁·책상",
-    "sub_category": "식탁",
-    "key_features": [
-      "포세린 세라믹, MDF, 스테인리스(무광/분체도장)",
-      "구성품: 포세린 세라믹 식탁"
-    ],
-    "attributes": {
-      "color": "그레이",
-      "style": "모던",
-      "pattern": "무지",
-      "shape": "타원형",
-      "top_material": "세라믹",
-      "frame_material": "철제/스틸",
-      "leg_type": "4다리",
-      "has_storage": false,
-      "seating_capacity": "6인"
-    }
-  },
-  {
-    "sku_id": 83,
+    "sku_id": 74,
     "sku_code": "VAN-11813F80",
     "product_name": "아일라 고무나무 원목 수납 화장대 거울포함 800/1000",
     "category": "화장대·콘솔",

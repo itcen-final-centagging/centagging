@@ -18,64 +18,22 @@ import re
 
 from app.core import catalog_spec
 
-# ===========================================================================
-# 색상
-# ===========================================================================
-COLOR_KEYWORDS: dict[str, list[str]] = {
-    "블랙": ["블랙", "차콜", "챠콜", "검정", "먹색"],
-    "화이트": [
-        "화이트",
-        "아이보리",
-        "크림",
-        "웜화이트",
-        "오프화이트",
-        "스노우",
-        "백색",
-        "무광백색",
-    ],
-    "베이지": ["베이지", "샌드", "밀크", "오트", "라떼"],
-    "네이비": ["네이비"],
-    "카키": ["카키", "올리브"],
-    "그레이": ["그레이", "그레이지", "실버", "은색"],
-    "브라운": [
-        "브라운",
-        "카멜",
-        "월넛",
-        "멀바우",
-        "헤이즐넛",
-        "메이플",
-        "오크",
-        "티크",
-        "애쉬",
-        "내추럴",
-        "내츄럴",
-        "원목색",
-        "모카",
-        "초코",
-    ],
-    "레드": ["레드", "버건디", "와인"],
-    "옐로우": ["옐로우", "머스타드", "노랑"],
-    "블루": ["블루", "인디고", "청록"],
-    "핑크": ["핑크", "로즈", "인디핑크"],
-    "퍼플": ["퍼플", "라벤더", "바이올렛"],
-    "그린": ["그린", "세이지", "민트"],
-    "오렌지": ["오렌지", "코랄", "테라코타"],
+COLOR_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "블랙": ("블랙", "검정", "먹색"),
+    "화이트": ("화이트", "오프화이트", "백색"),
+    "베이지": ("베이지",),
+    "네이비": ("네이비",),
+    "카키": ("카키", "올리브"),
+    "그레이": ("그레이", "그레이지"),
+    "브라운": ("브라운", "카멜", "모카"),
+    "레드": ("레드", "버건디", "와인"),
+    "옐로우": ("옐로우", "노랑"),
+    "블루": ("블루", "인디고"),
+    "핑크": ("핑크",),
+    "퍼플": ("퍼플", "라벤더"),
+    "그린": ("그린", "세이지", "민트"),
+    "오렌지": ("오렌지", "코랄"),
 }
-
-# 색상 키워드가 겹쳐 보이는 조합어는 여기서 먼저 결론을 낸다.
-COLOR_PRIORITY_OVERRIDE: dict[str, str] = {
-    "카키그린": "그린",
-    "네이비블루": "네이비",
-    "블랙우드": "블랙",
-    "블랙오크": "블랙",
-    "다크그레이": "그레이",
-    "파인그레이": "그레이",
-    "스카이블루": "블루",
-    "하바나옐로우": "옐로우",
-    "로즈우드": "브라운",
-    "로즈골드": "핑크",
-}
-
 
 def normalize_color(text: str | None) -> str | None:
     """텍스트에서 허용 색상 1개를 뽑는다.
@@ -88,10 +46,6 @@ def normalize_color(text: str | None) -> str | None:
     """
     if not text:
         return None
-
-    for combo, color in COLOR_PRIORITY_OVERRIDE.items():
-        if combo in text:
-            return color
 
     hits: list[tuple[int, int, str]] = []
     for color, keywords in COLOR_KEYWORDS.items():
@@ -137,16 +91,13 @@ def text_before(text: str | None, marker: str) -> str:
     return text.split(marker, 1)[0].strip()
 
 
-# ===========================================================================
 # 소재
-# ===========================================================================
-MATERIAL_KEYWORDS: dict[str, list[str]] = {
+MATERIAL_KEYWORDS = {
     "천연가죽": ["천연가죽", "천연면피", "소가죽", "통가죽", "우피"],
     "인조가죽": [
         "인조가죽",
         "인조피혁",
         "인조레더",
-        "실리콘레더",
         "레자",
         "pu레더",
         "pvc레더",
@@ -158,7 +109,6 @@ MATERIAL_KEYWORDS: dict[str, list[str]] = {
     "패브릭": [
         "패브릭",
         "아쿠아텍스",
-        "원단",
         "린넨",
         "리넨",
         "면혼방",
@@ -169,8 +119,8 @@ MATERIAL_KEYWORDS: dict[str, list[str]] = {
         "부클",
         "직물",
     ],
-    "라탄": ["라탄", "위빙"],
-    "천연대리석": ["천연대리석", "대리석", "마블스톤"],
+    "라탄": ["라탄"],
+    "천연대리석": ["천연대리석"],
     "세라믹": ["세라믹", "포세린"],
     "유리": ["강화유리", "유리"],
     "철제/스틸": [
@@ -180,12 +130,15 @@ MATERIAL_KEYWORDS: dict[str, list[str]] = {
         "steel",
         "철제",
         "철재",
-        "금속",
-        "분체도장",
-        "알루미늄",
-        "크롬",
     ],
-    "플라스틱": ["플라스틱", "abs", "pp수지", "pvc", "아크릴", "폴리프로필렌"],
+    "플라스틱": [
+        "플라스틱",
+        "abs",
+        "pp수지",
+        "pvc",
+        "아크릴",
+        "폴리프로필렌",
+    ],
     "원목": [
         "원목",
         "고무나무",
@@ -201,28 +154,21 @@ MATERIAL_KEYWORDS: dict[str, list[str]] = {
         "mdf",
         "lpm",
         "pb",
-        "e0",
-        "e1",
         "파티클보드",
         "무늬목",
         "합판",
         "hpm",
         "pet마감",
         "강화마이카",
-        "집성목",
         "가공목",
     ],
 }
 
-# 카테고리 허용값이 축약형인 경우의 별칭 (예: 의자는 "가죽"만 허용)
-MATERIAL_ALIAS: dict[str, list[str]] = {
+# 카테고리 허용값이 축약형인 경우의 별칭
+MATERIAL_ALIAS = {
     "가공목(MDF 외)": ["가공목"],
-    "철제/스틸": ["금속", "스틸", "철제"],
-    "천연가죽": ["가죽"],
-    "인조가죽": ["가죽"],
-    "천연대리석": ["대리석"],
+    "철제/스틸": ["스틸", "철제"],
 }
-
 
 def _fit_material(canonical: str, allowed: list[str]) -> str | None:
     """정규 소재명을 해당 카테고리의 허용값 표기로 맞춘다."""
@@ -269,11 +215,11 @@ def material_chunks(text: str) -> list[str]:
 
 
 def normalize_material(
-    text: str | None,
-    category: str,
-    attribute: str = "material",
-    prefer: tuple[str, ...] = (),
-    focus_words: tuple[str, ...] = (),
+        text: str | None,
+        category: str,
+        attribute: str = "material",
+        prefer: tuple[str, ...] = (),
+        focus_words: tuple[str, ...] = (),
 ) -> str | None:
     """소재 원문에서 대표 소재 1개를 뽑아 허용값으로 정규화한다.
 
@@ -321,9 +267,7 @@ def normalize_material(
     return None
 
 
-# ===========================================================================
 # 침구 사이즈 / 수량 / 구간
-# ===========================================================================
 SIZE_KOREAN: dict[str, str] = {
     "멀티싱글": "멀티싱글(MS)",
     "슈퍼싱글": "슈퍼싱글(SS)",
@@ -399,7 +343,7 @@ def normalize_level_count(text: str | None, allowed: list[str]) -> str | None:
 
 
 def normalize_seating_capacity(
-    text: str | None, allowed: list[str]
+        text: str | None, allowed: list[str]
 ) -> str | None:
     """`4인용 6인용 식탁` -> 가장 작은 인원 기준 `4인`.
 
@@ -416,7 +360,11 @@ def normalize_seating_capacity(
     seats = [seat for seat in seats if 1 <= seat <= 20]
     if not seats:
         return None
-    seat = min(seats)
+
+    # 여러 인원수가 동시에 나오면 확정하지 않음
+    if len(set(seats)) > 1:
+        return None
+    seat = seats[0]
     label = "8인 이상" if seat >= 8 else f"{seat}인"
     return label if (not allowed or label in allowed) else None
 
@@ -466,9 +414,7 @@ def normalize_length(width_mm: int | None) -> str | None:
     return "201cm 이상"
 
 
-# ===========================================================================
 # 치수
-# ===========================================================================
 _DIM_LABELLED = re.compile(
     r"W\s*(\d{2,5})\s*[xX*×]\s*D\s*(\d{2,5})\s*[xX*×]\s*H\s*(\d{2,5})",
     re.IGNORECASE,
@@ -498,9 +444,7 @@ def parse_dimensions(text: str | None) -> dict[str, int] | None:
     return {"width": width, "depth": depth, "height": height}
 
 
-# ===========================================================================
 # 불리언 / 열거형
-# ===========================================================================
 # 속성 -> (True 근거 키워드, False 근거 키워드). False를 먼저 확인한다.
 BOOLEAN_KEYWORDS: dict[str, tuple[list[str], list[str]]] = {
     "has_legs": (["다리", "레그", "각재"], ["다리 없음", "무다리", "다리없음"]),
@@ -683,7 +627,7 @@ def normalize_boolean(attribute: str, text: str | None) -> bool | None:
 
 
 def normalize_enum(
-    attribute: str, text: str | None, allowed: list[str]
+        attribute: str, text: str | None, allowed: list[str]
 ) -> str | None:
     """키워드 사전으로 열거형 속성을 판정한다.
 
@@ -708,9 +652,7 @@ def normalize_enum(
     return None
 
 
-# ===========================================================================
 # 스타일 / 무늬
-# ===========================================================================
 STYLE_KEYWORDS: dict[str, list[str]] = {
     "모던": ["모던", "미드센츄리", "미드센추리"],
     "클래식": ["클래식", "앤틱", "엔틱"],
@@ -768,9 +710,7 @@ def normalize_pattern(text: str | None) -> str | None:
     return None
 
 
-# ===========================================================================
 # 상품명
-# ===========================================================================
 _NAME_NOISE_PATTERNS = [
     r"^\s*\[[^\]]*\]\s*",
     r"^\s*\d+%\s*쿠폰\s*[|ㅣ]?\s*",
@@ -803,9 +743,9 @@ def clean_product_name(name: str | None) -> str:
 
     tokens = cleaned.split()
     while (
-        tokens
-        and not set("|ㅣ") & set(tokens[0])
-        and any(hint in tokens[0] for hint in _PROMO_HINTS)
+            tokens
+            and not set("|ㅣ") & set(tokens[0])
+            and any(hint in tokens[0] for hint in _PROMO_HINTS)
     ):
         tokens.pop(0)
     cleaned = " ".join(tokens)

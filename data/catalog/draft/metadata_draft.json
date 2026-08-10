@@ -148,7 +148,7 @@
     "sub_category": "침대프레임",
     "schema_size": 14,
     "rule_only": {
-      "color": "브라운",
+      "color": "화이트",
       "product_type": "프레임만",
       "size": "슈퍼싱글(SS)",
       "has_headboard": false,
@@ -227,6 +227,11 @@
       }
     ],
     "rule_vs_human": [
+      {
+        "attribute": "color",
+        "rule": "화이트",
+        "human": "브라운"
+      },
       {
         "attribute": "wood_tone",
         "rule": "어두운 우드톤",
@@ -846,13 +851,12 @@
     "sub_category": "책상",
     "schema_size": 12,
     "rule_only": {
-      "color": "브라운",
+      "color": "화이트",
       "pattern": "우드그레인",
       "shape": "사각형",
       "top_material": "원목",
       "frame_material": "원목",
-      "leg_type": "4다리",
-      "seating_capacity": "2인"
+      "leg_type": "4다리"
     },
     "attributes": {
       "color": {
@@ -885,11 +889,6 @@
         "source": "human",
         "confidence": 1.0
       },
-      "seating_capacity": {
-        "value": "2인",
-        "source": "human",
-        "confidence": 1.0
-      },
       "style": {
         "value": "내추럴",
         "source": "human",
@@ -904,6 +903,11 @@
         "value": "밝은 우드톤",
         "source": "human",
         "confidence": 1.0
+      },
+      "seating_capacity": {
+        "value": "2인",
+        "source": "human",
+        "confidence": 1.0
       }
     },
     "needs_review": [
@@ -916,7 +920,13 @@
         "reason": "값 없음"
       }
     ],
-    "rule_vs_human": []
+    "rule_vs_human": [
+      {
+        "attribute": "color",
+        "rule": "화이트",
+        "human": "브라운"
+      }
+    ]
   },
   "2352818": {
     "product_name": "드레스덴 조야패브릭 호텔식 침대프레임 SS/Q/K/LK/CK",
@@ -924,19 +934,13 @@
     "sub_category": "침대프레임",
     "schema_size": 14,
     "rule_only": {
-      "color": "화이트",
       "product_type": "프레임만",
       "style": "럭셔리",
       "size": "슈퍼싱글(SS)",
       "has_headboard": true,
-      "material": "가공목(MDF 외)"
+      "material": "원목"
     },
     "attributes": {
-      "color": {
-        "value": "화이트",
-        "source": "human",
-        "confidence": 1.0
-      },
       "product_type": {
         "value": "프레임만",
         "source": "human",
@@ -959,6 +963,11 @@
       },
       "material": {
         "value": "패브릭",
+        "source": "human",
+        "confidence": 1.0
+      },
+      "color": {
+        "value": "화이트",
         "source": "human",
         "confidence": 1.0
       },
@@ -1005,7 +1014,7 @@
     "rule_vs_human": [
       {
         "attribute": "material",
-        "rule": "가공목(MDF 외)",
+        "rule": "원목",
         "human": "패브릭"
       }
     ]
@@ -1083,7 +1092,7 @@
     "sub_category": "인테리어의자",
     "schema_size": 10,
     "rule_only": {
-      "color": "화이트",
+      "color": "옐로우",
       "chair_type": "인테리어의자",
       "style": "모던",
       "pattern": "패브릭 텍스처",
@@ -1142,6 +1151,11 @@
       }
     ],
     "rule_vs_human": [
+      {
+        "attribute": "color",
+        "rule": "옐로우",
+        "human": "화이트"
+      },
       {
         "attribute": "pattern",
         "rule": "패브릭 텍스처",
@@ -1214,18 +1228,12 @@
     "sub_category": "서랍장",
     "schema_size": 13,
     "rule_only": {
-      "color": "화이트",
       "storage_type": "서랍장",
       "drawer_count": "4단",
       "material": "가공목",
       "has_drawer": true
     },
     "attributes": {
-      "color": {
-        "value": "화이트",
-        "source": "human",
-        "confidence": 1.0
-      },
       "storage_type": {
         "value": "서랍장",
         "source": "human",
@@ -1243,6 +1251,11 @@
       },
       "has_drawer": {
         "value": true,
+        "source": "human",
+        "confidence": 1.0
+      },
+      "color": {
+        "value": "화이트",
         "source": "human",
         "confidence": 1.0
       },
@@ -1362,8 +1375,7 @@
       "color": "화이트",
       "shape": "타원형",
       "top_material": "세라믹",
-      "frame_material": "철제/스틸",
-      "seating_capacity": "4인"
+      "frame_material": "철제/스틸"
     },
     "attributes": {
       "color": {
@@ -1386,11 +1398,6 @@
         "source": "human",
         "confidence": 1.0
       },
-      "seating_capacity": {
-        "value": "4인",
-        "source": "human",
-        "confidence": 1.0
-      },
       "style": {
         "value": "모던",
         "source": "human",
@@ -1408,6 +1415,11 @@
       },
       "has_storage": {
         "value": false,
+        "source": "human",
+        "confidence": 1.0
+      },
+      "seating_capacity": {
+        "value": "4인",
         "source": "human",
         "confidence": 1.0
       }
