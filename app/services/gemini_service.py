@@ -4,42 +4,52 @@ Service for live Gemini Developer API calls.
 """
 
 import logging
-import typing
 import time
-from google.genai import errors, types
+import typing
 
 from google import genai
+from google.genai import errors, types
 from PIL import Image
-
 from pydantic import ValidationError
 
 from app.core import config
-from app.schemas.gemini_detection import GeminiDetectionResult, GeminiModelDetectionResult
-from app.services.furniture_detect_prompt import furniture_detection_prompt
+from app.schemas.gemini_detection import (
+    GeminiDetectionResult,
+    GeminiModelDetectionResult,
+)
+from app.services.furniture_detect_prompt import FURNITURE_DETECTION_PROMPT
 
 
 # 오류 클래스들 모음
 class GeminiConfigurationError(RuntimeError):
-    """Gemini API 키가 누락된 경우 발생합니다.
-    Raised when the Gemini API key is missing.
-    """
+    """Gemini API 키가 누락되었을 때 발생합니다."""
+
     code = "DETECTION_NOT_CONFIGURED"
 
 
 class GeminiApiError(RuntimeError):
     """Gemini API 호출이 실패한 경우 발생합니다. / Raised when a Gemini API call fails."""
 
+    code = "API_CALL_FAIL"
+
 
 class GeminiAuthenticationError(GeminiApiError):
+    """Gemini 인증에 실패할 때 발생합니다."""
+
     code = "DETECTION_AUTH_FAILED"
 
 
 class GeminiInferenceError(GeminiApiError):
+    """Gemini 추론 요청에 실패할 때 발생합니다."""
+
     code = "DETECTION_INFERENCE_FAILED"
 
 
 class GeminiResponseInvalidError(GeminiApiError):
+    """Gemini 응답 검증에 실패할 때 발생합니다."""
+
     code = "DETECTION_RESPONSE_INVALID"
+
 
 class GeminiVerificationResult(typing.TypedDict):
     """Gemini 실제 호출 검증 결과입니다. / Result of a live Gemini verification call."""
@@ -123,33 +133,40 @@ class GeminiService:
             GeminiRawDetection 객체 리스트입니다.
         """
         if not self.is_configured:
-            raise GeminiConfigurationError(
-                "GEMINI_API_KEY is not configured."
-            )
+            raise GeminiConfigurationError("GEMINI_API_KEY is not configured.")
 
         started_at = time.perf_counter()
         object_count = 0
 
         try:
-            client = genai.Client(
-                api_key=self._settings.gemini_api_key
-            )
+            client = genai.Client(api_key=self._settings.gemini_api_key)
+
+            contents: list[types.ContentUnionDict] = [
+                image,
+                FURNITURE_DETECTION_PROMPT,
+            ]
 
             response = client.models.generate_content(
                 model=self._settings.gemini_vlm_model,
-                contents=[image,furniture_detection_prompt],
+                contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=GeminiModelDetectionResult,
-            ),
-        )
+                ),
+            )
             if not response.text:
-                raise GeminiResponseInvalidError("Gemini VLM returned an empty response.")
+                raise GeminiResponseInvalidError(
+                    "Gemini VLM returned an empty response."
+                )
 
-            result = GeminiModelDetectionResult.model_validate_json(response.text)
-            processing_time_ms = round((time.perf_counter() - started_at) * 1000)
+            result = GeminiModelDetectionResult.model_validate_json(
+                response.text
+            )
+            processing_time_ms = round(
+                (time.perf_counter() - started_at) * 1000
+            )
             object_count = len(result.detections)
-        
+
         except GeminiResponseInvalidError:
             raise
 
@@ -178,7 +195,7 @@ class GeminiService:
             "model=%s, processing_time_ms=%d, object_count=%d",
             self._settings.gemini_vlm_model,
             processing_time_ms,
-            object_count, 
+            object_count,
         )
         return GeminiDetectionResult(
             detections=result.detections,

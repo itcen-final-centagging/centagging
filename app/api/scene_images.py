@@ -1,5 +1,6 @@
 """연출 이미지 업로드, 저장 및 유효성 검증 API입니다."""
 
+import json
 import logging
 import pathlib
 import uuid
@@ -7,13 +8,12 @@ import uuid
 import fastapi
 import pydantic
 import sqlalchemy
-import json
+from fastapi.concurrency import run_in_threadpool
 
 from app.core import config, database
-from app.services import image_validation
-from fastapi.concurrency import run_in_threadpool
-from app.services import furniture_detection_service
 from app.schemas.furniture_detection import DetectedObjectResponse
+from app.schemas.gemini_detection import GeminiDetectionResult
+from app.services import furniture_detection_service, image_validation
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,6 +85,7 @@ class ImageValidationResponse(pydantic.BaseModel):
         default_factory=list
     )
 
+
 def _save_image(path: pathlib.Path, content: bytes) -> None:
     """검증된 원본 이미지를 로컬 저장소에 기록합니다."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,21 +110,20 @@ async def _rollback(
     except Exception:  # pylint: disable=broad-exception-caught
         _LOGGER.exception("이미지 업로드 트랜잭션 rollback에 실패했습니다.")
 
+
 # 가구 객체 탐지 함수 선언
 def _build_detected_objects(
-    detection_result,
+    detection_result: GeminiDetectionResult,
 ) -> list[DetectedObjectResponse]:
     """내부 탐지 결과를 공개 응답 객체로 변환합니다."""
     return [
         DetectedObjectResponse(
             label=detection.label,
-            box_2d=[
-                round(coordinate)
-                for coordinate in detection.box_2d
-            ],
+            box_2d=[round(coordinate) for coordinate in detection.box_2d],
         )
         for detection in detection_result.detections
     ]
+
 
 # 분석 성공 시 성공 상태 저장
 async def _save_analysis_success(
@@ -148,6 +148,7 @@ async def _save_analysis_success(
         },
     )
     await database_session.commit()
+
 
 @router.post("/tagging", response_model=ImageValidationResponse)
 async def upload_scene_image(
@@ -235,10 +236,12 @@ async def upload_scene_image(
         detection_result = await run_in_threadpool(
             furniture_detection_service.detect_furniture_from_bytes,
             validated.content,
-            settings
+            settings,
         )
     except Exception as error:
-        raise fastapi.HTTPException(status_code = 502, detail="가구 탐지에 실패했습니다.") from error
+        raise fastapi.HTTPException(
+            status_code=502, detail="가구 탐지에 실패했습니다."
+        ) from error
 
     detected_objects = _build_detected_objects(detection_result)
 
@@ -252,5 +255,5 @@ async def upload_scene_image(
         status="validated",
         scene_image_id=scene_image_id,
         image=validated.metadata,
-        detections=detected_objects
+        detections=detected_objects,
     )

@@ -1,6 +1,7 @@
-#CoT, Markdown 프롬프트
-furniture_detection_prompt = (
-    """
+"""Gemini 가구 객체 탐지 프롬프트를 정의합니다."""
+
+# CoT, Markdown 프롬프트
+FURNITURE_DETECTION_PROMPT = """
     You are a furniture instance detection model.
 
     ## Task
@@ -73,4 +74,3 @@ furniture_detection_prompt = (
 
     Return JSON only. Do not return explanations outside the JSON.
     """
-)

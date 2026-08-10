@@ -1,27 +1,11 @@
-from pydantic import BaseModel, Field
+"""가구 객체 탐지 API 요청 및 응답 스키마입니다."""
 
-"""
-객체 탐지 결과 예시
-{
-  "detections": [
-    {
-      "label": "chair",
-      "box_2d": [
-        251,
-        99,
-        977,
-        631
-      ],
-      evidence: "팔걸이 모양을 보았을 때 의자로 추정된다.",
-      processing_time_ms: 123,
-      confidence: 0.82
-    }
-  ]
-}
-"""
+from pydantic import BaseModel, Field
 
 
 class DetectedObjectResponse(BaseModel):
+    """외부 API에 노출하는 탐지 객체입니다."""
+
     label: str
     box_2d: list[int] = Field(
         min_length=4,
@@ -30,6 +14,8 @@ class DetectedObjectResponse(BaseModel):
 
 
 class FurnitureDetectionResponse(BaseModel):
+    """가구 객체 탐지 API 응답입니다."""
+
     scene_image_id: int
     analysis_status: str
     object_count: int
@@ -38,7 +24,10 @@ class FurnitureDetectionResponse(BaseModel):
     height_px: int
     detections: list[DetectedObjectResponse] = Field(default_factory=list)
 
+
 class FurnitureDetectionRequest(BaseModel):
+    """가구 객체 탐지 API 요청입니다."""
+
     target_description: str = Field(
         min_length=2,
         max_length=100,
