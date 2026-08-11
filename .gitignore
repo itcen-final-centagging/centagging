@@ -30,11 +30,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.eslintcache
 
-# 카탈로그 파이프라인 산출물 / Catalog pipeline artifacts
-# 생성한 SKU 이미지는 용량이 커서 추적하지 않습니다.
-# 메타데이터 JSON(data/catalog/)은 팀이 같은 카탈로그를 쓰도록 커밋합니다.
-data/catalog/answer_sku
-data/catalog/answer_sku.json
+data/images
 resource
 
 # IDE 및 운영체제 파일 / IDE and operating system files
