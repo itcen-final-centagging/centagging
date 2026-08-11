@@ -3,7 +3,8 @@ import type {
   RubricEvaluation,
   SkuCandidate,
   TaggingHistory,
-  TaggingValues,
+  VlmMood,
+  XaiResult,
 } from '../types';
 
 type DevDetection = {
@@ -26,9 +27,7 @@ type DevCandidate = {
   similarity_score: number;
   sku_code: string;
   sub_category: string | null;
-  xai_result: {
-    summary: string;
-  };
+  xai_result: XaiResult & { vlm_mood: VlmMood };
 };
 
 type DevRecommendationResponse = {
@@ -139,13 +138,17 @@ const toKind = (category: string | null, subCategory: string | null) => {
   return null;
 };
 
-const toDevCandidate = (candidate: DevCandidate): SkuCandidate => ({
+const toDevCandidate = (
+  candidate: DevCandidate,
+  candidateIndex: number,
+): SkuCandidate => ({
   category: candidate.category,
   color: nullableText(candidate.attrs.color),
   grade: null,
   imageUrl: resolveAssetUrl(candidate.matched_sku_image.image_url),
   kind: toKind(candidate.category, candidate.sub_category),
   material: nullableText(candidate.attrs.material),
+  matchRank: candidateIndex + 1,
   metadataScore: null,
   name: candidate.product_name,
   rubric: null,
@@ -153,7 +156,12 @@ const toDevCandidate = (candidate: DevCandidate): SkuCandidate => ({
   size: nullableText(candidate.attrs.size),
   sku: candidate.sku_code,
   vectorScore: candidate.similarity_score / 100,
+  vlmMood: candidate.xai_result.vlm_mood,
   xaiReason: nullableText(candidate.xai_result.summary),
+  xaiResult: {
+    criteria: candidate.xai_result.criteria,
+    summary: candidate.xai_result.summary,
+  },
 });
 
 const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
@@ -163,6 +171,7 @@ const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
   imageUrl: resolveAssetUrl(candidate.image_url),
   kind: candidate.kind,
   material: candidate.material,
+  matchRank: null,
   metadataScore: candidate.metadata_score,
   name: candidate.name,
   rubric: {
@@ -175,7 +184,9 @@ const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
   size: candidate.size,
   sku: candidate.sku,
   vectorScore: candidate.vector_score,
+  vlmMood: null,
   xaiReason: candidate.rubric.xai_reason,
+  xaiResult: null,
 });
 
 const toHistory = (item: ApiHistory): TaggingHistory => ({
@@ -264,39 +275,39 @@ export const searchCatalogItems = async (
 };
 
 export const saveTaggingReview = async ({
-  analysisId,
-  imageName,
-  objectId,
-  objectName,
+  objectIndex,
+  sceneImageId,
   selectedSku,
-  tags,
 }: {
-  analysisId: string;
-  imageName: string;
-  objectId: string;
-  objectName: string;
-  selectedSku: string;
-  tags: TaggingValues;
-}): Promise<TaggingHistory> => {
-  const response = await request<ApiHistory>('/api/v1/taggings/reviews', {
+  objectIndex: number;
+  sceneImageId: string;
+  selectedSku: SkuCandidate;
+}): Promise<void> => {
+  if (
+    selectedSku.matchRank === null ||
+    selectedSku.score === null ||
+    selectedSku.vlmMood === null ||
+    selectedSku.xaiResult === null
+  ) {
+    throw new Error('추천 후보의 저장 정보가 없습니다.');
+  }
+
+  await request(`/tagging/scenes/${encodeURIComponent(sceneImageId)}`, {
     body: JSON.stringify({
-      analysis_id: analysisId,
-      image_name: imageName,
-      object_id: objectId,
-      object_name: objectName,
-      selected_sku: selectedSku,
-      tags: {
-        category: tags.category,
-        color: tags.color,
-        material: tags.material,
-        mood: tags.mood,
-        style_tags: tags.styleTags,
-      },
+      matching: [
+        {
+          match_rank: selectedSku.matchRank,
+          object_index: objectIndex,
+          similarity_score: selectedSku.score,
+          sku_code: selectedSku.sku,
+          vlm_mood: selectedSku.vlmMood,
+          xai_result: selectedSku.xaiResult,
+        },
+      ],
     }),
     headers: { 'Content-Type': 'application/json' },
-    method: 'POST',
+    method: 'PUT',
   });
-  return toHistory(response);
 };
 
 export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {

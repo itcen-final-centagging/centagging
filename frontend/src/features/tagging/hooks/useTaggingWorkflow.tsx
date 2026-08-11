@@ -22,7 +22,6 @@ import type {
   FurnitureObject,
   SkuCandidate,
   TaggingHistory,
-  TaggingValues,
   UploadedImage,
   WorkflowStage,
 } from '../types';
@@ -40,7 +39,7 @@ type TaggingWorkflowContextValue = {
   loadSelectedObjectRecommendations: () => Promise<void>;
   redetect: (description: string) => Promise<void>;
   resetWorkflow: () => void;
-  saveTagging: (tags: TaggingValues) => Promise<void>;
+  saveTagging: () => Promise<void>;
   searchCatalog: (query: string) => Promise<SkuCandidate[]>;
   selectObject: (object: FurnitureObject) => void;
   selectedObject?: FurnitureObject;
@@ -210,33 +209,25 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [],
   );
 
-  const saveTagging = useCallback(
-    async (tags: TaggingValues): Promise<void> => {
-      if (!analysisId || !uploadedImage || !selectedObject || !selectedSku)
-        return;
-      setStage('saving');
-      try {
-        const savedHistory = await saveTaggingReview({
-          analysisId,
-          imageName: uploadedImage.name,
-          objectId: selectedObject.id,
-          objectName: selectedObject.name,
-          selectedSku: selectedSku.sku,
-          tags,
-        });
-        setHistory((currentHistory) => [savedHistory, ...currentHistory]);
-        setStage('saved');
-      } catch (error) {
-        setWorkflowError(
-          error instanceof Error
-            ? error.message
-            : '태깅 결과를 저장하지 못했습니다.',
-        );
-        setStage('failed');
-      }
-    },
-    [analysisId, selectedObject, selectedSku, uploadedImage],
-  );
+  const saveTagging = useCallback(async (): Promise<void> => {
+    if (!analysisId || !selectedObject || !selectedSku) return;
+    setStage('saving');
+    try {
+      await saveTaggingReview({
+        objectIndex: selectedObject.objectIndex,
+        sceneImageId: analysisId,
+        selectedSku,
+      });
+      setStage('saved');
+    } catch (error) {
+      setWorkflowError(
+        error instanceof Error
+          ? error.message
+          : '태깅 결과를 저장하지 못했습니다.',
+      );
+      setStage('failed');
+    }
+  }, [analysisId, selectedObject, selectedSku]);
 
   const resetWorkflow = useCallback((): void => {
     setStage('upload');
