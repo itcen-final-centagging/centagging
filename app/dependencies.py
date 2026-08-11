@@ -6,6 +6,7 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 from app.core import config, database
 from app.services.gemini_service import GeminiService
 from app.services.similar_sku_service import SimilarSkuService
+from app.services.xai_scoring_service import XaiScoringService
 
 
 def get_similar_sku_service(
@@ -27,4 +28,5 @@ def get_similar_sku_service(
         session=session,
         gemini_service=GeminiService(settings=settings),
         settings=settings,
+        scoring_service=XaiScoringService(settings=settings),
     )
