@@ -111,63 +111,177 @@ COMMENT ON COLUMN detected_object.mood_tags     IS '분위기 태그 배열';
 COMMENT ON COLUMN detected_object.crop_url      IS '잘라낸 객체 이미지 경로/URL';
 COMMENT ON COLUMN detected_object.embedding     IS '크롭 이미지 벡터 - 검색 쿼리로 사용 (인덱스 불필요)';
 
--- ------------------------------------------------------------
--- 4. sku_catalog : 상품 마스터 + 속성 (FT-CAT-002/003)
--- ------------------------------------------------------------
+-- =========================================================
+-- 4. sku_catalog : SKU 상품 마스터 + 메타데이터
+--    SKU 1건 = 1 row
+--
+-- 예:
+-- sku_id       : 50
+-- sku_code     : WRD-A3A6EFE8
+-- product_name : NEW컬러 맞춤제작 블라인드 시스템 드레스룸
+-- category     : 행거·옷장
+-- sub_category : 드레스룸
+-- attributes   : {"color":"블랙","brand":"큐브","selling_price":7800}
+-- =========================================================
+
 CREATE TABLE sku_catalog (
-    sku_id       BIGSERIAL    PRIMARY KEY,
-    sku_code     VARCHAR(50)  NOT NULL UNIQUE,
-    product_name VARCHAR(200) NOT NULL,
-    brand        VARCHAR(100),
-    price        INT,
-    space        VARCHAR(50),
-    category     VARCHAR(50),
-    sub_category VARCHAR(50),
-    attributes   JSONB        NOT NULL DEFAULT '{}'::jsonb,
-    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+    sku_id          BIGSERIAL    PRIMARY KEY,
+    sku_code        VARCHAR(50)  NOT NULL UNIQUE,
+    product_name    VARCHAR(200) NOT NULL,
+    category        VARCHAR(50)  NOT NULL,
+    sub_category    VARCHAR(50),
+
+    key_features    JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    attributes      JSONB        NOT NULL DEFAULT '{}'::jsonb,
+
+    text_embedding  VECTOR(3072),
+
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+    CONSTRAINT ck_sku_key_features_array
+        CHECK (jsonb_typeof(key_features) = 'array'),
+
+    CONSTRAINT ck_sku_attributes_object
+        CHECK (jsonb_typeof(attributes) = 'object')
 );
 
--- 부분일치·대소문자 무시 검색 (FT-CAT-002)
-CREATE INDEX idx_sku_name_trgm ON sku_catalog USING GIN (lower(product_name) gin_trgm_ops);
-CREATE INDEX idx_sku_code_trgm ON sku_catalog USING GIN (lower(sku_code) gin_trgm_ops);
-CREATE INDEX idx_sku_attr      ON sku_catalog USING GIN (attributes jsonb_path_ops);
-CREATE INDEX idx_sku_category  ON sku_catalog(category);
+-- 상품명 부분일치 검색
+CREATE INDEX idx_sku_name_trgm
+ON sku_catalog
+USING GIN (lower(product_name) gin_trgm_ops);
 
-COMMENT ON TABLE  sku_catalog              IS '상품 마스터 + 속성';
-COMMENT ON COLUMN sku_catalog.sku_code     IS '상품 코드, 중복 불가 - 검색 대상';
-COMMENT ON COLUMN sku_catalog.product_name IS '상품명 - 부분일치 검색 대상';
-COMMENT ON COLUMN sku_catalog.category     IS '상품 대분류 - Top-K 필터 조건';
-COMMENT ON COLUMN sku_catalog.attributes   IS '상품 속성 - 객체 속성과 같은 키 체계';
+-- SKU 코드 부분일치 검색
+CREATE INDEX idx_sku_code_trgm
+ON sku_catalog
+USING GIN (lower(sku_code) gin_trgm_ops);
 
--- ------------------------------------------------------------
--- 5. sku_image : SKU 이미지 + 벡터 임베딩 (색인 단위)
---    SKU 1건 : 이미지 N건, 각 이미지가 자기 벡터를 소유
---    embedding 은 NULL 허용 — 이미지 등록 후 색인 배치가 채움
--- ------------------------------------------------------------
+-- attributes 조건 검색
+CREATE INDEX idx_sku_attr
+ON sku_catalog
+USING GIN (attributes jsonb_path_ops);
+
+-- 카테고리 필터
+CREATE INDEX idx_sku_category
+ON sku_catalog(category);
+
+-- 텍스트 임베딩 검색용 HNSW
+CREATE INDEX idx_sku_text_embedding_hnsw
+ON sku_catalog
+USING hnsw (
+    (text_embedding::halfvec(3072))
+    halfvec_cosine_ops
+)
+WHERE text_embedding IS NOT NULL;
+
+COMMENT ON TABLE sku_catalog
+IS 'SKU 상품 마스터 + 메타데이터';
+
+COMMENT ON COLUMN sku_catalog.sku_id
+IS 'SKU 고유 번호';
+
+COMMENT ON COLUMN sku_catalog.sku_code
+IS 'SKU 상품 코드, 중복 불가';
+
+COMMENT ON COLUMN sku_catalog.product_name
+IS '상품명';
+
+COMMENT ON COLUMN sku_catalog.category
+IS '상품 대분류';
+
+COMMENT ON COLUMN sku_catalog.sub_category
+IS '상품 소분류';
+
+COMMENT ON COLUMN sku_catalog.key_features
+IS 'SKU 대표 특징 배열';
+
+COMMENT ON COLUMN sku_catalog.attributes
+IS 'SKU 메타데이터 - category별 속성 및 공통 속성';
+
+COMMENT ON COLUMN sku_catalog.text_embedding
+IS '상품명·카테고리·속성·대표 특징을 기반으로 생성한 텍스트 임베딩';
+
+COMMENT ON COLUMN sku_catalog.created_at
+IS 'SKU 등록 일시';
+
+-- =========================================================
+-- 5. sku_image : SKU 이미지 + 이미지 임베딩
+--    SKU 1건 : 이미지 N건
+--
+-- 현재:
+--   MAIN 1장
+--
+-- 향후:
+--   MAIN
+--   ANGLE 1~N
+--   DETAIL 1~N
+--   STYLING 1~N
+-- =========================================================
+
 CREATE TABLE sku_image (
-    sku_image_id BIGSERIAL   PRIMARY KEY,
-    sku_id       BIGINT      NOT NULL REFERENCES sku_catalog(sku_id) ON DELETE CASCADE,
-    image_url    TEXT        NOT NULL,
-    image_type   VARCHAR(20) NOT NULL DEFAULT 'MAIN'
-                 CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
-    embedding    VECTOR(3072),
-    indexed_at   TIMESTAMPTZ,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    sku_image_id BIGSERIAL PRIMARY KEY,
+    sku_id BIGINT NOT NULL
+        REFERENCES sku_catalog(sku_id)
+        ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    image_type VARCHAR(20) NOT NULL DEFAULT 'MAIN',
+    embedding VECTOR(3072),
+    indexed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT ck_sku_image_type
+        CHECK (
+            image_type IN (
+                'MAIN',
+                'ANGLE',
+                'DETAIL',
+                'STYLING'
+            )
+        )
 );
 
-CREATE INDEX idx_skuimg_sku ON sku_image(sku_id);
--- 원본 VECTOR(3072)는 유지하고 검색 인덱스만 halfvec으로 변환한다.
--- pgvector의 halfvec HNSW 인덱스는 최대 4,000차원을 지원한다.
-CREATE INDEX idx_skuimg_hnsw ON sku_image
-    USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops)
-    WHERE embedding IS NOT NULL;
--- 미색인 이미지 조회용 (색인 배치가 사용)
-CREATE INDEX idx_skuimg_pending ON sku_image(sku_image_id) WHERE embedding IS NULL;
+-- SKU별 이미지 조회
+CREATE INDEX idx_skuimg_sku
+ON sku_image(sku_id);
 
-COMMENT ON TABLE  sku_image            IS 'SKU 이미지 + 벡터 (색인 단위)';
-COMMENT ON COLUMN sku_image.image_type IS 'MAIN | ANGLE | DETAIL | STYLING — 색인 대상 선별에 사용';
-COMMENT ON COLUMN sku_image.embedding  IS '이미지 벡터 - 검색 대상. NULL 이면 미색인';
-COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
+-- 이미지 임베딩 HNSW 검색
+-- 원본 VECTOR(3072)는 유지하고
+-- 검색 인덱스만 halfvec으로 변환
+CREATE INDEX idx_skuimg_hnsw
+ON sku_image
+USING hnsw (
+    (embedding::halfvec(3072))
+    halfvec_cosine_ops
+)
+WHERE embedding IS NOT NULL;
+
+-- 아직 임베딩되지 않은 이미지 조회
+CREATE INDEX idx_skuimg_pending
+ON sku_image(sku_image_id)
+WHERE embedding IS NULL;
+
+COMMENT ON TABLE sku_image
+IS 'SKU 이미지 + 이미지 임베딩';
+
+COMMENT ON COLUMN sku_image.sku_image_id
+IS 'SKU 이미지 고유 번호';
+
+COMMENT ON COLUMN sku_image.sku_id
+IS 'SKU 상품 ID';
+
+COMMENT ON COLUMN sku_image.image_url
+IS 'SKU 이미지 경로 또는 URL';
+
+COMMENT ON COLUMN sku_image.image_type
+IS 'SKU 이미지 타입: MAIN | ANGLE | DETAIL | STYLING';
+
+COMMENT ON COLUMN sku_image.embedding
+IS 'SKU 이미지 임베딩 벡터';
+
+COMMENT ON COLUMN sku_image.indexed_at
+IS '이미지 임베딩 생성 완료 일시';
+
+COMMENT ON COLUMN sku_image.created_at
+IS '이미지 등록 일시';
 
 -- ------------------------------------------------------------
 -- 6. tagging_result : 최종 객체-SKU 매핑 + 검수 이력
