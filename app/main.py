@@ -6,7 +6,15 @@ import contextlib
 import fastapi
 import starlette.staticfiles
 
-from app.api import auth, history, scene_images, sku, sku_search, tagging
+from app.api import (
+    approval,
+    auth,
+    history,
+    scene_images,
+    sku,
+    sku_search,
+    tagging,
+)
 from app.core import config, database
 from app.services import user_seed
 
@@ -34,6 +42,7 @@ app.include_router(tagging.router)
 app.include_router(sku.router)
 app.include_router(sku_search.router)
 app.include_router(history.router)
+app.include_router(approval.router)
 
 app.mount(
     "/uploads",
