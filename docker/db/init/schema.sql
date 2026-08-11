@@ -76,8 +76,16 @@ CREATE TABLE sku_catalog (
     space        VARCHAR(50),
     category     VARCHAR(50),
     sub_category VARCHAR(50),
+    key_features JSONB        NOT NULL DEFAULT '[]'::jsonb,
     attributes   JSONB        NOT NULL DEFAULT '{}'::jsonb,
-    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+    text_embedding VECTOR(3072),
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_sku_key_features_array CHECK (
+        jsonb_typeof(key_features) = 'array'
+    ),
+    CONSTRAINT ck_sku_attributes_object CHECK (
+        jsonb_typeof(attributes) = 'object'
+    )
 );
 
 -- 부분일치·대소문자 무시 검색 (FT-CAT-002)
@@ -85,12 +93,17 @@ CREATE INDEX idx_sku_name_trgm ON sku_catalog USING GIN (lower(product_name) gin
 CREATE INDEX idx_sku_code_trgm ON sku_catalog USING GIN (lower(sku_code) gin_trgm_ops);
 CREATE INDEX idx_sku_attr      ON sku_catalog USING GIN (attributes jsonb_path_ops);
 CREATE INDEX idx_sku_category  ON sku_catalog(category);
+CREATE INDEX idx_sku_text_embedding_hnsw ON sku_catalog
+    USING hnsw ((text_embedding::halfvec(3072)) halfvec_cosine_ops)
+    WHERE text_embedding IS NOT NULL;
 
 COMMENT ON TABLE  sku_catalog              IS '상품 마스터 + 속성';
 COMMENT ON COLUMN sku_catalog.sku_code     IS '상품 코드, 중복 불가 - 검색 대상';
 COMMENT ON COLUMN sku_catalog.product_name IS '상품명 - 부분일치 검색 대상';
 COMMENT ON COLUMN sku_catalog.category     IS '상품 대분류 - Top-K 필터 조건';
+COMMENT ON COLUMN sku_catalog.key_features IS '상품 핵심 특징 목록';
 COMMENT ON COLUMN sku_catalog.attributes   IS '상품 속성 - 객체 속성과 같은 키 체계';
+COMMENT ON COLUMN sku_catalog.text_embedding IS '상품 메타데이터 텍스트 임베딩';
 
 -- ------------------------------------------------------------
 -- 5. sku_image : SKU 이미지 + 벡터 임베딩 (색인 단위)

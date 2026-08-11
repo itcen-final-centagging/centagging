@@ -9,7 +9,7 @@
       "top_material": "가공목(MDF 외)",
       "frame_material": "철제/스틸",
       "leg_type": "4다리",
-      "has_storage": false
+      "has_storage": "없음"
     },
     "option_rules": [
       {
@@ -49,10 +49,10 @@
       "pattern": "무지",
       "sofa_type": "기본형(일자형)",
       "material": "패브릭",
-      "has_legs": true,
-      "has_armrest": true,
-      "has_headrest": false,
-      "has_stool": false
+      "has_legs": "있음",
+      "has_armrest": "있음",
+      "has_headrest": "없음",
+      "has_stool": "없음"
     }
   },
   "324336": {
@@ -62,7 +62,7 @@
       "style": "내추럴",
       "pattern": "우드그레인",
       "bed_type": "성인용",
-      "has_headboard": false,
+      "has_headboard": "없음",
       "frame_type": "하단오픈형",
       "material": "가공목(MDF 외)",
       "wood_tone": "밝은 우드톤",
@@ -73,7 +73,7 @@
       {
         "keyword": "헤드형",
         "set": {
-          "has_headboard": true,
+          "has_headboard": "있음",
           "head_type": "패널형"
         }
       },
@@ -132,9 +132,9 @@
       "drawer_count": "5단 이상",
       "material": "가공목",
       "wood_tone": "밝은 우드톤",
-      "has_legs": true,
-      "has_wheels": false,
-      "has_drawer": true
+      "has_legs": "있음",
+      "has_wheels": "없음",
+      "has_drawer": "있음"
     }
   },
   "425266": {
@@ -156,9 +156,9 @@
       "pattern": "무지",
       "chair_type": "학생·사무용의자",
       "material": "메쉬",
-      "has_wheels": true,
-      "has_backrest": true,
-      "has_armrest": true
+      "has_wheels": "있음",
+      "has_backrest": "있음",
+      "has_armrest": "있음"
     }
   },
   "858890": {
@@ -170,10 +170,10 @@
       "pattern": "무지",
       "sofa_type": "기본형(일자형)",
       "material": "천연가죽",
-      "has_legs": true,
-      "has_armrest": true,
-      "has_headrest": false,
-      "has_stool": false
+      "has_legs": "있음",
+      "has_armrest": "있음",
+      "has_headrest": "없음",
+      "has_stool": "없음"
     }
   },
   "1234567": {
@@ -184,10 +184,10 @@
       "pattern": "무지",
       "sofa_type": "기본형(일자형)",
       "material": "패브릭",
-      "has_legs": true,
-      "has_armrest": true,
-      "has_headrest": false,
-      "has_stool": false
+      "has_legs": "있음",
+      "has_armrest": "있음",
+      "has_headrest": "없음",
+      "has_stool": "없음"
     }
   },
   "1341125": {
@@ -198,7 +198,7 @@
       "pattern": "무지",
       "installation_type": "스탠드형",
       "shape": "아치형",
-      "has_frame": false
+      "has_frame": "없음"
     }
   },
   "1883916": {
@@ -238,7 +238,7 @@
       "top_material": "원목",
       "frame_material": "원목",
       "leg_type": "4다리",
-      "has_storage": false,
+      "has_storage": "없음",
       "wood_tone": "밝은 우드톤",
       "seating_capacity": "2인"
     },
@@ -272,7 +272,7 @@
       "style": "럭셔리",
       "pattern": "패브릭 텍스처",
       "bed_type": "성인용",
-      "has_headboard": true,
+      "has_headboard": "있음",
       "head_type": "곡선형",
       "frame_type": "하단밀폐형",
       "material": "패브릭",
@@ -283,7 +283,7 @@
       {
         "keyword": "무헤드",
         "set": {
-          "has_headboard": false,
+          "has_headboard": "없음",
           "head_type": null
         }
       }
@@ -299,7 +299,7 @@
       "length": "161~200cm",
       "material": "가공목(MDF 외)",
       "level_count": "2단",
-      "has_legs": false
+      "has_legs": "없음"
     }
   },
   "2504314": {
@@ -310,9 +310,9 @@
       "pattern": "무지",
       "chair_type": "인테리어의자",
       "material": "패브릭",
-      "has_wheels": false,
-      "has_backrest": true,
-      "has_armrest": false
+      "has_wheels": "없음",
+      "has_backrest": "있음",
+      "has_armrest": "없음"
     },
     "option_rules": [
       {
@@ -368,9 +368,9 @@
       "storage_type": "서랍장",
       "drawer_count": "4단",
       "material": "가공목",
-      "has_legs": true,
-      "has_wheels": false,
-      "has_drawer": true
+      "has_legs": "있음",
+      "has_wheels": "없음",
+      "has_drawer": "있음"
     }
   },
   "4015272": {
@@ -395,7 +395,7 @@
       "top_material": "세라믹",
       "frame_material": "철제/스틸",
       "leg_type": "4다리",
-      "has_storage": false,
+      "has_storage": "없음",
       "seating_capacity": "4인"
     },
     "option_rules": [
@@ -420,7 +420,7 @@
       "style": "내추럴",
       "pattern": "우드그레인",
       "vanity_type": "수납형",
-      "has_mirror": true,
+      "has_mirror": "있음",
       "storage_type": "복합형",
       "material": "원목"
     }
