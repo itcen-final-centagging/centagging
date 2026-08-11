@@ -2,8 +2,14 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.dependencies import get_similar_sku_service
-from app.schemas.tagging import DetectionResponse
+from app.dependencies import get_similar_sku_service, get_sku_match_service
+from app.schemas.tagging import (
+    DetectionResponse,
+    SkuMatchingRequest,
+    SkuMatchingResponse,
+    SkuMatchingResult,
+)
+from app.services import sku_match_service as sku_match
 from app.services.similar_sku_service import (
     SceneImageNotFoundError,
     SimilarSkuService,
@@ -41,27 +47,44 @@ async def get_recommendation_sku(
 
     return DetectionResponse(status="success", data=result)
 
+
 @router.put("/scenes/{scene_id}")
-def update_scene(scene_id: int):
-    return {
-      "matching": [
-        {
-          "object_index": 0,
-          "sku_code": "CHR-2041",
-          "similarity_score": 92,
-          "xai_result": {
-            "summary": "등받이 곡률과 헤드레스트 형태가 거의 동일하고 색상까지 일치합니다.",
-            "criteria": [
-              { "label": "구조", "score": 29, "comment": "등받이 곡률·암레스트 각도가 일치합니다." },
-              { "label": "색상", "score": 28, "comment": "화이트 바디와 차콜 메쉬 조합이 같습니다." },
-              { "label": "디테일", "score": 17, "comment": "5스타 캐스터 형태가 유사합니다." },
-              { "label": "맥락", "score": 18, "comment": "홈오피스 연출과 사용 공간이 맞습니다." }
-            ]
-          },
-          "vlm_mood": {
-            "summary": "밝은 자연광이 드는 미니멀한 홈오피스에 어울리는 화이트 톤 워크체어입니다.",
-            "tags": ["미니멀", "내추럴", "홈오피스", "밝은 톤"]
-          }
-        }
-      ]
-    }
+async def confirm_scene_matching(
+    scene_id: int,
+    match_request: SkuMatchingRequest,
+    match_service: sku_match.SkuMatchService = Depends(get_sku_match_service),
+) -> SkuMatchingResponse:
+    """탐지 객체별로 선택한 SKU를 최종 확정해 저장합니다.
+
+    Args:
+        scene_id: 확정할 장면 이미지 ID입니다.
+        match_request: 확정할 객체-SKU 매핑 목록입니다.
+        match_service: SKU 확정 저장 서비스입니다.
+
+    Returns:
+        저장된 tagging_result의 result_id 목록입니다.
+
+    Raises:
+        HTTPException: 장면 이미지가 없으면 404, 요청 값이 장면·카탈로그와
+            맞지 않으면 422를 반환합니다.
+    """
+    try:
+        result_ids = await match_service.confirm_matching(
+            scene_id, match_request.matching
+        )
+    except sku_match.SceneImageNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (
+        sku_match.DuplicateObjectIndexError,
+        sku_match.ObjectIndexOutOfRangeError,
+        sku_match.MatchingTargetNotFoundError,
+    ) as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    return SkuMatchingResponse(
+        status="success",
+        data=SkuMatchingResult(
+            processing_status="CONFIRMED",
+            result_ids=result_ids,
+        ),
+    )
