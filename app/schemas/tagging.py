@@ -140,6 +140,7 @@ class SkuMatching(BaseModel):
     # scene_image.bbox_coord 배열의 인덱스입니다.
     object_index: int = Field(ge=0)
     sku_code: str = Field(min_length=1)
+    match_rank: int = Field(ge=1)
     similarity_score: int = Field(ge=0, le=100)
     xai_result: XaiResult
     vlm_mood: VlmMood = Field(default_factory=VlmMood)

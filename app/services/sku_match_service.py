@@ -36,15 +36,18 @@ _SELECT_SCENE = sqlalchemy.text("""
 _INSERT_TAGGING_RESULT = sqlalchemy.text("""
     INSERT INTO tagging_result (
         scene_image_id,
+        object_index,
         sku_id,
         sku_image_id,
+        match_source,
+        match_rank,
         similarity_score,
         xai_result,
-        tag_values,
         vlm_mood,
         created_by
     )
     SELECT :scene_image_id,
+           :object_index,
            sc.sku_id,
            (
                SELECT si.sku_image_id
@@ -53,9 +56,10 @@ _INSERT_TAGGING_RESULT = sqlalchemy.text("""
                 ORDER BY (si.image_type <> 'MAIN'), si.sku_image_id
                 LIMIT 1
            ),
+           :match_source,
+           :match_rank,
            :similarity_score,
            CAST(:xai_result AS jsonb),
-           CAST(:tag_values AS jsonb),
            CAST(:vlm_mood AS jsonb),
            au.user_id
       FROM sku_catalog sc
@@ -64,13 +68,6 @@ _INSERT_TAGGING_RESULT = sqlalchemy.text("""
        AND au.login_id = :login_id
        AND au.is_active = TRUE
     RETURNING result_id
-    """)
-
-_UPDATE_ANALYSIS_STATUS = sqlalchemy.text("""
-    UPDATE scene_image
-       SET analysis_status = :analysis_status,
-           analysis_error = NULL
-     WHERE scene_image_id = :scene_image_id
     """)
 
 _LOGGER = logging.getLogger(__name__)
@@ -101,7 +98,6 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
     ) -> list[int]:
         """요청받은 객체-SKU 매핑을 확정하고 result_id를 반환합니다.
 
-        매핑을 모두 저장한 뒤에만 장면 상태를 confirmed로 바꿉니다.
         중간에 실패하면 전체를 롤백해 부분 저장을 남기지 않습니다.
 
         Args:
@@ -127,13 +123,6 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             for item in matching:
                 result_ids.append(await self._insert_matching(scene_id, item))
 
-            await self.session.execute(
-                _UPDATE_ANALYSIS_STATUS,
-                {
-                    "scene_image_id": scene_id,
-                    "analysis_status": "confirmed",
-                },
-            )
             await self.session.commit()
 
             return result_ids
@@ -210,16 +199,14 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             _INSERT_TAGGING_RESULT,
             {
                 "scene_image_id": scene_id,
+                "object_index": item.object_index,
                 "sku_code": item.sku_code,
                 "login_id": self.settings.mvp_login_id,
-                "similarity_score": item.similarity_score,
+                "match_source": "RECOMMEND",
+                "match_rank": item.match_rank,
+                "similarity_score": item.similarity_score / 100,
                 "xai_result": json.dumps(
-                    item.xai_result.model_dump(), ensure_ascii=False
-                ),
-                # tagging_result에 object_index 컬럼이 없어서 확정 태깅
-                # 값에 함께 보관합니다.
-                "tag_values": json.dumps(
-                    {"object_index": item.object_index},
+                    item.xai_result.model_dump(exclude={"vlm_mood"}),
                     ensure_ascii=False,
                 ),
                 "vlm_mood": json.dumps(
