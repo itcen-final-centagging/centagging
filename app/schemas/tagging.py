@@ -2,7 +2,7 @@
 
 import typing
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MatchedSkuImage(BaseModel):
@@ -33,10 +33,13 @@ class SkuCandidate(BaseModel):
 
 
 class DetectedObject(BaseModel):
-    """탐지된 가구 객체 1건과 해당 SKU 후보 목록입니다."""
+    """탐지된 가구 객체의 속성과 SKU 후보 목록입니다."""
 
     object_index: int
     bbox_coord: dict[str, float]
+    category: str
+    sub_category: str | None = None
+    attributes: dict[str, str] = Field(default_factory=dict)
     sku_candidates: list[SkuCandidate]
 
 

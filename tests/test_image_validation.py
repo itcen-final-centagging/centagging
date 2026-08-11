@@ -225,7 +225,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
         detection_result = GeminiDetectionResult(
             detections=[
                 GeminiRawDetection(
-                    label="chair",
+                    category="의자",
                     box_2d=[100, 200, 700, 800],
                     evidence="chair shape",
                     confidence=0.9,
@@ -299,6 +299,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
             ),
             [
                 {
+                    "category":"의자",
                     "xmin": 200,
                     "ymin": 100,
                     "xmax": 800,

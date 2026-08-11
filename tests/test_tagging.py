@@ -14,6 +14,7 @@ from app import dependencies
 from app.api import tagging
 from app.core import config
 from app.schemas import tagging as tagging_schemas
+from app.schemas.furniture_attribute import FurnitureAttributeResult
 from app.services import image_processing_service, similar_sku_service
 
 
@@ -143,10 +144,26 @@ class _FakeSimilarSkuSession:
 
 
 class _FakeGeminiService:
-    """실제 Gemini 호출 없이 고정 임베딩을 반환하는 가짜 서비스입니다."""
+    """실제 Gemini 호출 없이 속성과 고정 임베딩을 반환합니다."""
 
     def __init__(self) -> None:
         self.received_images: list[PIL.Image.Image] = []
+        self.received_attribute_images: list[PIL.Image.Image] = []
+        self.received_categories: list[str] = []
+
+    def extract_furniture_attributes(
+        self,
+        image: PIL.Image.Image,
+        category: str,
+    ) -> FurnitureAttributeResult:
+        """속성 추출에 전달된 크롭과 카테고리를 기록합니다."""
+        self.received_attribute_images.append(image.copy())
+        self.received_categories.append(category)
+        return FurnitureAttributeResult(
+            category=category,
+            sub_category=("인테리어의자" if category == "의자" else None),
+            attributes={"color": "베이지", "material": "패브릭"},
+        )
 
     def embed_image(self, image: PIL.Image.Image) -> list[float]:
         """전달받은 크롭 이미지를 기록하고 고정 임베딩을 반환합니다."""
@@ -160,6 +177,18 @@ class _FailingGeminiService(_FakeGeminiService):
     def embed_image(self, image: PIL.Image.Image) -> list[float]:
         """임베딩 실패 상황을 재현합니다."""
         raise RuntimeError("embedding failed")
+
+
+class _FailingAttributeGeminiService(_FakeGeminiService):
+    """속성 추출 단계 오류를 발생시키는 가짜 서비스입니다."""
+
+    def extract_furniture_attributes(
+        self,
+        image: PIL.Image.Image,
+        category: str,
+    ) -> FurnitureAttributeResult:
+        """속성 추출 실패 상황을 재현합니다."""
+        raise RuntimeError("attribute extraction failed")
 
 
 def _test_settings(image_storage_root: str) -> config.Settings:
@@ -255,14 +284,22 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         """object_indexes=[2, 0]으로 요청하면 응답도 2, 0 순서/값을 유지합니다."""
         bbox_coord = [
-            {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0},
             {
+                "category": "의자",
+                "xmin": 0.0,
+                "ymin": 0.0,
+                "xmax": 100.0,
+                "ymax": 100.0,
+            },
+            {
+                "category": "의자",
                 "xmin": 100.0,
                 "ymin": 100.0,
                 "xmax": 200.0,
                 "ymax": 200.0,
             },
             {
+                "category": "의자",
                 "xmin": 200.0,
                 "ymin": 200.0,
                 "xmax": 300.0,
@@ -308,6 +345,19 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
             result.objects[1].bbox_coord,
             {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0},
         )
+        self.assertEqual(
+            [obj.category for obj in result.objects], ["의자", "의자"]
+        )
+        self.assertEqual(
+            [obj.sub_category for obj in result.objects],
+            ["인테리어의자", "인테리어의자"],
+        )
+        self.assertEqual(
+            result.objects[0].attributes,
+            {"color": "베이지", "material": "패브릭"},
+        )
+        self.assertEqual(gemini_service.received_categories, ["의자", "의자"])
+        self.assertEqual(len(gemini_service.received_attribute_images), 2)
         self.assertEqual(len(gemini_service.received_images), 2)
         self.assertEqual(
             result.objects[0].sku_candidates[0].sku_code, "SKU-001"
@@ -341,6 +391,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
             "image_url": "/uploads/scene-images/scene.png",
             "bbox_coord": [
                 {
+                    "category": "의자",
                     "xmin": 0.0,
                     "ymin": 0.0,
                     "xmax": 100.0,
@@ -365,12 +416,60 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.processing_status, "detected")
         self.assertEqual(session.status_updates, [])
 
+    async def test_marks_failed_when_attribute_extraction_fails(self) -> None:
+        """속성 추출 오류가 발생하면 임베딩 없이 failed로 전환합니다."""
+        scene_row = {
+            "image_url": "/uploads/scene-images/scene.png",
+            "bbox_coord": [
+                {
+                    "category": "의자",
+                    "xmin": 0.0,
+                    "ymin": 0.0,
+                    "xmax": 100.0,
+                    "ymax": 100.0,
+                }
+            ],
+        }
+        session = _FakeSimilarSkuSession(scene_row=scene_row)
+        gemini_service = _FailingAttributeGeminiService()
+        service = similar_sku_service.SimilarSkuService(
+            session=session,
+            gemini_service=gemini_service,
+            settings=self.settings,
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError, "attribute extraction failed"
+        ):
+            await service.orchestrate_similar_skus(
+                scene_id=1, object_indexes=[0]
+            )
+
+        self.assertEqual(gemini_service.received_images, [])
+        self.assertEqual(session.rollback_count, 1)
+        self.assertEqual(
+            session.status_updates,
+            [
+                {
+                    "scene_image_id": 1,
+                    "analysis_status": "failed",
+                    "analysis_error": "attribute extraction failed",
+                }
+            ],
+        )
+
     async def test_marks_failed_when_embedding_fails(self) -> None:
         """임베딩 오류가 발생하면 failed 상태와 원인을 저장합니다."""
         scene_row = {
             "image_url": "/uploads/scene-images/scene.png",
             "bbox_coord": [
-                {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0}
+                {
+                    "category": "의자",
+                    "xmin": 0.0,
+                    "ymin": 0.0,
+                    "xmax": 100.0,
+                    "ymax": 100.0,
+                }
             ],
         }
         session = _FakeSimilarSkuSession(scene_row=scene_row)
@@ -432,7 +531,13 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
         scene_row = {
             "image_url": "/uploads/scene-images/scene.png",
             "bbox_coord": [
-                {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0}
+                {
+                    "category": "의자",
+                    "xmin": 0.0,
+                    "ymin": 0.0,
+                    "xmax": 100.0,
+                    "ymax": 100.0,
+                }
             ],
         }
         session = _FakeSimilarSkuSession(

@@ -12,7 +12,7 @@ Coordinate = Annotated[float, Field(ge=0, le=1000)]
 class GeminiRawDetection(BaseModel):
     """Gemini가 반환하는 개별 탐지 객체입니다."""
 
-    label: str = Field(min_length=1)
+    category: str = Field(min_length=1)
     box_2d: list[Coordinate] = Field(min_length=4, max_length=4)
     evidence: str = Field(min_length=1)
     confidence: float | None = Field(default=None, ge=0, le=1)

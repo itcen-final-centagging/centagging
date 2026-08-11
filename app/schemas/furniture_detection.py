@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 class DetectedObjectResponse(BaseModel):
     """외부 API에 노출하는 탐지 객체입니다."""
 
-    label: str
+    category: str
     box_2d: list[int] = Field(
         min_length=4,
         max_length=4,

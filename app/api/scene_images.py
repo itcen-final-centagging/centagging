@@ -118,7 +118,7 @@ def _build_detected_objects(
     """내부 탐지 결과를 공개 응답 객체로 변환합니다."""
     return [
         DetectedObjectResponse(
-            label=detection.label,
+            category=detection.category,
             box_2d=[round(coordinate) for coordinate in detection.box_2d],
         )
         for detection in detection_result.detections
@@ -137,6 +137,7 @@ async def _save_detection_success(
         ymin, xmin, ymax, xmax = detected_object.box_2d
         bbox_coord.append(
             {
+                "category": detected_object.category,
                 "xmin": xmin,
                 "ymin": ymin,
                 "xmax": xmax,

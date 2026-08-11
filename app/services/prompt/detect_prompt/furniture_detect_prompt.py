@@ -32,11 +32,10 @@ FURNITURE_DETECTION_PROMPT = """
 
     ## Uncertain objects rules
     1. Favor recall when there is clear visual evidence that the region is furniture.
-    2. If the object is clearly furniture but its detailed type is uncertain, include it using the most reliable coarse label.
-    3. Use "other_furniture" when the object is clearly furniture but none of the allowed labels can be determined reliably.
-    4. Do not invent a specific label from hidden or invisible parts.
-    5. Exclude a candidate only when there is insufficient evidence that it is actually furniture.
-    6. Explain visible evidence and uncertainty briefly in the evidence field.
+    2. If the object is clearly furniture but its detailed type is uncertain, include it using the most reliable category.
+    3. Do not invent a specific category from hidden or invisible parts.
+    4. Exclude a candidate only when there is insufficient evidence that it is actually furniture.
+    5. Explain visible evidence and uncertainty briefly in the evidence field.
 
     ## Occlusion and truncation rules
     1. Detect a partially occluded object when enough visible structure exists to identify it as an independent furniture instance.
@@ -46,16 +45,16 @@ FURNITURE_DETECTION_PROMPT = """
     5. When part of the object is hidden behind another object, box the reliably estimated object extent only when its continuation is visually obvious. Otherwise, box the visible extent and set is_occluded to true.
     6. Do not treat shadows or reflections as part of the furniture boundary.
 
-    ## Label rules
-    - Use a coarse furniture label from the provided allowed label list.
+    ## Category rules
+    - Use a coarse furniture category from the provided allowed category list.
     - Do not infer a detailed product category or attributes at this stage.
-    - Do not guess an unsupported label when visual evidence is insufficient.
+    - Do not guess an unsupported category when visual evidence is insufficient.
 
     ## Output format
     {
         "detections": [
             {
-            "label": "chair",
+            "category": "의자",
             "box_2d": [251, 99, 977, 631],
             "evidence": "A separately visible chair with a backrest and four legs.",
             "confidence": 0.82

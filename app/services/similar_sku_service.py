@@ -55,7 +55,7 @@ class SceneCropData(typing.TypedDict):
     """scene_image에서 조회한 원본 이미지 경로와 대상 좌표입니다."""
 
     image_url: str
-    indexed_coords: list[tuple[int, dict[str, float]]]
+    indexed_coords: list[tuple[int, dict[str, object]]]
 
 
 _SIMILAR_SKU_QUERY = sqlalchemy.text("""
@@ -165,25 +165,43 @@ class SimilarSkuService:
                 "image_url"
             ].removeprefix("/uploads/")
 
-            embedded_objects = []
+            processed_objects = []
             with Image.open(image_path, "r") as scene_image:
                 for object_index, coord in scene["indexed_coords"]:
-                    crop_image = get_crop_image(scene_image, coord)
+
+                    category = str(coord["category"])
+
+                    bbox_coord = {
+                        key: float(coord[key])
+                        for key in ("xmin", "ymin", "xmax", "ymax")
+                    }
+
+                    crop_image = get_crop_image(scene_image, bbox_coord)
+
+                    metadata = await asyncio.to_thread(
+                        self.gemini_service.extract_furniture_attributes,
+                        crop_image,
+                        category
+                    )
+
                     embedding = await asyncio.to_thread(
                         self.gemini_service.embed_image, crop_image
                     )
-                    embedded_objects.append((object_index, coord, embedding))
+                    processed_objects.append((object_index, bbox_coord, metadata, embedding))
 
             await self._update_analysis_status(scene_id, "embedded")
 
             objects = []
-            for object_index, coord, embedding in embedded_objects:
+            for object_index, bbox_coord, metadata, embedding in processed_objects:
                 similar_skus = await self.find_similar_skus(embedding)
 
                 objects.append(
                     DetectedObject(
                         object_index=object_index,
-                        bbox_coord=coord,
+                        bbox_coord=bbox_coord,
+                        category=metadata.category,
+                        sub_category=metadata.sub_category,
+                        attributes=metadata.attributes,
                         sku_candidates=[
                             SkuCandidate(
                                 sku_code=sku.sku_code,
