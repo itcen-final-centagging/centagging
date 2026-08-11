@@ -41,8 +41,8 @@ async def get_recommendation_sku(
 
     return DetectionResponse(status="success", data=result)
 
-@router.put("/scenes{scene_id}")
-def update_scene():
+@router.put("/scenes/{scene_id}")
+def update_scene(scene_id: int):
     return {
       "matching": [
         {
