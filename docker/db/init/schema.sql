@@ -227,3 +227,49 @@ COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 �
 COMMENT ON COLUMN tagging_result.similarity_score IS '선택 시점의 임베딩 유사도 (0~1)';
 COMMENT ON COLUMN tagging_result.similarity_grade IS '화면 표시용 등급 상/중/하';
 COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 위 주석의 JSON 구조 참고';
+
+-- ------------------------------------------------------------
+-- 7. approval : 객체-SKU 매칭(tagging_result) 단위 승인 요청
+--    tagging_result와 마찬가지로 scene_image_id/object_id를 함께 FK로
+--    가져와서, 목록/조인 시 detected_object를 거치지 않고도 어느
+--    연출 이미지의 요청인지 바로 알 수 있게 한다.
+-- ------------------------------------------------------------
+CREATE TABLE approval (
+    request_id     BIGSERIAL   PRIMARY KEY,
+    scene_image_id BIGINT      NOT NULL REFERENCES scene_image(scene_image_id) ON DELETE CASCADE,
+    object_id      BIGINT      NOT NULL REFERENCES detected_object(object_id) ON DELETE CASCADE,
+    status         VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    requested_by   BIGINT      NOT NULL REFERENCES app_user(user_id),
+    requested_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reviewed_by    BIGINT      REFERENCES app_user(user_id),
+    reviewed_at    TIMESTAMPTZ,
+    reject_reason  VARCHAR(255),
+    CONSTRAINT ck_approval_status CHECK (status IN ('PENDING','ACTIVE','REJECTED','NO_SKU')),
+    -- 처리된 건은 검수자·일시가 필수, 반려는 사유까지 필수
+    -- NO_SKU는 매칭 대상 tagging_result가 없는 상태로 생길 수 있어
+    -- 검수자·일시를 강제하지 않는다(태깅 시점에 바로 생길 수도 있음).
+    CONSTRAINT ck_approval_reviewed CHECK (
+        (status = 'PENDING'  AND reviewed_by IS NULL AND reviewed_at IS NULL AND reject_reason IS NULL)
+     OR (status = 'ACTIVE'   AND reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)
+     OR (status = 'REJECTED' AND reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL
+                             AND reject_reason IS NOT NULL)
+     OR (status = 'NO_SKU')
+    )
+);
+
+-- 같은 객체에 PENDING은 1건만. 반려 후 재요청은 허용된다.
+CREATE UNIQUE INDEX uq_approval_pending
+    ON approval(object_id) WHERE status = 'PENDING';
+
+CREATE INDEX idx_approval_status_req ON approval(status, requested_at DESC);
+CREATE INDEX idx_approval_scene       ON approval(scene_image_id);
+
+COMMENT ON TABLE  approval               IS '객체-SKU 매칭(tagging_result) 단위 승인 요청';
+COMMENT ON COLUMN approval.request_id    IS '승인 요청 고유 번호';
+COMMENT ON COLUMN approval.object_id     IS '승인 대상 탐지 객체 - 객체 단위로 개별 승인/반려';
+COMMENT ON COLUMN approval.status        IS 'PENDING | ACTIVE | REJECTED | NO_SKU';
+COMMENT ON COLUMN approval.requested_by  IS '태깅을 저장한 작업자';
+COMMENT ON COLUMN approval.reviewed_by   IS '승인·반려를 수행한 사용자';
+
+-- sku_image 멱등성 인덱스: confirm이 두 번 호출돼도 같은 크롭이 중복 등록되지 않는다.
+CREATE UNIQUE INDEX uq_sku_image_sku_url ON sku_image(sku_id, image_url);
