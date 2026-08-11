@@ -36,6 +36,7 @@ frontend/.eslintcache
 data/catalog/answer_sku
 data/catalog/answer_sku.json
 resource
+data/images
 
 # IDE 및 운영체제 파일 / IDE and operating system files
 .vscode/
