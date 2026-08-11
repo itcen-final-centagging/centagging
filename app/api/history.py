@@ -1,27 +1,35 @@
-from fastapi import APIRouter
+import fastapi
+from sqlalchemy.ext import asyncio as sqlalchemy_async
 
-router = APIRouter(prefix="/history", tags=["history"])
+from app.core import database
+from app.repositories import tagging_history_repository
+from app.schemas import history as history_schema
 
-@router.get("/results")
-def get_tagging_history():
-    return {
-      "status": "success",
-      "data": {
-        "items": [
-          {
-            "result_id": 8801,
-            "similarity_score": 92,
-            "created_by": "김태깅",
-            "created_at": "2026-08-10T17:56:00+09:00",
-            "scene_image": {
-              "image_url": "/uploads/scene-images/9f2c.jpg",
-              "origin_name": "scene_office_01.jpg",
-              "bbox": { "xmin": 262, "ymin": 300, "xmax": 681, "ymax": 890 }
-            }
-          }
-        ]
-      }
-    }
+router = fastapi.APIRouter(prefix="/history", tags=["history"])
+
+
+@router.get(
+    "/results",
+    response_model=history_schema.TaggingHistoryListResponse,
+)
+async def list_tagging_history(
+    session: sqlalchemy_async.AsyncSession = fastapi.Depends(
+        database.get_database_session
+    ),
+) -> history_schema.TaggingHistoryListResponse:
+    """저장된 태깅 결과를 최신순으로 조회합니다.
+
+    Args:
+        session: 요청 범위의 비동기 DB 세션입니다.
+
+    Returns:
+        검수 이력 화면에 표시할 태깅 결과 목록입니다.
+    """
+    items = await tagging_history_repository.list_tagging_history(session)
+    return history_schema.TaggingHistoryListResponse(
+        status="success",
+        data={"items": items},
+    )
 
 
 @router.get("/results/{result_id}")
