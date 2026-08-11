@@ -45,3 +45,23 @@ class TaggingHistoryListResponse(pydantic.BaseModel):
         typing.Literal["items"],
         list[TaggingHistoryListItem],
     ] = pydantic.Field(min_length=1, max_length=1)
+
+
+class TaggingHistoryDetail(pydantic.BaseModel):
+    """태깅 이력 상세 결과입니다."""
+
+    result_id: int
+    created_by: str
+    created_at: datetime.datetime
+    similarity_score: int | None
+    scene_image: dict[str, str]
+    detected_object: dict[str, typing.Any]
+    matched_sku: dict[str, typing.Any]
+    xai_result: dict[str, typing.Any] | None
+
+
+class TaggingHistoryDetailResponse(pydantic.BaseModel):
+    """태깅 이력 상세 API 응답입니다."""
+
+    status: typing.Literal["success"]
+    data: TaggingHistoryDetail

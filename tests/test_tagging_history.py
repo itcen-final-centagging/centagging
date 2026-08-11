@@ -26,17 +26,33 @@ class _FakeResult:
         """조회 행을 반환합니다."""
         return self._rows
 
+    def one_or_none(self) -> dict[str, object] | None:
+        """상세 조회 행을 반환합니다."""
+        return self._rows[0] if self._rows else None
+
 
 class _FakeSession:
     """목록 조회 테스트용 비동기 DB 세션입니다."""
 
-    def __init__(self, rows: list[dict[str, object]]) -> None:
+    def __init__(
+        self,
+        rows: list[dict[str, object]],
+        detail_row: dict[str, object] | None,
+    ) -> None:
         self._rows = rows
+        self.detail_row = detail_row
         self.executed_statement = ""
 
-    async def execute(self, statement: object) -> _FakeResult:
+    async def execute(
+        self,
+        statement: object,
+        parameters: dict[str, object] | None = None,
+    ) -> _FakeResult:
         """준비된 목록 조회 결과를 반환합니다."""
         self.executed_statement = str(statement)
+        if parameters is not None:
+            rows = [self.detail_row] if self.detail_row is not None else []
+            return _FakeResult(rows)
         return _FakeResult(self._rows)
 
 
@@ -71,7 +87,37 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 },
             }
         ]
-        self.session = _FakeSession(rows)
+        detail_row = {
+            "result_id": 9901,
+            "created_by": "김태깅",
+            "created_at": datetime.datetime(
+                2026,
+                8,
+                11,
+                9,
+                30,
+                tzinfo=datetime.timezone(datetime.timedelta(hours=9)),
+            ),
+            "similarity_score": decimal.Decimal("0.8750"),
+            "scene_image_url": "/uploads/scene-images/detail.jpg",
+            "origin_name": "scene_detail.jpg",
+            "bbox": {
+                "xmin": 100,
+                "ymin": 200,
+                "xmax": 500,
+                "ymax": 800,
+            },
+            "sku_code": "CHR-9901",
+            "product_name": "메쉬 사무용 의자",
+            "brand": "센터퍼니처",
+            "price": 249000,
+            "sku_image_url": "/uploads/sku-images/CHR-9901_main.jpg",
+            "category": "의자",
+            "sub_category": "학생·사무용의자",
+            "attributes": {"color": "화이트", "material": "메쉬"},
+            "xai_result": {"summary": "형태와 색상이 유사합니다."},
+        }
+        self.session = _FakeSession(rows, detail_row)
         self.app = fastapi.FastAPI()
         self.app.include_router(history.router)
 
@@ -144,6 +190,44 @@ class TaggingHistoryApiTest(unittest.TestCase):
         self.assertIn(
             "ORDER BY tr.created_at DESC, tr.result_id DESC",
             self.session.executed_statement,
+        )
+
+    def test_returns_saved_tagging_history_detail(self) -> None:
+        """저장된 연출 이미지와 확정 SKU 상세 정보를 반환합니다."""
+        response = self.client.get("/history/results/9901")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(data["result_id"], 9901)
+        self.assertEqual(data["similarity_score"], 88)
+        self.assertEqual(data["scene_image"]["origin_name"], "scene_detail.jpg")
+        self.assertEqual(
+            data["detected_object"]["bbox"],
+            {"xmin": 100, "ymin": 200, "xmax": 500, "ymax": 800},
+        )
+        self.assertIsNone(data["detected_object"]["category"])
+        self.assertEqual(data["detected_object"]["attrs"], {})
+        self.assertIsNone(data["detected_object"]["vlm_mood"])
+        self.assertEqual(data["matched_sku"]["sku_code"], "CHR-9901")
+        self.assertEqual(
+            data["matched_sku"]["image_url"],
+            "/uploads/sku-images/CHR-9901_main.jpg",
+        )
+        self.assertEqual(
+            data["xai_result"],
+            {"summary": "형태와 색상이 유사합니다."},
+        )
+
+    def test_returns_404_when_tagging_history_does_not_exist(self) -> None:
+        """결과 ID에 해당하는 태깅 이력이 없으면 404를 반환합니다."""
+        self.session.detail_row = None
+
+        response = self.client.get("/history/results/9999")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.json()["detail"],
+            "태깅 이력을 찾을 수 없습니다.",
         )
 
 
