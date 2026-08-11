@@ -62,19 +62,31 @@ type ApiCandidate = {
   vector_score: number;
 };
 
-type ApiHistory = {
-  id: string;
-  image_name: string;
-  object_name: string;
+type ApiHistoryListItem = {
+  result_id: number;
+  sku_code: string;
   product_name: string;
-  saved_at: string;
-  sku: string;
-  tags: {
-    category: string;
-    color: string;
-    material: string;
-    mood: string;
-    style_tags: string[];
+  object_name: string | null;
+  similarity_score: number | null;
+  created_by: string;
+  created_at: string;
+  style_tags: string[];
+  scene_image: {
+    image_url: string;
+    origin_name: string;
+    bbox: {
+      xmin: number;
+      ymin: number;
+      xmax: number;
+      ymax: number;
+    };
+  };
+};
+
+type ApiHistoryListResponse = {
+  status: 'success';
+  data: {
+    items: ApiHistoryListItem[];
   };
 };
 
@@ -189,19 +201,19 @@ const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
   xaiResult: null,
 });
 
-const toHistory = (item: ApiHistory): TaggingHistory => ({
-  id: item.id,
-  imageName: item.image_name,
-  objectName: item.object_name,
+const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
+  id: String(item.result_id),
+  imageName: item.scene_image.origin_name,
+  objectName: item.object_name ?? '',
   productName: item.product_name,
-  savedAt: item.saved_at,
-  sku: item.sku,
+  savedAt: item.created_at,
+  sku: item.sku_code,
   tags: {
-    category: item.tags.category,
-    color: item.tags.color,
-    material: item.tags.material,
-    mood: item.tags.mood,
-    styleTags: item.tags.style_tags,
+    category: '',
+    color: '',
+    material: '',
+    mood: '',
+    styleTags: item.style_tags,
   },
 });
 
@@ -274,6 +286,11 @@ export const searchCatalogItems = async (
   return response.map(toCandidate);
 };
 
+export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
+  const response = await request<ApiHistoryListResponse>('/history/results');
+  return response.data.items.map(toHistory);
+};
+
 export const saveTaggingReview = async ({
   objectIndex,
   sceneImageId,
@@ -308,9 +325,4 @@ export const saveTaggingReview = async ({
     headers: { 'Content-Type': 'application/json' },
     method: 'PUT',
   });
-};
-
-export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
-  const response = await request<ApiHistory[]>('/api/v1/taggings/history');
-  return response.map(toHistory);
 };

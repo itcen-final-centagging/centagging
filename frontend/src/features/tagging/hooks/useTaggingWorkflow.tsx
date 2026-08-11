@@ -218,6 +218,8 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         sceneImageId: analysisId,
         selectedSku,
       });
+      const nextHistory = await fetchTaggingHistory();
+      setHistory(nextHistory);
       setStage('saved');
     } catch (error) {
       setWorkflowError(
