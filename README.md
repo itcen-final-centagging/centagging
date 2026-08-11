@@ -115,13 +115,12 @@ Docker 외에 로컬에서 코드 품질 검사 또는 디버깅을 하려면 Co
 ```powershell
 conda env create -f environment.yml
 conda activate centagging
-pre-commit install
 ```
 
-전체 코드 품질 검사는 아래처럼 실행합니다.
+pre-commit 검사는 커밋 시 자동으로 실행되지 않습니다. 전체 코드 품질 검사가 필요할 때 아래처럼 수동으로 실행합니다.
 
 ```powershell
-pre-commit run --all-files
+pre-commit run --hook-stage manual --all-files
 ```
 
 Python 코드는 [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)를 따르며, 세부 협업 기준은 [docs/CODING_CONVENTION.md](docs/CODING_CONVENTION.md)를 확인합니다.
@@ -230,7 +229,7 @@ centagging-backend/
 ├─ .env                         # 개인 로컬 비밀값 - Git 제외
 ├─ .env.example                 # 팀 공유용 환경 변수 템플릿
 ├─ .gitignore                   # 비밀값·캐시·가상환경 제외 규칙
-├─ .pre-commit-config.yaml      # 로컬 커밋 전 코드 검사 설정
+├─ .pre-commit-config.yaml      # 수동 Python 코드 품질 검사 설정
 ├─ .dockerignore                # Docker 빌드 제외 규칙
 ├─ docker-compose.yml           # API·Frontend·DB 통합 실행
 ├─ Dockerfile.api               # FastAPI 컨테이너 이미지 정의
