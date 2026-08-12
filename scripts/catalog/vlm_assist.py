@@ -27,7 +27,7 @@ import pathlib
 from typing import Any
 
 from dotenv import load_dotenv
-
+import time
 from app.core import catalog_spec
 from scripts.catalog import metadata_builder, storage
 
@@ -37,10 +37,10 @@ load_dotenv(storage.PROJECT_ROOT / ".env", override=True)
 MODEL_NAME = os.getenv("GEMINI_VLM_MODEL", "gemini-3.5-flash")
 
 # 상품당 보낼 이미지 수 (메인 + 각도컷). 상세컷은 배너가 많아 제외한다.
-MAX_IMAGES = 3
+MAX_IMAGES = 1
 
 # 이미지로는 판정할 수 없는 치수 계열 속성. VLM이 추론하지 못하게 뺀다.
-EXCLUDED_ATTRS = {"size", "length", "width", "depth", "height"}
+EXCLUDED_ATTRS = {"size", "length", "width", "depth", "height", "color"}
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -83,15 +83,20 @@ def load_images(goods_dir: pathlib.Path, limit: int = MAX_IMAGES) -> list[str]:
         FileNotFoundError: 쓸 수 있는 이미지가 없는 경우입니다.
     """
     image_dir = goods_dir / "images"
-    paths = sorted(
-        path
-        for path in image_dir.glob("*")
-        if path.suffix.lower() in IMAGE_SUFFIXES
-        and "detail" not in path.name.lower()
-    )
-    if not paths:
-        raise FileNotFoundError(f"이미지가 없습니다: {image_dir}")
-    return [str(path) for path in paths[:limit]]
+    main_image = image_dir / "000_main.jpg"
+    if not main_image.exists():
+        raise FileNotFoundError(f"메인 이미지가 없습니다: {main_image}")
+
+    return [str(main_image)]
+    # paths = sorted(
+    #     path
+    #     for path in image_dir.glob("*")
+    #     if path.suffix.lower() in IMAGE_SUFFIXES
+    #     and "detail" not in path.name.lower()
+    # )
+    # if not paths:
+    #     raise FileNotFoundError(f"이미지가 없습니다: {image_dir}")
+    # return [str(path) for path in paths[:limit]]
 
 
 def plan_targets(
@@ -315,9 +320,8 @@ def ask_product(
             build_prompt(category, sub_category, known, targets),
             load_images(goods_dir),
         )
-    # 상품 1건의 실패로 전체 실행을 멈추지 않는다. 원인은 그대로 출력한다.
-    except (RuntimeError, FileNotFoundError, ValueError) as error:
-        print(f"  실패: {error}")
+    except Exception as error:
+        print(f"  실패: {type(error).__name__}: {error}")
         return AskResult()
 
     return AskResult(
@@ -370,32 +374,57 @@ def main() -> None:
     calls = 0
     skipped = 0
     for goods_dir in target_dirs(args.goods_ids):
+
+        # 이미 성공해서 JSON에 저장된 상품은 다시 호출하지 않음
+        if goods_dir.name in results:
+            print(f"[{goods_dir.name}] 이미 처리됨 — 건너뜀")
+            continue
+
         if args.limit and calls >= args.limit:
-            print(f"호출 상한({args.limit}) 도달 — 남은 상품은 다음 실행으로")
+            print(
+                f"호출 상한({args.limit}) 도달 — "
+                "남은 상품은 다음 실행으로"
+            )
             break
 
         result = ask_product(
-            goods_dir, verified_all.get(goods_dir.name) or {}, args.dry_run
+            goods_dir,
+            verified_all.get(goods_dir.name) or {},
+            args.dry_run,
         )
+
         skipped += int(result.enough)
+
         if result.payload is None:
             continue
 
-        calls += 1
+        # Gemini 성공 결과를 메모리에 추가
         results[goods_dir.name] = result.payload
-        print(f"  응답 채택 {len(result.payload['attributes'])}개")
+        calls += 1
+
+        # 성공한 상품마다 즉시 JSON 저장
+        storage.dump_json(storage.VLM_PATH, results)
+
+        print(
+            f"  응답 저장 완료 "
+            f"{len(result.payload['attributes'])}개"
+        )
+
+    saved_path = storage.VLM_PATH.relative_to(
+        storage.PROJECT_ROOT
+    )
+
+    print(
+        f"VLM 호출 {calls}회 / "
+        f"규칙·확정값으로 충분해 건너뛴 상품 {skipped}건"
+    )
+    print(f"저장 파일: {saved_path}")
 
     if calls:
-        storage.dump_json(storage.VLM_PATH, results)
-        saved_path = storage.VLM_PATH.relative_to(storage.PROJECT_ROOT)
-        print(f"저장 완료: {saved_path}")
         print(
             "이 결과는 초안입니다. 사람이 확인한 값만 "
             "scripts/catalog/verified_attrs.json에 옮겨 적으세요."
         )
-    print(
-        f"VLM 호출 {calls}회 / 규칙·확정값으로 충분해 건너뛴 상품 {skipped}건"
-    )
 
 
 if __name__ == "__main__":

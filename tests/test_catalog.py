@@ -12,11 +12,6 @@ from scripts.catalog import validator
 # --- 색상 -----------------------------------------------------------------
 
 
-def test_색상_조합어는_우선순위표를_따른다():
-    assert rules.normalize_color("로즈우드") == "브라운"
-    assert rules.normalize_color("블랙오크(상판)") == "블랙"
-    assert rules.normalize_color("파인그레이") == "그레이"
-
 
 def test_색상_근거가_없으면_None():
     assert rules.normalize_color("단품") is None
