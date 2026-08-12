@@ -239,7 +239,7 @@ export const ReviewPanel = () => {
         <Button
           endDecorator={<Save size={17} />}
           fullWidth
-          onClick={() => void saveTagging(values)}
+          onClick={() => void saveTagging()}
         >
           태깅 결과 저장
         </Button>
