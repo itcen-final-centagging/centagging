@@ -108,53 +108,24 @@ Invoke-RestMethod -Method Post `
 
 > **주의:** MVP 로그인 계정은 프로토타입 검증용입니다. 운영 환경에서는 고정 계정 대신 SSO·IAM 등의 인증 체계로 교체해야 합니다.
 
-## 6. Gemini API 호출 확인
-
-먼저 Gemini 설정 상태를 확인합니다.(http://localhost:8000/docs 에서 테스트 권장)
-
-```powershell
-Invoke-RestMethod http://localhost:8000/api/v1/gemini/status
-```
-
-`configured` 값이 `true`이면 실제 호출 검증을 실행합니다.
-
-```powershell
-Invoke-RestMethod -Method Post `
-  -Uri http://localhost:8000/api/v1/gemini/verify
-```
-
-정상 응답 예시는 아래와 같습니다.
-
-```json
-{
-  "status": "ok",
-  "vlm_model": "gemini-3.5-flash",
-  "embedding_model": "gemini-embedding-2",
-  "embedding_dimensions": 3072
-}
-```
-
-`/api/v1/gemini/verify`는 Gemini VLM과 임베딩 API를 실제로 각각 호출합니다. 사용량이 발생할 수 있으므로 연동 확인이 필요할 때만 실행합니다.
-
-## 7. 로컬 Python 환경 (선택)
+## 6. 로컬 Python 환경 (선택)
 
 Docker 외에 로컬에서 코드 품질 검사 또는 디버깅을 하려면 Conda 환경을 생성합니다.
 
 ```powershell
 conda env create -f environment.yml
 conda activate centagging
-pre-commit install
 ```
 
-전체 코드 품질 검사는 아래처럼 실행합니다.
+pre-commit 검사는 커밋 시 자동으로 실행되지 않습니다. 전체 코드 품질 검사가 필요할 때 아래처럼 수동으로 실행합니다.
 
 ```powershell
-pre-commit run --all-files
+pre-commit run --hook-stage manual --all-files
 ```
 
 Python 코드는 [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)를 따르며, 세부 협업 기준은 [docs/CODING_CONVENTION.md](docs/CODING_CONVENTION.md)를 확인합니다.
 
-## 8. 종료 및 초기화(Docker Desktop앱을 이용해도 무관)
+## 7. 종료 및 초기화(Docker Desktop앱을 이용해도 무관)
 
 실행 중인 컨테이너만 멈추려면 다음을 사용합니다.
 
@@ -176,7 +147,7 @@ docker compose down -v
 
 `-v` 옵션은 PostgreSQL 볼륨을 삭제하므로, 필요한 로컬 데이터가 있다면 실행하지 않습니다.
 
-## 9. 문제 해결
+## 8. 문제 해결
 
 ### Docker Desktop 또는 컨테이너가 실행되지 않을 때
 
@@ -196,7 +167,7 @@ Remove-Item Env:GEMINI_API_KEY -ErrorAction SilentlyContinue
 docker compose up -d --force-recreate --no-deps api
 ```
 
-위 명령 후 `/api/v1/gemini/verify`를 다시 실행합니다. Windows 시스템 환경 변수에 `GEMINI_API_KEY`가 남아 있다면 `환경 변수 편집`에서 삭제하고 새 터미널을 열어야 합니다.
+위 명령 후 Gemini를 사용하는 분석 기능을 다시 실행합니다. Windows 시스템 환경 변수에 `GEMINI_API_KEY`가 남아 있다면 `환경 변수 편집`에서 삭제하고 새 터미널을 열어야 합니다.
 
 ### Gemini 호출이 `API_KEY_INVALID`로 실패할 때
 
@@ -258,7 +229,7 @@ centagging-backend/
 ├─ .env                         # 개인 로컬 비밀값 - Git 제외
 ├─ .env.example                 # 팀 공유용 환경 변수 템플릿
 ├─ .gitignore                   # 비밀값·캐시·가상환경 제외 규칙
-├─ .pre-commit-config.yaml      # 로컬 커밋 전 코드 검사 설정
+├─ .pre-commit-config.yaml      # 수동 Python 코드 품질 검사 설정
 ├─ .dockerignore                # Docker 빌드 제외 규칙
 ├─ docker-compose.yml           # API·Frontend·DB 통합 실행
 ├─ Dockerfile.api               # FastAPI 컨테이너 이미지 정의

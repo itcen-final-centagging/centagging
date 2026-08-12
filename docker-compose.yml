@@ -44,6 +44,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./uploads:/app/uploads
+      - ./data:/app/data:ro
     depends_on:
       db:
         condition: service_healthy

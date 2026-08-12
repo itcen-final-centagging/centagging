@@ -10,6 +10,7 @@
     "lint:fix": "eslint --cache . --fix",
     "prettier:check": "prettier --cache . --check",
     "prettier:write": "prettier --cache . --write",
+    "test:tagging-api": "node --test tests/tagging-api.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

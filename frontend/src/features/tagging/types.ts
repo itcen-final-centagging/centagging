@@ -54,6 +54,22 @@ export interface RubricEvaluation {
   xaiReason: string;
 }
 
+export interface XaiCriterion {
+  comment: string;
+  label: string;
+  score: number;
+}
+
+export interface XaiResult {
+  criteria: XaiCriterion[];
+  summary: string;
+}
+
+export interface VlmMood {
+  summary: string;
+  tags: string[];
+}
+
 export interface SkuCandidate {
   category: string | null;
   color: string | null;
@@ -61,6 +77,7 @@ export interface SkuCandidate {
   imageUrl: string | null;
   kind: 'sofa' | 'table' | 'lamp' | 'chair' | 'cabinet' | null;
   material: string | null;
+  matchRank: number | null;
   metadataScore: number | null;
   name: string;
   rubric: RubricEvaluation | null;
@@ -68,7 +85,9 @@ export interface SkuCandidate {
   size: string | null;
   sku: string;
   vectorScore: number | null;
+  vlmMood: VlmMood | null;
   xaiReason: string | null;
+  xaiResult: XaiResult | null;
 }
 
 export interface TaggingValues {

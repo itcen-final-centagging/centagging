@@ -65,227 +65,79 @@ COMMENT ON COLUMN scene_image.width_px             IS '이미지 너비(pixel)';
 COMMENT ON COLUMN scene_image.height_px            IS '이미지 높이(pixel)';
 
 -- ------------------------------------------------------------
--- 3. detected_object : 탐지된 가구 객체 (크롭 패치 단위)
---
---    attributes 예시 (PRODUCT_ATTRIBUTE + COMMON_ATTRIBUTE 병합)
---      { "카테고리": {"value":"의자 > 오피스체어","confidence":1.0,"reason":"..."},
---        "주요 소재": {"value":"메쉬","confidence":0.95,"reason":"..."} }
---
---    mood_summary : "밝은 자연광이 드는 미니멀한 홈오피스에 어울리는 화이트 톤 워크체어입니다."
---    mood_tags    : ["미니멀","내추럴","홈오피스","밝은 톤"]
+-- 4. sku_catalog : 상품 마스터 + 속성 (FT-CAT-002/003)
 -- ------------------------------------------------------------
-CREATE TABLE detected_object (
-    object_id      BIGSERIAL    PRIMARY KEY,
-    scene_image_id BIGINT       NOT NULL REFERENCES scene_image(scene_image_id) ON DELETE CASCADE,
-    category       VARCHAR(50),
-    sub_category   VARCHAR(50),
-    category_meta  JSONB,
-    confidence     NUMERIC(4,3) NOT NULL,
-    bbox_ymin      SMALLINT     NOT NULL,
-    bbox_xmin      SMALLINT     NOT NULL,
-    bbox_ymax      SMALLINT     NOT NULL,
-    bbox_xmax      SMALLINT     NOT NULL,
-    attributes     JSONB,
-    mood_summary   TEXT,
-    mood_tags      JSONB,
-    crop_url       TEXT,
-    embedding      VECTOR(3072),
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT ck_object_bbox  CHECK (bbox_ymin < bbox_ymax AND bbox_xmin < bbox_xmax),
-    CONSTRAINT ck_object_range CHECK (bbox_ymin >= 0 AND bbox_xmin >= 0
-                                  AND bbox_ymax <= 1000 AND bbox_xmax <= 1000),
-    CONSTRAINT ck_object_conf  CHECK (confidence BETWEEN 0 AND 1)
-);
-
-CREATE INDEX idx_object_scene ON detected_object(scene_image_id);
-
-COMMENT ON TABLE  detected_object               IS '탐지된 가구 객체 = 크롭 패치';
-COMMENT ON COLUMN detected_object.category      IS '대분류 - Top-K 검색의 필터 조건';
-COMMENT ON COLUMN detected_object.sub_category  IS '소분류 - 화면 표시·점수 가중치용';
-COMMENT ON COLUMN detected_object.category_meta IS '분류 신뢰도·근거 {"confidence":0.95,"reason":"..."}';
-COMMENT ON COLUMN detected_object.confidence    IS '탐지 신뢰도, 0.5 미만은 저장하지 않음';
-COMMENT ON COLUMN detected_object.bbox_ymin     IS '0~1000 정규화 좌표';
-COMMENT ON COLUMN detected_object.attributes    IS '추출 속성 - sku_catalog.attributes 와 같은 키 체계';
-COMMENT ON COLUMN detected_object.mood_summary  IS '객체 단위 분위기 한 줄 요약';
-COMMENT ON COLUMN detected_object.mood_tags     IS '분위기 태그 배열';
-COMMENT ON COLUMN detected_object.crop_url      IS '잘라낸 객체 이미지 경로/URL';
-COMMENT ON COLUMN detected_object.embedding     IS '크롭 이미지 벡터 - 검색 쿼리로 사용 (인덱스 불필요)';
-
--- =========================================================
--- 4. sku_catalog : SKU 상품 마스터 + 메타데이터
---    SKU 1건 = 1 row
---
--- 예:
--- sku_id       : 50
--- sku_code     : WRD-A3A6EFE8
--- product_name : NEW컬러 맞춤제작 블라인드 시스템 드레스룸
--- category     : 행거·옷장
--- sub_category : 드레스룸
--- attributes   : {"color":"블랙","brand":"큐브","selling_price":7800}
--- =========================================================
-
 CREATE TABLE sku_catalog (
-    sku_id          BIGSERIAL    PRIMARY KEY,
-    sku_code        VARCHAR(50)  NOT NULL UNIQUE,
-    product_name    VARCHAR(200) NOT NULL,
-    category        VARCHAR(50)  NOT NULL,
-    sub_category    VARCHAR(50),
-
-    key_features    JSONB        NOT NULL DEFAULT '[]'::jsonb,
-    attributes      JSONB        NOT NULL DEFAULT '{}'::jsonb,
-
-    text_embedding  VECTOR(3072),
-
-    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
-
-    CONSTRAINT ck_sku_key_features_array
-        CHECK (jsonb_typeof(key_features) = 'array'),
-
-    CONSTRAINT ck_sku_attributes_object
-        CHECK (jsonb_typeof(attributes) = 'object')
+    sku_id       BIGSERIAL    PRIMARY KEY,
+    sku_code     VARCHAR(50)  NOT NULL UNIQUE,
+    product_name VARCHAR(200) NOT NULL,
+    brand        VARCHAR(100),
+    price        INT,
+    space        VARCHAR(50),
+    category     VARCHAR(50),
+    sub_category VARCHAR(50),
+    key_features JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    attributes   JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    text_embedding VECTOR(3072),
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_sku_key_features_array CHECK (
+        jsonb_typeof(key_features) = 'array'
+    ),
+    CONSTRAINT ck_sku_attributes_object CHECK (
+        jsonb_typeof(attributes) = 'object'
+    )
 );
 
--- 상품명 부분일치 검색
-CREATE INDEX idx_sku_name_trgm
-ON sku_catalog
-USING GIN (lower(product_name) gin_trgm_ops);
+-- 부분일치·대소문자 무시 검색 (FT-CAT-002)
+CREATE INDEX idx_sku_name_trgm ON sku_catalog USING GIN (lower(product_name) gin_trgm_ops);
+CREATE INDEX idx_sku_code_trgm ON sku_catalog USING GIN (lower(sku_code) gin_trgm_ops);
+CREATE INDEX idx_sku_attr      ON sku_catalog USING GIN (attributes jsonb_path_ops);
+CREATE INDEX idx_sku_category  ON sku_catalog(category);
+CREATE INDEX idx_sku_text_embedding_hnsw ON sku_catalog
+    USING hnsw ((text_embedding::halfvec(3072)) halfvec_cosine_ops)
+    WHERE text_embedding IS NOT NULL;
 
--- SKU 코드 부분일치 검색
-CREATE INDEX idx_sku_code_trgm
-ON sku_catalog
-USING GIN (lower(sku_code) gin_trgm_ops);
+COMMENT ON TABLE  sku_catalog              IS '상품 마스터 + 속성';
+COMMENT ON COLUMN sku_catalog.sku_code     IS '상품 코드, 중복 불가 - 검색 대상';
+COMMENT ON COLUMN sku_catalog.product_name IS '상품명 - 부분일치 검색 대상';
+COMMENT ON COLUMN sku_catalog.category     IS '상품 대분류 - Top-K 필터 조건';
+COMMENT ON COLUMN sku_catalog.key_features IS '상품 핵심 특징 목록';
+COMMENT ON COLUMN sku_catalog.attributes   IS '상품 속성 - 객체 속성과 같은 키 체계';
+COMMENT ON COLUMN sku_catalog.text_embedding IS '상품 메타데이터 텍스트 임베딩';
 
--- attributes 조건 검색
-CREATE INDEX idx_sku_attr
-ON sku_catalog
-USING GIN (attributes jsonb_path_ops);
-
--- 카테고리 필터
-CREATE INDEX idx_sku_category
-ON sku_catalog(category);
-
--- 텍스트 임베딩 검색용 HNSW
-CREATE INDEX idx_sku_text_embedding_hnsw
-ON sku_catalog
-USING hnsw (
-    (text_embedding::halfvec(3072))
-    halfvec_cosine_ops
-)
-WHERE text_embedding IS NOT NULL;
-
-COMMENT ON TABLE sku_catalog
-IS 'SKU 상품 마스터 + 메타데이터';
-
-COMMENT ON COLUMN sku_catalog.sku_id
-IS 'SKU 고유 번호';
-
-COMMENT ON COLUMN sku_catalog.sku_code
-IS 'SKU 상품 코드, 중복 불가';
-
-COMMENT ON COLUMN sku_catalog.product_name
-IS '상품명';
-
-COMMENT ON COLUMN sku_catalog.category
-IS '상품 대분류';
-
-COMMENT ON COLUMN sku_catalog.sub_category
-IS '상품 소분류';
-
-COMMENT ON COLUMN sku_catalog.key_features
-IS 'SKU 대표 특징 배열';
-
-COMMENT ON COLUMN sku_catalog.attributes
-IS 'SKU 메타데이터 - category별 속성 및 공통 속성';
-
-COMMENT ON COLUMN sku_catalog.text_embedding
-IS '상품명·카테고리·속성·대표 특징을 기반으로 생성한 텍스트 임베딩';
-
-COMMENT ON COLUMN sku_catalog.created_at
-IS 'SKU 등록 일시';
-
--- =========================================================
--- 5. sku_image : SKU 이미지 + 이미지 임베딩
---    SKU 1건 : 이미지 N건
---
--- 현재:
---   MAIN 1장
---
--- 향후:
---   MAIN
---   ANGLE 1~N
---   DETAIL 1~N
---   STYLING 1~N
--- =========================================================
-
+-- ------------------------------------------------------------
+-- 5. sku_image : SKU 이미지 + 벡터 임베딩 (색인 단위)
+--    SKU 1건 : 이미지 N건, 각 이미지가 자기 벡터를 소유
+--    embedding 은 NULL 허용 — 이미지 등록 후 색인 배치가 채움
+-- ------------------------------------------------------------
 CREATE TABLE sku_image (
-    sku_image_id BIGSERIAL PRIMARY KEY,
-    sku_id BIGINT NOT NULL
-        REFERENCES sku_catalog(sku_id)
-        ON DELETE CASCADE,
-    image_url TEXT NOT NULL,
-    image_type VARCHAR(20) NOT NULL DEFAULT 'MAIN',
-    embedding VECTOR(3072),
-    indexed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    CONSTRAINT ck_sku_image_type
-        CHECK (
-            image_type IN (
-                'MAIN',
-                'ANGLE',
-                'DETAIL',
-                'STYLING'
-            )
-        )
+    sku_image_id BIGSERIAL   PRIMARY KEY,
+    sku_id       BIGINT      NOT NULL REFERENCES sku_catalog(sku_id) ON DELETE CASCADE,
+    image_url    TEXT        NOT NULL,
+    image_type   VARCHAR(20) NOT NULL DEFAULT 'MAIN'
+                 CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
+    embedding    VECTOR(3072),
+    indexed_at   TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- SKU별 이미지 조회
-CREATE INDEX idx_skuimg_sku
-ON sku_image(sku_id);
+CREATE INDEX idx_skuimg_sku ON sku_image(sku_id);
+-- 원본 VECTOR(3072)는 유지하고 검색 인덱스만 halfvec으로 변환한다.
+-- pgvector의 halfvec HNSW 인덱스는 최대 4,000차원을 지원한다.
+CREATE INDEX idx_skuimg_hnsw ON sku_image
+    USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops)
+    WHERE embedding IS NOT NULL;
+-- 미색인 이미지 조회용 (색인 배치가 사용)
+CREATE INDEX idx_skuimg_pending ON sku_image(sku_image_id) WHERE embedding IS NULL;
 
--- 이미지 임베딩 HNSW 검색
--- 원본 VECTOR(3072)는 유지하고
--- 검색 인덱스만 halfvec으로 변환
-CREATE INDEX idx_skuimg_hnsw
-ON sku_image
-USING hnsw (
-    (embedding::halfvec(3072))
-    halfvec_cosine_ops
-)
-WHERE embedding IS NOT NULL;
-
--- 아직 임베딩되지 않은 이미지 조회
-CREATE INDEX idx_skuimg_pending
-ON sku_image(sku_image_id)
-WHERE embedding IS NULL;
-
-COMMENT ON TABLE sku_image
-IS 'SKU 이미지 + 이미지 임베딩';
-
-COMMENT ON COLUMN sku_image.sku_image_id
-IS 'SKU 이미지 고유 번호';
-
-COMMENT ON COLUMN sku_image.sku_id
-IS 'SKU 상품 ID';
-
-COMMENT ON COLUMN sku_image.image_url
-IS 'SKU 이미지 경로 또는 URL';
-
-COMMENT ON COLUMN sku_image.image_type
-IS 'SKU 이미지 타입: MAIN | ANGLE | DETAIL | STYLING';
-
-COMMENT ON COLUMN sku_image.embedding
-IS 'SKU 이미지 임베딩 벡터';
-
-COMMENT ON COLUMN sku_image.indexed_at
-IS '이미지 임베딩 생성 완료 일시';
-
-COMMENT ON COLUMN sku_image.created_at
-IS '이미지 등록 일시';
+COMMENT ON TABLE  sku_image            IS 'SKU 이미지 + 벡터 (색인 단위)';
+COMMENT ON COLUMN sku_image.image_type IS 'MAIN | ANGLE | DETAIL | STYLING — 색인 대상 선별에 사용';
+COMMENT ON COLUMN sku_image.embedding  IS '이미지 벡터 - 검색 대상. NULL 이면 미색인';
+COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
 
 -- ------------------------------------------------------------
 -- 6. tagging_result : 최종 객체-SKU 매핑 + 검수 이력
---    detected_object 1 : 0..1  (object_id UNIQUE → 객체당 최대 1건)
+--    scene_image.bbox_coord 배열의 object_index로 탐지 객체를 식별한다.
 --    이미지 1장에서 객체 N개를 태깅하면 N행이 생성됨
 --
 --    xai_result 구조 (루브릭 채점, PoC vlm_client.py 기준)
@@ -300,7 +152,7 @@ IS '이미지 등록 일시';
 CREATE TABLE tagging_result (
     result_id        BIGSERIAL   PRIMARY KEY,
     scene_image_id   BIGINT      NOT NULL REFERENCES scene_image(scene_image_id),
-    object_id        BIGINT      NOT NULL UNIQUE REFERENCES detected_object(object_id),
+    object_index     SMALLINT    NOT NULL,
     sku_id           BIGINT      NOT NULL REFERENCES sku_catalog(sku_id),
     sku_image_id     BIGINT      REFERENCES sku_image(sku_image_id),
     match_source     VARCHAR(20) NOT NULL
@@ -309,9 +161,11 @@ CREATE TABLE tagging_result (
     similarity_score NUMERIC(6,4),
     similarity_grade CHAR(1)     CHECK (similarity_grade IN ('상','중','하')),
     xai_result       JSONB,
+    vlm_mood         JSONB,
     created_by       BIGINT      NOT NULL REFERENCES app_user(user_id),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT uq_result_scene_object UNIQUE (scene_image_id, object_index),
     -- 검색 경유는 순위·유사도·근거가 없고, 추천 경유는 순위·유사도가 반드시 있어야 함
     CONSTRAINT ck_result_source CHECK (
         (match_source = 'SEARCH'
@@ -334,10 +188,11 @@ CREATE INDEX idx_result_scene        ON tagging_result(scene_image_id);
 CREATE INDEX idx_result_sku          ON tagging_result(sku_id);
 
 COMMENT ON TABLE  tagging_result                  IS '최종 객체-SKU 매핑 + 검수 이력';
-COMMENT ON COLUMN tagging_result.object_id        IS '대상 객체 - 객체당 1건만 (UNIQUE)';
+COMMENT ON COLUMN tagging_result.object_index     IS 'scene_image.bbox_coord 배열의 객체 인덱스';
 COMMENT ON COLUMN tagging_result.sku_image_id     IS '매칭 근거가 된 SKU 이미지';
 COMMENT ON COLUMN tagging_result.match_source     IS 'RECOMMEND(추천 경유) | SEARCH(카탈로그 검색 경유)';
 COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 순위';
 COMMENT ON COLUMN tagging_result.similarity_score IS '선택 시점의 임베딩 유사도 (0~1)';
 COMMENT ON COLUMN tagging_result.similarity_grade IS '화면 표시용 등급 상/중/하';
 COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 위 주석의 JSON 구조 참고';
+COMMENT ON COLUMN tagging_result.vlm_mood         IS '연출 이미지 분위기 요약과 태그';
