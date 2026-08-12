@@ -2,7 +2,7 @@
 
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class MatchedSkuImage(BaseModel):
@@ -37,9 +37,6 @@ class DetectedObject(BaseModel):
 
     object_index: int
     bbox_coord: dict[str, float]
-    category: str
-    sub_category: str | None = None
-    attributes: dict[str, str] = Field(default_factory=dict)
     sku_candidates: list[SkuCandidate]
 
 

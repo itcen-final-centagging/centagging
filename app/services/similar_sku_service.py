@@ -169,8 +169,6 @@ class SimilarSkuService:
             with Image.open(image_path, "r") as scene_image:
                 for object_index, coord in scene["indexed_coords"]:
 
-                    category = str(coord["category"])
-
                     bbox_coord = {
                         key: float(coord[key])
                         for key in ("xmin", "ymin", "xmax", "ymax")
@@ -178,30 +176,21 @@ class SimilarSkuService:
 
                     crop_image = get_crop_image(scene_image, bbox_coord)
 
-                    metadata = await asyncio.to_thread(
-                        self.gemini_service.extract_furniture_attributes,
-                        crop_image,
-                        category
-                    )
-
                     embedding = await asyncio.to_thread(
                         self.gemini_service.embed_image, crop_image
                     )
-                    processed_objects.append((object_index, bbox_coord, metadata, embedding))
+                    processed_objects.append((object_index, bbox_coord, embedding))
 
             await self._update_analysis_status(scene_id, "embedded")
 
             objects = []
-            for object_index, bbox_coord, metadata, embedding in processed_objects:
+            for object_index, bbox_coord, embedding in processed_objects:
                 similar_skus = await self.find_similar_skus(embedding)
 
                 objects.append(
                     DetectedObject(
                         object_index=object_index,
                         bbox_coord=bbox_coord,
-                        category=metadata.category,
-                        sub_category=metadata.sub_category,
-                        attributes=metadata.attributes,
                         sku_candidates=[
                             SkuCandidate(
                                 sku_code=sku.sku_code,

@@ -54,10 +54,10 @@ FURNITURE_DETECTION_PROMPT = """
     {
         "detections": [
             {
-            "category": "의자",
-            "box_2d": [251, 99, 977, 631],
-            "evidence": "A separately visible chair with a backrest and four legs.",
-            "confidence": 0.82
+                "category": "의자",
+                "box_2d": [251, 99, 977, 631],
+                "evidence": "A separately visible chair with a backrest and four legs.",
+                "confidence": 0.82
             }
         ]
     }

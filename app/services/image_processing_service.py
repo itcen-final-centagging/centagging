@@ -8,6 +8,9 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 class InvalidImageError(ValueError):
     """업로드된 이미지가 유효하지 않을 때 발생합니다."""
 
+class InvalidBoundingBoxError(ValueError):
+    """bounding box 좌표가 유효하지 않을 때 발생합니다."""
+
 
 def decode_image(image_bytes: bytes) -> Image.Image:
     """이미지 바이트를 RGB PIL 이미지로 변환합니다.
@@ -51,9 +54,29 @@ def get_crop_image(image: Image.Image, bbox: dict[str, float]) -> Image.Image:
     Returns:
         bbox 영역만큼 잘라낸 이미지입니다.
     """
-    left = round(bbox["xmin"] / 1000 * image.width)
-    right = round(bbox["xmax"] / 1000 * image.width)
-    upper = round(bbox["ymin"] / 1000 * image.height)
-    lower = round(bbox["ymax"] / 1000 * image.height)
+    xmin = bbox["xmin"]
+    ymin = bbox["ymin"]
+    xmax = bbox["xmax"]
+    ymax = bbox["ymax"]
+
+    if not (0<= xmin < xmax <= 1000):
+        raise InvalidBoundingBoxError(
+            "bbox는 0 <= xmin < xmax <= 1000을 만족해야 합니다."
+        )
+
+    if not (0 <= ymin < ymax <= 1000):
+        raise InvalidBoundingBoxError(
+            "bbox는 0 <= ymin < ymax <= 1000을 만족해야 합니다."
+        )
+
+    left = round(xmin / 1000 * image.width)
+    right = round(xmax / 1000 * image.width)
+    upper = round(ymin / 1000 * image.height)
+    lower = round(ymax / 1000 * image.height)
+
+    if left >= right or upper >= lower:
+        raise InvalidBoundingBoxError(
+            "픽셀 변환 후 크롭 영역의 폭 또는 높이가 0입니다."
+        )
 
     return image.crop((left, upper, right, lower))

@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # 좌표범위 제한(0~1000)
 Coordinate = Annotated[float, Field(ge=0, le=1000)]
@@ -16,6 +16,19 @@ class GeminiRawDetection(BaseModel):
     box_2d: list[Coordinate] = Field(min_length=4, max_length=4)
     evidence: str = Field(min_length=1)
     confidence: float | None = Field(default=None, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_box_2d(self) -> "GeminiRawDetection":
+        """bounding box 좌표의 방향과 크기를 검증합니다."""
+        ymin, xmin, ymax, xmax = self.box_2d
+
+        if ymin >= ymax:
+            raise ValueError("ymin 값은 ymax 값보다 작아야 합니다.")
+
+        if xmin >= xmax:
+            raise ValueError("xmin 값은 xmax 값보다 작아야 합니다.")
+
+        return self
 
 
 # Gemini 탐지 결과 리스트
