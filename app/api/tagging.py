@@ -19,12 +19,17 @@ router = APIRouter(prefix="/tagging", tags=["tagging"])
 @router.get("/scenes/{scene_id}")
 async def get_recommendation_sku(
     scene_id: int,
+    object_indexes: list[int] | None = Query(
+        default=None,
+        description="탐지 객체 인덱스 목록입니다. "
+    ),
     taggin_service: TaggingService = Depends(get_tagging_service),
 ) -> common_schema.SuccessResponse[DetectionResult]:
     """장면 이미지에서 탐지된 객체들의 유사 SKU를 추천합니다.
 
     Args:
         scene_id: 조회할 장면 이미지 ID입니다.
+        object_indexes: 조회할 탐지 객체의 인덱스 목록입니다.
         taggin_service: 유사 SKU 조회 및 XAI 근거 산출 서비스입니다.
 
     Returns:
