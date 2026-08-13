@@ -179,6 +179,66 @@ class AuthApiTest(unittest.TestCase):
         self.assertEqual(missing_response.status_code, 401)
         self.assertEqual(mismatched_response.status_code, 401)
 
+    def test_auth_openapi_documents_korean_descriptions_and_error_examples(
+        self,
+    ) -> None:
+        """인증 API Swagger 문서가 인증·입력 오류와 Bearer 헤더를 설명합니다."""
+        openapi = self.client.get("/openapi.json").json()
+        login_operation = openapi["paths"]["/auth/login"]["post"]
+        me_operation = openapi["paths"]["/auth/me"]["get"]
+
+        self.assertEqual(
+            login_operation["summary"], "아이디와 비밀번호로 로그인"
+        )
+        self.assertEqual(
+            login_operation["responses"]["401"]["content"]["application/json"][
+                "example"
+            ],
+            {"detail": "아이디 또는 비밀번호가 올바르지 않습니다."},
+        )
+        self.assertIn("등록된 사용자", login_operation["description"])
+        self.assertEqual(
+            login_operation["responses"]["200"]["description"],
+            "로그인한 사용자 정보와 고정 세션을 반환합니다.",
+        )
+        self.assertEqual(
+            login_operation["responses"]["422"]["content"]["application/json"][
+                "example"
+            ]["detail"][0]["loc"],
+            ["body", "login_id"],
+        )
+        validation_error_schema = openapi["components"]["schemas"][
+            "ValidationErrorDetail"
+        ]["properties"]
+        self.assertIn(
+            "요청 본문", validation_error_schema["loc"]["description"]
+        )
+        self.assertIn(
+            "실제로 전달한", validation_error_schema["input"]["description"]
+        )
+        self.assertEqual(me_operation["summary"], "현재 로그인 사용자 조회")
+        self.assertEqual(
+            me_operation["responses"]["401"]["content"]["application/json"][
+                "example"
+            ],
+            {"detail": "인증 세션이 유효하지 않습니다."},
+        )
+        self.assertIn("헤더는 필수", me_operation["description"])
+        self.assertEqual(
+            me_operation["responses"]["200"]["description"],
+            "세션과 일치하는 현재 사용자 정보를 반환합니다.",
+        )
+        authorization = next(
+            parameter
+            for parameter in me_operation["parameters"]
+            if parameter["name"] == "authorization"
+        )
+        self.assertIn("Bearer", authorization["description"])
+        self.assertEqual(
+            authorization["examples"]["user_session"]["value"],
+            "Bearer centagging-poc-user-session",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
