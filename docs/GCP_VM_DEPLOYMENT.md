@@ -357,41 +357,33 @@ gcsfuse --version
 
 ### 11.1 GCS 버킷 마운트
 
-버킷 마운트 설정은 다음 작업 단위에서 자동화합니다. 현재 수동 절차는 다음과 같습니다.
+로컬 프로젝트 루트에서 마운트 설정 스크립트를 VM으로 복사합니다.
 
 ```bash
-export GCS_BUCKET="replace-with-production-bucket-name"
-
-sudo mkdir -p /mnt/centagging-gcs
-
-sudo mount -t gcsfuse \
-  -o rw,allow_other,implicit_dirs \
-  "${GCS_BUCKET}" \
-  /mnt/centagging-gcs
-
-sudo mkdir -p \
-  /mnt/centagging-gcs/uploads \
-  /mnt/centagging-gcs/sku-images
+gcloud compute scp scripts/setup/configure_gcs_mount.sh \
+  "${VM_NAME}:/tmp/configure_gcs_mount.sh" \
+  --zone="${ZONE}" \
+  --tunnel-through-iap
 ```
 
-마운트를 확인합니다.
+VM에 접속하여 버킷을 마운트합니다. VM 서비스 계정에는 6절의 버킷 객체 사용 권한이 있어야 합니다.
 
 ```bash
-mount | grep centagging-gcs
-ls -la /mnt/centagging-gcs
+sudo bash /tmp/configure_gcs_mount.sh "${GCS_BUCKET}"
 ```
 
-재부팅 후에도 자동 마운트하려면 `/etc/fstab`에 다음 한 줄을 추가합니다. `BUCKET_NAME`은 실제 버킷명으로 변경합니다.
+스크립트는 `/etc/fstab`에 자동 마운트 설정을 등록하고 다음 경로를 생성합니다.
 
 ```text
-BUCKET_NAME /mnt/centagging-gcs gcsfuse rw,_netdev,allow_other,implicit_dirs 0 0
+/mnt/centagging-gcs/uploads
+/mnt/centagging-gcs/sku-images
 ```
 
-적용 전에 문법과 마운트를 검증합니다.
+마운트와 재부팅 설정을 확인합니다.
 
 ```bash
-sudo mount -a
-mount | grep centagging-gcs
+findmnt --target /mnt/centagging-gcs
+grep -F '/mnt/centagging-gcs' /etc/fstab
 ```
 
 ## 12. 저장소와 운영 환경변수 준비
