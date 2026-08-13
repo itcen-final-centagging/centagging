@@ -123,7 +123,50 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --role="roles/monitoring.metricWriter"
 ```
 
-Secret Manager를 배포에 연결할 때는 필요한 Secret 단위로 `roles/secretmanager.secretAccessor`를 부여합니다. 프로젝트 전체 Secret 접근 권한은 피합니다.
+### 5.1 Secret Manager 구성
+
+운영 시크릿은 Secret Manager를 원본 저장소로 사용합니다. 먼저 시크릿 리소스를 생성합니다.
+
+```bash
+gcloud secrets create centagging-prod-gemini-api-key \
+  --replication-policy=automatic
+
+gcloud secrets create centagging-prod-postgres-password \
+  --replication-policy=automatic
+
+gcloud secrets create centagging-prod-login-id \
+  --replication-policy=automatic
+
+gcloud secrets create centagging-prod-login-password \
+  --replication-policy=automatic
+```
+
+각 값은 화면에 표시하거나 셸 기록에 직접 작성하지 않고 새 버전으로 등록합니다. 아래 절차를 시크릿마다 반복합니다.
+
+```bash
+read -r -s -p "Secret value: " SECRET_VALUE
+echo
+printf '%s' "${SECRET_VALUE}" \
+  | gcloud secrets versions add SECRET_ID --data-file=-
+unset SECRET_VALUE
+```
+
+VM 서비스 계정에는 네 개의 시크릿에 대해서만 조회 권한을 부여합니다.
+
+```bash
+for SECRET_ID in \
+  centagging-prod-gemini-api-key \
+  centagging-prod-postgres-password \
+  centagging-prod-login-id \
+  centagging-prod-login-password
+do
+  gcloud secrets add-iam-policy-binding "${SECRET_ID}" \
+    --member="serviceAccount:${VM_SERVICE_ACCOUNT}" \
+    --role="roles/secretmanager.secretAccessor"
+done
+```
+
+프로젝트 전체 Secret 접근 권한은 부여하지 않습니다. 단일 VM 구조에서는 VM에 연결된 서비스 계정이 IAM 신뢰 경계이므로, VM에서 실행되는 컨테이너와 Docker 관리 권한을 가진 운영자를 동일한 보안 경계로 관리합니다.
 
 ## 6. Cloud Storage 버킷 구성
 
@@ -168,14 +211,14 @@ gcloud sql instances create "${CLOUD_SQL_INSTANCE}" \
   --enable-point-in-time-recovery
 ```
 
-데이터베이스와 애플리케이션 사용자를 생성합니다. 비밀번호는 변수로 입력하고 작업 직후 제거합니다. 실제 운영에서는 Cloud Console 또는 조직에서 승인한 Secret 관리 절차를 사용합니다.
+데이터베이스와 애플리케이션 사용자를 생성합니다. DB 사용자 비밀번호는 Secret Manager에 등록한 승인 버전과 동일한 값을 사용합니다.
 
 ```bash
 gcloud sql databases create centagging \
   --instance="${CLOUD_SQL_INSTANCE}"
 
-read -s -p "Cloud SQL application user password: " DB_PASSWORD
-echo
+DB_PASSWORD="$(gcloud secrets versions access 1 \
+  --secret=centagging-prod-postgres-password)"
 
 gcloud sql users create centagging \
   --instance="${CLOUD_SQL_INSTANCE}" \
@@ -298,11 +341,12 @@ docker version
 docker compose version
 ```
 
-## 11. VM에 Cloud Storage FUSE 설치 및 마운트
+## 11. VM에 Google Cloud CLI와 Cloud Storage FUSE 설치 및 마운트
 
 VM에서 실행합니다.
 
 ```bash
+export PROJECT_ID="replace-with-gcp-project-id"
 export GCS_BUCKET="replace-with-production-bucket-name"
 
 sudo apt-get update
@@ -312,11 +356,15 @@ export GCSFUSE_REPO="gcsfuse-$(lsb_release -c -s)"
 echo "deb [signed-by=/usr/share/keyrings/cloud.google.asc] https://packages.cloud.google.com/apt ${GCSFUSE_REPO} main" \
   | sudo tee /etc/apt/sources.list.d/gcsfuse.list
 
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.asc] https://packages.cloud.google.com/apt cloud-sdk main" \
+  | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
   | sudo tee /usr/share/keyrings/cloud.google.asc > /dev/null
 
 sudo apt-get update
-sudo apt-get install -y gcsfuse
+sudo apt-get install -y gcsfuse google-cloud-cli
+gcloud config set project "${PROJECT_ID}"
 sudo mkdir -p /mnt/centagging-gcs
 
 sudo mount -t gcsfuse \
@@ -372,9 +420,16 @@ cp .env.prod.example .env.prod
 chmod 600 .env.prod
 ```
 
-`.env.prod`의 모든 placeholder를 실제 값으로 교체합니다.
+`.env.prod`에는 비시크릿 운영 설정과 Secret Manager의 ID·버전만 입력합니다. 다음 네 개의 런타임 값은 비워둡니다.
 
-필수 확인 항목:
+```text
+MVP_LOGIN_ID=
+MVP_LOGIN_PASSWORD=
+GEMINI_API_KEY=
+POSTGRES_PASSWORD=
+```
+
+비시크릿 필수 확인 항목:
 
 ```text
 GCP_PROJECT_ID
@@ -384,13 +439,79 @@ GCS_MOUNT_ROOT=/mnt/centagging-gcs
 CLOUD_SQL_INSTANCE_CONNECTION_NAME
 POSTGRES_DB
 POSTGRES_USER
-POSTGRES_PASSWORD
-MVP_LOGIN_ID
-MVP_LOGIN_PASSWORD
-GEMINI_API_KEY
+MVP_LOGIN_ID_SECRET_ID
+MVP_LOGIN_ID_SECRET_VERSION
+MVP_LOGIN_PASSWORD_SECRET_ID
+MVP_LOGIN_PASSWORD_SECRET_VERSION
+GEMINI_API_KEY_SECRET_ID
+GEMINI_API_KEY_SECRET_VERSION
+POSTGRES_PASSWORD_SECRET_ID
+POSTGRES_PASSWORD_SECRET_VERSION
 ```
 
-실제 `.env.prod`는 Git에 추가하지 않습니다. 수동 검증 단계에서도 파일 권한을 `600`으로 유지합니다. GitHub Actions 자동 배포 단계에서는 민감값을 Secret Manager에서 읽도록 전환합니다.
+실제 `.env.prod`는 Git에 추가하지 않고 파일 권한을 `600`으로 유지합니다.
+
+Secret Manager 값을 VM의 메모리 기반 `/run` 경로에 생성합니다. 시크릿 값은 공백 문자를 포함하지 않는 단일 행 값이어야 합니다.
+
+```bash
+cd /opt/centagging
+
+set -euo pipefail
+set -a
+source .env.prod
+set +a
+
+sudo install -d -m 0700 \
+  -o "${USER}" \
+  -g "$(id -gn)" \
+  /run/centagging
+
+umask 077
+SECRET_ENV_TMP="$(mktemp /run/centagging/secrets.env.XXXXXX)"
+trap 'rm -f "${SECRET_ENV_TMP}"' EXIT
+
+fetch_secret() {
+  local env_name="$1"
+  local secret_id="$2"
+  local secret_version="$3"
+  local secret_value
+
+  if ! secret_value="$(gcloud secrets versions access "${secret_version}" \
+    --secret="${secret_id}")"; then
+    echo "${env_name}: failed to access Secret Manager" >&2
+    return 1
+  fi
+
+  if [[ -z "${secret_value}" || "${secret_value}" =~ [[:space:]] ]]; then
+    echo "${env_name}: empty or whitespace-containing secrets are not supported" >&2
+    return 1
+  fi
+
+  printf '%s=%s\n' "${env_name}" "${secret_value}"
+}
+
+{
+  fetch_secret GEMINI_API_KEY \
+    "${GEMINI_API_KEY_SECRET_ID}" \
+    "${GEMINI_API_KEY_SECRET_VERSION}"
+  fetch_secret POSTGRES_PASSWORD \
+    "${POSTGRES_PASSWORD_SECRET_ID}" \
+    "${POSTGRES_PASSWORD_SECRET_VERSION}"
+  fetch_secret MVP_LOGIN_ID \
+    "${MVP_LOGIN_ID_SECRET_ID}" \
+    "${MVP_LOGIN_ID_SECRET_VERSION}"
+  fetch_secret MVP_LOGIN_PASSWORD \
+    "${MVP_LOGIN_PASSWORD_SECRET_ID}" \
+    "${MVP_LOGIN_PASSWORD_SECRET_VERSION}"
+} > "${SECRET_ENV_TMP}"
+
+test "$(wc -l < "${SECRET_ENV_TMP}")" -eq 4
+chmod 600 "${SECRET_ENV_TMP}"
+mv "${SECRET_ENV_TMP}" /run/centagging/secrets.env
+trap - EXIT
+```
+
+시크릿 파일 내용을 `cat`, `echo` 또는 `docker compose config`로 출력하지 않습니다. VM 재부팅이나 시크릿 버전 변경 후에는 위 절차로 `/run/centagging/secrets.env`를 다시 생성합니다.
 
 ## 13. Cloud SQL 스키마 초기화
 
@@ -401,16 +522,19 @@ cd /opt/centagging
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   config --quiet
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   up -d cloud-sql-proxy
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   ps cloud-sql-proxy
 ```
@@ -421,6 +545,7 @@ docker compose \
 docker run --rm \
   --network centagging_app_network \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -v "$(pwd)/docker/db/init:/init:ro" \
   postgres:16-alpine \
   sh -c 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -v ON_ERROR_STOP=1 -h cloud-sql-proxy -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /init/01-enable-vector.sql'
@@ -428,6 +553,7 @@ docker run --rm \
 docker run --rm \
   --network centagging_app_network \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -v "$(pwd)/docker/db/init:/init:ro" \
   postgres:16-alpine \
   sh -c 'export PGPASSWORD="$POSTGRES_PASSWORD"; psql -v ON_ERROR_STOP=1 -h cloud-sql-proxy -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /init/schema.sql'
@@ -435,6 +561,7 @@ docker run --rm \
 docker run --rm \
   --network centagging_app_network \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -v "$(pwd)/docker/db/init:/init:ro" \
   postgres:16-alpine \
   sh -c 'export PGPASSWORD="$POSTGRES_PASSWORD"; gzip -dc /init/zz-sku-catalog-embeddings.sql.gz | psql -v ON_ERROR_STOP=1 -h cloud-sql-proxy -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
@@ -451,6 +578,7 @@ cd /opt/centagging
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   up -d --build
 ```
@@ -460,11 +588,13 @@ docker compose \
 ```bash
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   ps
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   logs --tail=200 cloud-sql-proxy api frontend
 ```
@@ -501,11 +631,13 @@ git pull --ff-only origin deploy
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   config --quiet
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   up -d --build --remove-orphans
 
@@ -528,6 +660,7 @@ git switch --detach VERIFIED_COMMIT_SHA
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   up -d --build --remove-orphans
 
@@ -547,11 +680,13 @@ git switch deploy
 ```bash
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   ps
 
 docker compose \
   --env-file .env.prod \
+  --env-file /run/centagging/secrets.env \
   -f docker-compose.prod.yml \
   logs --since=30m
 
