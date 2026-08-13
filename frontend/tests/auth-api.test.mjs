@@ -80,3 +80,33 @@ test('current user lookup sends the stored session as a Bearer token', async (t)
     'Bearer centagging-poc-admin-session',
   );
 });
+
+test('common API error exposes its code, message, and request ID', async (t) => {
+  const { ApiRequestError, login } = await loadAuthApi(t);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        status: 'error',
+        error: {
+          code: 'AUTH_CREDENTIALS_INVALID',
+          message: '아이디 또는 비밀번호가 올바르지 않습니다.',
+          details: [],
+        },
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 401 },
+    );
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    () => login({ loginId: 'user', password: 'wrong' }),
+    (error) =>
+      error instanceof ApiRequestError &&
+      error.code === 'AUTH_CREDENTIALS_INVALID' &&
+      error.message === '아이디 또는 비밀번호가 올바르지 않습니다.' &&
+      error.requestId === 'request-123',
+  );
+});
