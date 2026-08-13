@@ -100,8 +100,8 @@ class XaiScoringService:
                 `crop_{index}` 형태로 만드는 데 씁니다.
             crop_image: 대상 크롭 PIL 이미지입니다.
             sku_images: `{sku_code: JPEG 바이트}` 형태의 후보 이미지입니다.
-                `_read_sku_image`가 실패로 None을 준 항목은 호출부에서
-                미리 걸러서 넘기세요.
+                `SkuImageStorage.read_jpeg`가 실패로 None을 준 항목은
+                호출부에서 미리 걸러서 넘기세요.
 
         Returns:
             해당 크롭 1건에 대한 채점 결과입니다.

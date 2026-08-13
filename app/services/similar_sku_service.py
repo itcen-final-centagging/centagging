@@ -5,8 +5,6 @@ import collections.abc
 import logging
 import pathlib
 import typing
-import io
-import httpx
 
 import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import pydantic
@@ -16,18 +14,19 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core import config
 from app.schemas.tagging import (
+    BoundingBox,
     DetectedObject,
     DetectionResult,
     MatchedSkuImage,
-    SkuCandidate,
-    XaiResult,
-    BoundingBox,
     SceneImageInfo,
+    SkuCandidate,
     VlmMood,
     XaiCriterion,
+    XaiResult,
 )
 from app.services.gemini_service import GeminiService
 from app.services.image_processing_service import get_crop_image
+from app.services.sku_image_storage import SkuImageStorage
 from app.services.xai_scoring_service import XaiScoringService
 
 EMBEDDING_DIMENSIONS = 3072
@@ -150,6 +149,7 @@ class SimilarSkuService:
         self.gemini_service = gemini_service
         self.settings = settings
         self.scoring_service = scoring_service
+        self.sku_image_storage = SkuImageStorage(settings.sku_image_root)
 
     async def orchestrate_similar_skus(
         self,
@@ -209,7 +209,9 @@ class SimilarSkuService:
                 similar_images = []
 
                 for similar_sku in similar_skus:
-                    similar_images.append(self._read_sku_image(similar_sku.image_url))
+                    similar_images.append(
+                        self.sku_image_storage.read_jpeg(similar_sku.image_url)
+                    )
 
                 # SKU 이미지를 읽어온 후보만 채점 대상으로 넘깁니다.
                 sku_images = {
@@ -287,7 +289,9 @@ class SimilarSkuService:
                             matched_sku_image=MatchedSkuImage(
                                 sku_image_id=sku.sku_image_id,
                                 image_type=sku.image_type,
-                                image_url=sku.image_url,
+                                image_url=self.sku_image_storage.public_url(
+                                    sku.image_url
+                                ),
                             ),
                             xai_result=xai_result,
                         )
@@ -447,31 +451,3 @@ class SimilarSkuService:
         rows = result.mappings().all()
 
         return [SimilarSku(**row) for row in rows]
-
-    def _read_sku_image(self, image_url: str) -> bytes | None:
-        """sku_image.image_url이 가리키는 이미지를 JPEG 바이트로 읽습니다.
-
-        블로킹 I/O이므로 호출부에서 `asyncio.to_thread`로 감싸세요.
-
-        Args:
-            image_url: sku_image 테이블의 image_url 값입니다.
-
-        Returns:
-            JPEG 바이트이며, 파일이 없거나 내려받지 못하면 None입니다.
-            후보 1건을 못 읽어도 나머지 채점은 계속하도록 예외 대신
-            None을 돌려줍니다.
-        """
-        try:
-            path = pathlib.Path(self.settings.sku_image_root) / image_url.lstrip("/")
-            raw = path.read_bytes()
-
-            with Image.open(io.BytesIO(raw)) as sku_image:
-                buffer = io.BytesIO()
-                sku_image.convert("RGB").save(
-                    buffer, format="JPEG", quality=90
-                )
-                return buffer.getvalue()
-        # 이미지 1건 실패로 채점 전체를 멈추지 않습니다.
-        except (OSError, httpx.HTTPError):
-            _LOGGER.warning("SKU 이미지를 읽지 못했습니다: %s", image_url)
-            return None
