@@ -14,6 +14,7 @@ class _SeededUser(typing.TypedDict):
 
     login_id: str
     user_name: str
+    password_hash: str
     session: str
     role: _Role
 
@@ -23,18 +24,30 @@ _SEEDED_USERS: tuple[_SeededUser, ...] = (
     {
         "login_id": "user",
         "user_name": "일반 사용자",
+        "password_hash": (
+            "03ac674216f3e15c761ee1a5e255f067"
+            "953623c8b388b4459e13f978d7c846f4"
+        ),
         "session": "centagging-poc-user-session",
         "role": "USER",
     },
     {
         "login_id": "admin",
         "user_name": "관리자",
+        "password_hash": (
+            "03ac674216f3e15c761ee1a5e255f067"
+            "953623c8b388b4459e13f978d7c846f4"
+        ),
         "session": "centagging-poc-admin-session",
         "role": "ADMIN",
     },
     {
         "login_id": "super-admin",
         "user_name": "최종 관리자",
+        "password_hash": (
+            "03ac674216f3e15c761ee1a5e255f067"
+            "953623c8b388b4459e13f978d7c846f4"
+        ),
         "session": "centagging-poc-super-admin-session",
         "role": "SUPER_ADMIN",
     },
@@ -45,6 +58,16 @@ _ENSURE_USER_SCHEMA = sqlalchemy.text("""
     BEGIN
         ALTER TABLE app_user
         ADD COLUMN IF NOT EXISTS session VARCHAR(255);
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'uq_app_user_session'
+              AND conrelid = 'app_user'::regclass
+        ) THEN
+            ALTER TABLE app_user
+            ADD CONSTRAINT uq_app_user_session UNIQUE (session);
+        END IF;
 
         ALTER TABLE app_user
         ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'USER';
@@ -72,10 +95,11 @@ _UPSERT_USER = sqlalchemy.text("""
     INSERT INTO app_user (
         login_id, user_name, password_hash, session, role, is_active
     )
-    VALUES (:login_id, :user_name, NULL, :session, :role, TRUE)
+    VALUES (:login_id, :user_name, :password_hash, :session, :role, TRUE)
     ON CONFLICT (login_id)
     DO UPDATE SET
         user_name = EXCLUDED.user_name,
+        password_hash = EXCLUDED.password_hash,
         session = EXCLUDED.session,
         role = EXCLUDED.role,
         is_active = TRUE

@@ -75,18 +75,21 @@ class InitializeUserTest(unittest.IsolatedAsyncioTestCase):
                 {
                     "login_id": "user",
                     "user_name": "일반 사용자",
+                    "password_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
                     "session": "centagging-poc-user-session",
                     "role": "USER",
                 },
                 {
                     "login_id": "admin",
                     "user_name": "관리자",
+                    "password_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
                     "session": "centagging-poc-admin-session",
                     "role": "ADMIN",
                 },
                 {
                     "login_id": "super-admin",
                     "user_name": "최종 관리자",
+                    "password_hash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
                     "session": "centagging-poc-super-admin-session",
                     "role": "SUPER_ADMIN",
                 },
