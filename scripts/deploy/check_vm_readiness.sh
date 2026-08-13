@@ -52,8 +52,6 @@ required_variables=(
   GCP_REGION
   GCS_BUCKET_NAME
   GCS_MOUNT_ROOT
-  GEMINI_API_KEY_SECRET_ID
-  GEMINI_API_KEY_SECRET_VERSION
   MVP_LOGIN_ID_SECRET_ID
   MVP_LOGIN_ID_SECRET_VERSION
   MVP_LOGIN_PASSWORD_SECRET_ID
@@ -62,6 +60,7 @@ required_variables=(
   POSTGRES_PASSWORD_SECRET_ID
   POSTGRES_PASSWORD_SECRET_VERSION
   POSTGRES_USER
+  VERTEX_AI_LOCATION
 )
 
 for variable_name in "${required_variables[@]}"; do
@@ -78,7 +77,6 @@ for variable_name in "${required_variables[@]}"; do
 done
 
 runtime_secret_variables=(
-  GEMINI_API_KEY
   MVP_LOGIN_ID
   MVP_LOGIN_PASSWORD
   POSTGRES_PASSWORD

@@ -17,8 +17,6 @@ set +a
 
 required_variables=(
   GCP_PROJECT_ID
-  GEMINI_API_KEY_SECRET_ID
-  GEMINI_API_KEY_SECRET_VERSION
   POSTGRES_PASSWORD_SECRET_ID
   POSTGRES_PASSWORD_SECRET_VERSION
   MVP_LOGIN_ID_SECRET_ID
@@ -67,9 +65,6 @@ fetch_secret() {
 }
 
 {
-  fetch_secret GEMINI_API_KEY \
-    "${GEMINI_API_KEY_SECRET_ID}" \
-    "${GEMINI_API_KEY_SECRET_VERSION}"
   fetch_secret POSTGRES_PASSWORD \
     "${POSTGRES_PASSWORD_SECRET_ID}" \
     "${POSTGRES_PASSWORD_SECRET_VERSION}"
@@ -81,7 +76,7 @@ fetch_secret() {
     "${MVP_LOGIN_PASSWORD_SECRET_VERSION}"
 } > "${secret_file_tmp}"
 
-if [[ "$(wc -l < "${secret_file_tmp}")" -ne 4 ]]; then
+if [[ "$(wc -l < "${secret_file_tmp}")" -ne 3 ]]; then
   echo "Unexpected number of rendered secrets" >&2
   exit 1
 fi

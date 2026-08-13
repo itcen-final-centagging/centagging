@@ -128,9 +128,6 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
 운영 시크릿은 Secret Manager를 원본 저장소로 사용합니다. 먼저 시크릿 리소스를 생성합니다.
 
 ```bash
-gcloud secrets create centagging-prod-gemini-api-key \
-  --replication-policy=automatic
-
 gcloud secrets create centagging-prod-postgres-password \
   --replication-policy=automatic
 
@@ -151,11 +148,10 @@ printf '%s' "${SECRET_VALUE}" \
 unset SECRET_VALUE
 ```
 
-VM 서비스 계정에는 네 개의 시크릿에 대해서만 조회 권한을 부여합니다.
+VM 서비스 계정에는 세 개의 시크릿에 대해서만 조회 권한을 부여합니다.
 
 ```bash
 for SECRET_ID in \
-  centagging-prod-gemini-api-key \
   centagging-prod-postgres-password \
   centagging-prod-login-id \
   centagging-prod-login-password
@@ -409,12 +405,11 @@ cp .env.prod.example .env.prod
 chmod 600 .env.prod
 ```
 
-`.env.prod`에는 비시크릿 운영 설정과 Secret Manager의 ID·버전만 입력합니다. 다음 네 개의 런타임 값은 비워둡니다.
+`.env.prod`에는 비시크릿 운영 설정과 Secret Manager의 ID·버전만 입력합니다. 다음 세 개의 런타임 값은 비워둡니다.
 
 ```text
 MVP_LOGIN_ID=
 MVP_LOGIN_PASSWORD=
-GEMINI_API_KEY=
 POSTGRES_PASSWORD=
 ```
 
@@ -423,6 +418,7 @@ POSTGRES_PASSWORD=
 ```text
 GCP_PROJECT_ID
 GCP_REGION
+VERTEX_AI_LOCATION
 GCS_BUCKET_NAME
 GCS_MOUNT_ROOT=/mnt/centagging-gcs
 CLOUD_SQL_INSTANCE_CONNECTION_NAME
@@ -432,8 +428,6 @@ MVP_LOGIN_ID_SECRET_ID
 MVP_LOGIN_ID_SECRET_VERSION
 MVP_LOGIN_PASSWORD_SECRET_ID
 MVP_LOGIN_PASSWORD_SECRET_VERSION
-GEMINI_API_KEY_SECRET_ID
-GEMINI_API_KEY_SECRET_VERSION
 POSTGRES_PASSWORD_SECRET_ID
 POSTGRES_PASSWORD_SECRET_VERSION
 ```

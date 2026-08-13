@@ -54,7 +54,8 @@
 ### 4.2 운영 환경
 
 - `.env.prod`에는 프로젝트 ID, 리전, 이미지 주소, Secret ID와 Secret 버전 등 비시크릿 설정만 저장한다.
-- `GEMINI_API_KEY`, `POSTGRES_PASSWORD`, `MVP_LOGIN_ID`, `MVP_LOGIN_PASSWORD`의 실제 값은 Secret Manager에 저장한다.
+- `POSTGRES_PASSWORD`, `MVP_LOGIN_ID`, `MVP_LOGIN_PASSWORD`의 실제 값은 Secret Manager에 저장한다.
+- 운영 FastAPI는 API Key 대신 VM 서비스 계정의 ADC로 Vertex AI를 호출한다.
 - 배포 직전에 VM 서비스 계정으로 지정된 Secret 버전을 조회해 `/run/centagging/secrets.env`를 생성한다.
 - `/run/centagging/secrets.env`는 메모리 기반 경로에 권한 `600`으로 생성하며 Git 저장소 아래에 두지 않는다.
 - Docker Compose에는 `.env.prod`를 먼저, `/run/centagging/secrets.env`를 나중에 전달해 시크릿 값이 빈 예시값을 덮어쓰게 한다.
@@ -74,6 +75,7 @@
 | `PUBLIC_HTTP_PORT` | 일반 설정 | VM 외부 공개 HTTP 포트 | 사용하지 않음 | `.env.prod` |
 | `API_IMAGE`, `FRONTEND_IMAGE` | 일반 설정 | 배포 이미지 주소와 태그 | 사용하지 않음 | `.env.prod` |
 | `GCP_PROJECT_ID`, `GCP_REGION` | 일반 설정 | GCP 프로젝트와 리전 | 필요 시 `.env` | `.env.prod` |
+| `VERTEX_AI_LOCATION` | 일반 설정 | Vertex AI 호출 위치 | 사용하지 않음 | `.env.prod` |
 | `GCS_BUCKET_NAME`, `GCS_MOUNT_ROOT` | 일반 설정 | GCS 버킷과 VM 마운트 경로 | 로컬 경로 사용 | `.env.prod` |
 | `CLOUD_SQL_INSTANCE_CONNECTION_NAME` | 민감 설정 | Cloud SQL 인스턴스 식별자 | 사용하지 않음 | `.env.prod` |
 | `CLOUD_SQL_PROXY_IMAGE` | 일반 설정 | 고정된 Proxy 이미지 | 사용하지 않음 | `.env.prod` |
@@ -82,11 +84,11 @@
 | `GEMINI_VLM_MODEL` | 일반 설정 | Gemini VLM 모델명 | `.env` | `.env.prod` |
 | `GEMINI_EMBEDDING_MODEL` | 일반 설정 | Gemini 임베딩 모델명 | `.env` | `.env.prod` |
 | `IMAGE_STORAGE_ROOT`, `SKU_IMAGE_ROOT` | 일반 설정 | 컨테이너 내부 이미지 경로 | `.env` | `.env.prod` |
-| `GEMINI_API_KEY` | **시크릿** | Gemini API 인증 키 | `.env` | Secret Manager |
+| `GEMINI_API_KEY` | **시크릿** | 오프라인 임베딩 유틸리티용 키 | `.env` | 사용하지 않음 |
 | `POSTGRES_PASSWORD` | **시크릿** | PostgreSQL 비밀번호 | `.env` | Secret Manager |
 | `MVP_LOGIN_PASSWORD` | **시크릿** | MVP 고정 계정 비밀번호 | `.env` | Secret Manager |
 | `MVP_LOGIN_ID` | **민감 설정** | MVP 고정 계정 ID | `.env` | Secret Manager |
-| `VERTEX_API_KEY` | **시크릿** | 카탈로그 VLM 보조 도구용 키 | `.env` | 배치 도입 시 별도 Secret 검토 |
+| `VERTEX_API_KEY` | **시크릿** | 로컬 FastAPI·카탈로그 VLM 보조 도구용 키 | `.env` | 사용하지 않음(ADC 사용) |
 | `*_SECRET_ID`, `*_SECRET_VERSION` | 일반 설정 | Secret 리소스와 고정 버전 | 사용하지 않음 | `.env.prod` |
 
 새 환경 변수를 추가할 때는 다음을 함께 변경한다.
@@ -134,7 +136,6 @@ centagging-{environment}-{purpose}
 
 | Secret Manager 시크릿 | 애플리케이션 환경 변수 |
 | --------------------- | ---------------------- |
-| `centagging-prod-gemini-api-key` | `GEMINI_API_KEY` |
 | `centagging-prod-postgres-password` | `POSTGRES_PASSWORD` |
 | `centagging-prod-login-id` | `MVP_LOGIN_ID` |
 | `centagging-prod-login-password` | `MVP_LOGIN_PASSWORD` |
