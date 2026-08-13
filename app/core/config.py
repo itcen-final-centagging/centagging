@@ -20,6 +20,9 @@ class Settings:
     """Application settings read from the runtime environment."""
 
     gemini_api_key: str
+    vertex_api_key: str = dataclasses.field(repr=False)
+    gcp_project_id: str
+    vertex_ai_location: str
     gemini_vlm_model: str
     gemini_embedding_model: str
     mvp_login_id: str
@@ -37,6 +40,9 @@ def get_settings() -> Settings:
     """
     return Settings(
         gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+        vertex_api_key=os.getenv("VERTEX_API_KEY", ""),
+        gcp_project_id=os.getenv("GCP_PROJECT_ID", ""),
+        vertex_ai_location=os.getenv("VERTEX_AI_LOCATION", "global"),
         gemini_vlm_model=os.getenv("GEMINI_VLM_MODEL", "gemini-3.5-flash"),
         gemini_embedding_model=os.getenv(
             "GEMINI_EMBEDDING_MODEL", "gemini-embedding-2"

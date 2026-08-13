@@ -4,12 +4,11 @@ import io
 import string
 import typing
 
-from google import genai
 from google.genai import types
 from PIL import Image
 from pydantic import BaseModel, Field
 
-from app.core import config
+from app.core import config, genai_client
 from app.services.gemini_service import (
     GeminiApiError,
     GeminiConfigurationError,
@@ -50,11 +49,13 @@ class SkuEvaluation(BaseModel):
     total_score: int = Field(ge=0, le=100)
     xai_result: XaiResultItem
 
+
 class ObjectAttribute(BaseModel):
     """크롭에서 관찰된 객체 속성 1건입니다."""
 
     key: str
     value: str
+
 
 class CropScore(BaseModel):
     """크롭 1건의 채점 결과입니다."""
@@ -62,9 +63,7 @@ class CropScore(BaseModel):
     crop_index: int
     label: str = ""
     confidence: int = Field(default=0, ge=0, le=100)
-    object_attrs: list[ObjectAttribute] = Field(
-        default_factory=list
-    )
+    object_attrs: list[ObjectAttribute] = Field(default_factory=list)
     evaluations: list[SkuEvaluation] = Field(default_factory=list)
 
 
@@ -81,7 +80,7 @@ class XaiScoringService:
         """채점에 필요한 Gemini 설정을 주입받습니다.
 
         Args:
-            settings: API 키와 VLM 모델명이 담긴 애플리케이션 설정입니다.
+            settings: Gen AI 공급자와 VLM 모델명이 담긴 설정입니다.
         """
         self.settings = settings
 
@@ -108,16 +107,16 @@ class XaiScoringService:
 
         Raises:
             ValueError: 채점할 SKU 후보 이미지가 하나도 없는 경우입니다.
-            GeminiConfigurationError: Gemini API 키가 없는 경우입니다.
+            GeminiConfigurationError: Gen AI 설정이 누락된 경우입니다.
             GeminiResponseInvalidError: 응답이 비었거나 스키마와 다른
                 경우입니다.
             GeminiApiError: 그 밖의 Gemini 호출 실패입니다.
         """
         if not sku_images:
             raise ValueError("채점할 SKU 후보 이미지가 없습니다.")
-        if not self.settings.gemini_api_key:
+        if not genai_client.is_configured(self.settings):
             raise GeminiConfigurationError(
-                "GEMINI_API_KEY가 설정되지 않았습니다."
+                "Vertex AI 인증 설정이 누락되었습니다."
             )
 
         crop_id = f"crop_{crop_index}"
@@ -140,13 +139,11 @@ class XaiScoringService:
         for sku_code, sku_bytes in sku_images.items():
             contents += [
                 f"[{crop_id}] CANDIDATE SKU: {sku_code}",
-                types.Part.from_bytes(
-                    data=sku_bytes, mime_type="image/jpeg"
-                ),
+                types.Part.from_bytes(data=sku_bytes, mime_type="image/jpeg"),
             ]
 
         try:
-            client = genai.Client(api_key=self.settings.gemini_api_key)
+            client = genai_client.create_client(self.settings)
             response = client.models.generate_content(
                 model=self.settings.gemini_vlm_model,
                 contents=contents,

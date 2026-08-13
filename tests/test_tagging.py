@@ -166,11 +166,15 @@ def _test_settings(image_storage_root: str) -> config.Settings:
     """테스트용 애플리케이션 설정을 생성합니다."""
     return config.Settings(
         gemini_api_key="test-key",
+        vertex_api_key="test-vertex-key",
+        gcp_project_id="test-project",
+        vertex_ai_location="global",
         gemini_vlm_model="",
         gemini_embedding_model="",
         mvp_login_id="",
         mvp_login_password="",
         image_storage_root=image_storage_root,
+        sku_image_root="data/images",
         database=config.DatabaseSettings(
             name="", username="", password="", host="", port=5432
         ),
