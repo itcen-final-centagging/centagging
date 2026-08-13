@@ -36,6 +36,14 @@ app.include_router(sku_search.router)
 app.include_router(history.router)
 
 app.mount(
+    "/sku-images",
+    starlette.staticfiles.StaticFiles(
+        directory=config.get_settings().sku_image_root, check_dir=False
+    ),
+    name="sku-images",
+)
+
+app.mount(
     "/uploads",
     starlette.staticfiles.StaticFiles(
         directory=config.get_settings().image_storage_root, check_dir=False

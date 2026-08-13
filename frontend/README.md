@@ -36,7 +36,7 @@ npm run lint
 npm run prettier:write
 ```
 
-개발 서버는 `/api`, `/tagging`, `/history/results`, `/uploads`, `/auth` 요청을 `http://localhost:8000`으로 프록시합니다. API·PostgreSQL·프론트를 함께 실행하려면 저장소 루트에서 `docker compose up --build`를 사용합니다.
+개발 서버는 `/api`, `/tagging`, `/history/results`, `/uploads`, `/sku-images`, `/auth` 요청을 `http://localhost:8000`으로 프록시합니다. API·PostgreSQL·프론트를 함께 실행하려면 저장소 루트에서 `docker compose up --build`를 사용합니다.
 
 ## 환경 변수
 
