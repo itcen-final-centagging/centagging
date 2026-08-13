@@ -2,20 +2,27 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ------------------------------------------------------------
--- 1. app_user : 고정 관리자 계정 (FT-ACC-001 · 하드코딩, P3)
+-- 1. app_user : 고정 POC 사용자 계정 (FT-ACC-001 · 하드코딩, P3)
 -- ------------------------------------------------------------
 CREATE TABLE app_user (
     user_id       BIGSERIAL    PRIMARY KEY,
     login_id      VARCHAR(50)  NOT NULL UNIQUE,
     user_name     VARCHAR(100) NOT NULL,
     password_hash VARCHAR(255),
+    session       VARCHAR(255) UNIQUE,
+    role          VARCHAR(20)  NOT NULL DEFAULT 'USER',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_app_user_role CHECK (
+        role IN ('USER', 'ADMIN', 'SUPER_ADMIN')
+    )
 );
 
-COMMENT ON TABLE  app_user           IS '고정 관리자 계정';
+COMMENT ON TABLE  app_user           IS '고정 POC 사용자 계정';
 COMMENT ON COLUMN app_user.login_id  IS '로그인 아이디, 중복 불가';
 COMMENT ON COLUMN app_user.user_name IS '화면에 표시할 작업자 이름';
+COMMENT ON COLUMN app_user.session   IS 'POC 인증에 사용하는 고정 세션';
+COMMENT ON COLUMN app_user.role      IS '사용자 역할: USER | ADMIN | SUPER_ADMIN';
 
 -- ------------------------------------------------------------
 -- 2. scene_image : 업로드된 연출 이미지
@@ -31,15 +38,15 @@ CREATE TABLE scene_image (
     analysis_error  TEXT,
     analysis_status VARCHAR(20) NOT NULL DEFAULT 'pending',
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    bbox_coord      JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    object_metadata JSONB        NOT NULL DEFAULT '[]'::jsonb,
     width_px        INT          NOT NULL,
     height_px       INT          NOT NULL,
     CONSTRAINT ck_scene_mime CHECK (mime_type IN ('image/jpeg','image/png')),
     CONSTRAINT ck_scene_size CHECK (file_size > 0 AND file_size <= 10485760),
     CONSTRAINT ck_scene_dimensions CHECK (width_px > 0 AND height_px > 0),
     -- 개별 좌표의 길이와 범위는 탐지 결과 저장 단계에서 검증한다.
-    CONSTRAINT ck_scene_bbox_coord_array CHECK (
-        jsonb_typeof(bbox_coord) = 'array'
+    CONSTRAINT ck_scene_object_metadata_array CHECK (
+        jsonb_typeof(object_metadata) = 'array'
     ),
     CONSTRAINT ck_scene_analysis_status CHECK (
         analysis_status IN (
@@ -60,7 +67,7 @@ COMMENT ON COLUMN scene_image.file_size            IS '연출 이미지 파일 �
 COMMENT ON COLUMN scene_image.analysis_error       IS '탐지·임베딩·SKU 후보 생성 실패 사유';
 COMMENT ON COLUMN scene_image.analysis_status      IS '태깅 처리 상태: pending | detected | embedded | completed | failed';
 COMMENT ON COLUMN scene_image.created_at           IS '연출 이미지 업로드 일시';
-COMMENT ON COLUMN scene_image.bbox_coord           IS '탐지 객체 좌표 배열 [{xmin,ymin,xmax,ymax}, ...]';
+COMMENT ON COLUMN scene_image.object_metadata      IS '탐지 객체 메타데이터 배열 [{label,xmin,ymin,xmax,ymax}, ...]';
 COMMENT ON COLUMN scene_image.width_px             IS '이미지 너비(pixel)';
 COMMENT ON COLUMN scene_image.height_px            IS '이미지 높이(pixel)';
 
@@ -137,7 +144,7 @@ COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
 
 -- ------------------------------------------------------------
 -- 6. tagging_result : 최종 객체-SKU 매핑 + 검수 이력
---    scene_image.bbox_coord 배열의 object_index로 탐지 객체를 식별한다.
+--    scene_image.object_metadata 배열의 object_index로 탐지 객체를 식별한다.
 --    이미지 1장에서 객체 N개를 태깅하면 N행이 생성됨
 --
 --    xai_result 구조 (루브릭 채점, PoC vlm_client.py 기준)
@@ -161,6 +168,8 @@ CREATE TABLE tagging_result (
     similarity_score NUMERIC(6,4),
     similarity_grade CHAR(1)     CHECK (similarity_grade IN ('상','중','하')),
     xai_result       JSONB,
+    status           VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+                     CHECK (status IN ('PENDING', 'ACTIVE', 'DEACTIVE')),
     vlm_mood         JSONB,
     created_by       BIGINT      NOT NULL REFERENCES app_user(user_id),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -188,11 +197,12 @@ CREATE INDEX idx_result_scene        ON tagging_result(scene_image_id);
 CREATE INDEX idx_result_sku          ON tagging_result(sku_id);
 
 COMMENT ON TABLE  tagging_result                  IS '최종 객체-SKU 매핑 + 검수 이력';
-COMMENT ON COLUMN tagging_result.object_index     IS 'scene_image.bbox_coord 배열의 객체 인덱스';
+COMMENT ON COLUMN tagging_result.object_index     IS 'scene_image.object_metadata 배열의 객체 인덱스';
 COMMENT ON COLUMN tagging_result.sku_image_id     IS '매칭 근거가 된 SKU 이미지';
 COMMENT ON COLUMN tagging_result.match_source     IS 'RECOMMEND(추천 경유) | SEARCH(카탈로그 검색 경유)';
 COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 순위';
 COMMENT ON COLUMN tagging_result.similarity_score IS '선택 시점의 임베딩 유사도 (0~1)';
 COMMENT ON COLUMN tagging_result.similarity_grade IS '화면 표시용 등급 상/중/하';
 COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 위 주석의 JSON 구조 참고';
+COMMENT ON COLUMN tagging_result.status           IS '최종 관리자 검수 상태: PENDING | ACTIVE | DEACTIVE';
 COMMENT ON COLUMN tagging_result.vlm_mood         IS '연출 이미지 분위기 요약과 태그';
