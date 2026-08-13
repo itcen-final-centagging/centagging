@@ -12,7 +12,11 @@ import {
   type AuthenticatedUser,
   type LoginCredentials,
 } from '../api/auth';
-import { AuthContext, type AuthenticationStatus } from '../authContext';
+import {
+  AuthContext,
+  type AuthenticationError,
+  type AuthenticationStatus,
+} from '../authContext';
 import {
   clearStoredSession,
   getStoredSession,
@@ -24,6 +28,7 @@ const getInitialStatus = (): AuthenticationStatus =>
 
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [status, setStatus] = useState<AuthenticationStatus>(getInitialStatus);
+  const [authError, setAuthError] = useState<AuthenticationError>();
   const [user, setUser] = useState<AuthenticatedUser>();
 
   useEffect(() => {
@@ -40,6 +45,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       .catch(() => {
         clearStoredSession();
         if (!isMounted) return;
+        setAuthError('expired_session');
         setUser(undefined);
         setStatus('unauthenticated');
       });
@@ -51,6 +57,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const login = useCallback(
     async (credentials: LoginCredentials): Promise<AuthenticatedUser> => {
+      setAuthError(undefined);
       const nextUser = await requestLogin(credentials);
       storeSession(nextUser.session);
       setUser(nextUser);
@@ -62,13 +69,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const logout = useCallback((): void => {
     clearStoredSession();
+    setAuthError(undefined);
     setUser(undefined);
     setStatus('unauthenticated');
   }, []);
 
   const value = useMemo(
-    () => ({ login, logout, status, user }),
-    [login, logout, status, user],
+    () => ({ authError, login, logout, status, user }),
+    [authError, login, logout, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
