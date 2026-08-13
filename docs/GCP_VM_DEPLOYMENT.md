@@ -331,30 +331,37 @@ docker version
 docker compose version
 ```
 
-## 11. VM에 Google Cloud CLI와 Cloud Storage FUSE 설치 및 마운트
+## 11. VM에 Google Cloud CLI와 Cloud Storage FUSE 설치
 
-VM에서 실행합니다.
+로컬 프로젝트 루트에서 설치 스크립트를 VM으로 복사합니다.
 
 ```bash
-export PROJECT_ID="replace-with-gcp-project-id"
+gcloud compute scp scripts/setup/install_gcp_vm_tools.sh \
+  "${VM_NAME}:/tmp/install_gcp_vm_tools.sh" \
+  --zone="${ZONE}" \
+  --tunnel-through-iap
+```
+
+VM에 접속하여 Google Cloud CLI와 Cloud Storage FUSE를 설치합니다.
+
+```bash
+sudo bash /tmp/install_gcp_vm_tools.sh
+```
+
+설치 버전을 확인합니다.
+
+```bash
+gcloud version
+gcsfuse --version
+```
+
+### 11.1 GCS 버킷 마운트
+
+버킷 마운트 설정은 다음 작업 단위에서 자동화합니다. 현재 수동 절차는 다음과 같습니다.
+
+```bash
 export GCS_BUCKET="replace-with-production-bucket-name"
 
-sudo apt-get update
-sudo apt-get install -y curl lsb-release
-
-export GCSFUSE_REPO="gcsfuse-$(lsb_release -c -s)"
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.asc] https://packages.cloud.google.com/apt ${GCSFUSE_REPO} main" \
-  | sudo tee /etc/apt/sources.list.d/gcsfuse.list
-
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.asc] https://packages.cloud.google.com/apt cloud-sdk main" \
-  | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
-
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-  | sudo tee /usr/share/keyrings/cloud.google.asc > /dev/null
-
-sudo apt-get update
-sudo apt-get install -y gcsfuse google-cloud-cli
-gcloud config set project "${PROJECT_ID}"
 sudo mkdir -p /mnt/centagging-gcs
 
 sudo mount -t gcsfuse \
