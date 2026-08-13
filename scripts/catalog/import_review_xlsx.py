@@ -375,10 +375,7 @@ def build_final_skus(
             sku_id
         ][attribute] = final_value
 
-    # ========================================================
     # attributes 적용
-    # ========================================================
-
     for sku_id, sku in final_skus.items():
 
         sku["attributes"] = (
@@ -397,10 +394,7 @@ def build_final_skus(
     ]
 
 
-# ============================================================
 # 저장
-# ============================================================
-
 def save_final_skus(
     skus: list[dict[str, Any]],
     path: pathlib.Path,

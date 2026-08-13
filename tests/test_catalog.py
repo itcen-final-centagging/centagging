@@ -10,17 +10,12 @@ from scripts.catalog import text_rules as rules
 from scripts.catalog import validator
 
 # --- 색상 -----------------------------------------------------------------
-
-
-
 def test_색상_근거가_없으면_None():
     assert rules.normalize_color("단품") is None
     assert rules.normalize_color("") is None
 
 
 # --- 소재 -----------------------------------------------------------------
-
-
 def test_프레임_소재는_프레임_절이나_금속을_먼저_본다():
     spec = "18mm PB, 양면LPM마감, 1.5T ABS엣지, 스틸프레임 분체도장 마감"
     assert (

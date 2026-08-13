@@ -11,8 +11,11 @@
     2. sku_catalog 메타데이터 적재(upsert), sku_id 시퀀스 동기화
     3. 텍스트 임베딩: sku.json 기준으로 문장을 만들어 Gemini로 임베딩,
        sku_catalog.text_embedding에 저장
-    4. 이미지 임베딩: data/images/{sku_id}/main.* 를 Gemini로 임베딩,
-       sku_image(MAIN)에 적재하며 sku_id로 sku_catalog와 연관관계를 맺음
+    4. 이미지 임베딩: data/images/incomming의
+       {goods_id}_{sku_code}_{color}_{type}_{sequence}.{ext} 파일을
+       Gemini로 임베딩해 sku_image에 적재한다. type 토큰(m/a)이
+       image_type(MAIN/ANGLE)이 되고, sku_code로 sku_id를 찾아 연관
+       관계를 맺는다. SKU당 이미지가 여러 장이어도 전부 처리한다.
 
 기존에 임베딩이 이미 있는 SKU는 기본적으로 건너뛴다(--force-* 로 재계산 가능).
 한 건이 실패해도 전체가 멈추지 않고, 실패 목록을 마지막에 정리해서 보여준다.
@@ -44,9 +47,9 @@ class RunResult:
     text_failed: list[tuple[int, str]] = dataclasses.field(default_factory=list)
 
     image_skipped_existing: int = 0
-    image_skipped_missing_file: int = 0
+    image_skipped_unknown_sku: int = 0
     image_embedded: int = 0
-    image_failed: list[tuple[int, str]] = dataclasses.field(default_factory=list)
+    image_failed: list[tuple[str, str]] = dataclasses.field(default_factory=list)
 
 
 def _format_error(error: BaseException) -> str:
@@ -153,39 +156,58 @@ def embed_texts(
 
 def embed_images(
     conn,
-    skus: list[dict],
     settings,
     result: RunResult,
     dry_run: bool,
     force: bool,
 ) -> None:
-    """data/images/{sku_id}/main.* 이미지를 임베딩해 sku_image(MAIN)에 적재한다."""
-    already_done = set() if force or dry_run else db.fetch_image_embedded_sku_ids(conn)
+    """data/images/incomming의 이미지를 임베딩해 sku_image에 적재한다.
+
+    파일명에서 sku_code/color/image_type/sequence를 읽고, sku_code로
+    sku_id를 찾는다(upsert_metadata가 먼저 실행돼 있어야 한다). 파일명
+    규칙에 안 맞거나 image_type 토큰을 모르는 파일은
+    storage.list_incoming_images()가 이미 걸러낸 뒤이므로 여기서는
+    다루지 않는다 — 그런 파일명 자체의 검수는
+    scripts.catalog.validate_sku_images가 담당한다.
+    """
+    images = storage.list_incoming_images()
+
+    sku_id_by_code = {} if dry_run else db.fetch_sku_ids_by_code(conn)
+    already_done = set() if force or dry_run else db.fetch_embedded_image_urls(conn)
     embedder = None if dry_run else gemini_embed.make_image_embedder(settings)
 
-    for sku in skus:
-        sku_id = sku["sku_id"]
-        if sku_id in already_done:
+    for image in images:
+        relative_url = str(image.path.relative_to(storage.PROJECT_ROOT))
+
+        if dry_run:
+            result.image_embedded += 1
+            continue
+
+        sku_id = sku_id_by_code.get(image.sku_code)
+        if sku_id is None:
+            result.image_skipped_unknown_sku += 1
+            print(
+                f"[건너뜀][이미지 임베딩] sku_code={image.sku_code}: "
+                f"sku_catalog에 없는 sku_code입니다 ({relative_url})"
+            )
+            continue
+
+        if relative_url in already_done:
             result.image_skipped_existing += 1
             continue
 
-        image_path = storage.main_image_path(sku_id)
-        if image_path is None:
-            result.image_skipped_missing_file += 1
-            continue
-
         try:
-            if dry_run:
-                result.image_embedded += 1
-                continue
+            with Image.open(image.path) as pil_image:
+                pil_image.load()
+                embedding = embedder.embed_image(pil_image)
 
-            with Image.open(image_path) as image:
-                image.load()
-                embedding = embedder.embed_image(image)
-
-            relative_url = str(image_path.relative_to(storage.PROJECT_ROOT))
             inserted = db.upsert_sku_image(
-                conn, sku_id, relative_url, embedding, overwrite=force
+                conn,
+                sku_id,
+                relative_url,
+                image.image_type,
+                embedding,
+                overwrite=force,
             )
             conn.commit()
             if inserted:
@@ -195,8 +217,11 @@ def embed_images(
         except Exception as error:  # noqa: BLE001
             conn.rollback()
             message = _format_error(error)
-            result.image_failed.append((sku_id, message))
-            print(f"[실패][이미지 임베딩] sku_id={sku_id}: {message}")
+            result.image_failed.append((image.sku_code, message))
+            print(
+                f"[실패][이미지 임베딩] sku_code={image.sku_code} "
+                f"({relative_url}): {message}"
+            )
 
 
 def print_summary(result: RunResult) -> None:
@@ -214,18 +239,18 @@ def print_summary(result: RunResult) -> None:
     print("\n=== 이미지 임베딩 ===")
     print(f"신규: {result.image_embedded}건, 이미 있어서 건너뜀: "
           f"{result.image_skipped_existing}건, "
-          f"이미지 파일 없어서 건너뜀: {result.image_skipped_missing_file}건, "
+          f"sku_code를 못 찾아서 건너뜀: {result.image_skipped_unknown_sku}건, "
           f"실패: {len(result.image_failed)}건")
 
-    for label, failures in (
-        ("메타데이터", result.metadata_failed),
-        ("텍스트 임베딩", result.text_failed),
-        ("이미지 임베딩", result.image_failed),
+    for label, key_name, failures in (
+        ("메타데이터", "sku_id", result.metadata_failed),
+        ("텍스트 임베딩", "sku_id", result.text_failed),
+        ("이미지 임베딩", "sku_code", result.image_failed),
     ):
         if failures:
             print(f"\n[{label} 실패 목록]")
-            for sku_id, message in failures:
-                print(f"  sku_id={sku_id}: {message}")
+            for key, message in failures:
+                print(f"  {key_name}={key}: {message}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -259,7 +284,7 @@ def main() -> None:
             embed_texts(conn, skus, settings, result, args.dry_run, args.force_text)
 
         if not args.skip_images:
-            embed_images(conn, skus, settings, result, args.dry_run, args.force_images)
+            embed_images(conn, settings, result, args.dry_run, args.force_images)
     finally:
         if conn is not None:
             conn.close()
