@@ -8,10 +8,11 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 bucket_name="${1:-}"
+target_user="${2:-${SUDO_USER:-}}"
 mount_root="/mnt/centagging-gcs"
 
-if [[ -z "${bucket_name}" ]]; then
-  echo "Usage: configure_gcs_mount.sh GCS_BUCKET" >&2
+if [[ -z "${bucket_name}" || -z "${target_user}" ]]; then
+  echo "Usage: configure_gcs_mount.sh GCS_BUCKET [VM_USER]" >&2
   exit 1
 fi
 
@@ -24,6 +25,14 @@ if ! command -v gcsfuse > /dev/null 2>&1; then
   echo "Cloud Storage FUSE is not installed." >&2
   exit 1
 fi
+
+if [[ "${target_user}" == "root" ]] || ! id "${target_user}" > /dev/null 2>&1; then
+  echo "A non-root VM user is required: ${target_user}" >&2
+  exit 1
+fi
+
+target_uid="$(id -u "${target_user}")"
+target_gid="$(id -g "${target_user}")"
 
 install -d -m 0755 "${mount_root}"
 
@@ -42,6 +51,13 @@ if mountpoint -q "${mount_root}"; then
     echo "Unmount ${mount_root} before changing its bucket configuration." >&2
     exit 1
   fi
+
+  mounted_uid="$(findmnt -n -o OPTIONS --target "${mount_root}" \
+    | tr ',' '\n' \
+    | awk -F= '$1 == "user_id" { print $2; exit }')"
+  if [[ "${mounted_uid}" != "${target_uid}" ]]; then
+    umount "${mount_root}"
+  fi
 fi
 
 fstab_tmp="$(mktemp /etc/fstab.centagging.XXXXXX)"
@@ -51,15 +67,18 @@ awk -v mount_root="${mount_root}" \
   '$2 != mount_root { print }' \
   /etc/fstab > "${fstab_tmp}"
 
-printf '%s %s gcsfuse rw,_netdev,nofail,allow_other,implicit_dirs 0 0\n' \
+printf '%s %s gcsfuse rw,_netdev,allow_other,implicit_dirs,uid=%s,gid=%s 0 0\n' \
   "${bucket_name}" \
   "${mount_root}" \
+  "${target_uid}" \
+  "${target_gid}" \
   >> "${fstab_tmp}"
 
 chown --reference=/etc/fstab "${fstab_tmp}"
 chmod --reference=/etc/fstab "${fstab_tmp}"
 mv "${fstab_tmp}" /etc/fstab
 trap - EXIT
+systemctl daemon-reload
 
 if ! mountpoint -q "${mount_root}"; then
   mount "${mount_root}"
@@ -69,10 +88,14 @@ mkdir -p \
   "${mount_root}/uploads" \
   "${mount_root}/sku-images"
 
-test -r "${mount_root}/uploads"
-test -w "${mount_root}/uploads"
-test -r "${mount_root}/sku-images"
-test -w "${mount_root}/sku-images"
+write_test_path="${mount_root}/uploads/.mount-write-test-$$"
+runuser -u "${target_user}" -- touch "${write_test_path}"
+runuser -u "${target_user}" -- rm "${write_test_path}"
+
+runuser -u "${target_user}" -- test -r "${mount_root}/uploads"
+runuser -u "${target_user}" -- test -w "${mount_root}/uploads"
+runuser -u "${target_user}" -- test -r "${mount_root}/sku-images"
+runuser -u "${target_user}" -- test -w "${mount_root}/sku-images"
 
 findmnt --target "${mount_root}"
 echo "Cloud Storage bucket mount configuration is complete."
