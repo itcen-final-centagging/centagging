@@ -1,3 +1,5 @@
+import { requestJson, type ApiSuccessResponse } from '../../../lib/api-request';
+
 import type {
   FurnitureObject,
   RubricEvaluation,
@@ -30,13 +32,11 @@ type DevCandidate = {
   xai_result: XaiResult & { vlm_mood: VlmMood };
 };
 
-type DevRecommendationResponse = {
-  data: {
-    objects: Array<{
-      object_index: number;
-      sku_candidates: DevCandidate[];
-    }>;
-  };
+type DevRecommendationData = {
+  objects: Array<{
+    object_index: number;
+    sku_candidates: DevCandidate[];
+  }>;
 };
 
 type ApiRubric = {
@@ -83,11 +83,8 @@ type ApiHistoryListItem = {
   };
 };
 
-type ApiHistoryListResponse = {
-  status: 'success';
-  data: {
-    items: ApiHistoryListItem[];
-  };
+type ApiHistoryListData = {
+  items: ApiHistoryListItem[];
 };
 
 export type TaggingAnalysis = {
@@ -101,24 +98,6 @@ const API_BASE_URL =
     /\/$/,
     '',
   ) ?? '';
-
-const getErrorMessage = async (response: Response): Promise<string> => {
-  try {
-    const payload = (await response.json()) as { detail?: string };
-    return payload.detail ?? '요청을 처리하지 못했습니다.';
-  } catch {
-    return '요청을 처리하지 못했습니다.';
-  }
-};
-
-const request = async <ResponseData>(
-  input: string,
-  init?: RequestInit,
-): Promise<ResponseData> => {
-  const response = await fetch(`${API_BASE_URL}${input}`, init);
-  if (!response.ok) throw new Error(await getErrorMessage(response));
-  return (await response.json()) as ResponseData;
-};
 
 const toBbox = (coordinates: number[]): [number, number, number, number] => [
   coordinates[0] ?? 0,
@@ -226,7 +205,7 @@ export const analyzeImage = async (
   if (targetDescription) {
     formData.append('image', file);
     formData.append('target_description', targetDescription);
-    await request('/api/v1/taggings/analyze', {
+    await requestJson(`${API_BASE_URL}/api/v1/taggings/analyze`, {
       body: formData,
       method: 'POST',
     });
@@ -234,21 +213,24 @@ export const analyzeImage = async (
   }
 
   formData.append('file', file);
-  const response = await request<DevUploadResponse>('/tagging', {
-    body: formData,
-    method: 'POST',
-  });
+  const response = await requestJson<ApiSuccessResponse<DevUploadResponse>>(
+    `${API_BASE_URL}/tagging`,
+    {
+      body: formData,
+      method: 'POST',
+    },
+  );
 
   return {
-    analysisId: String(response.scene_image_id),
+    analysisId: String(response.data.scene_image_id),
     mode: null,
-    objects: response.detections.map((detection, objectIndex) => ({
+    objects: response.data.detections.map((detection, objectIndex) => ({
       bbox: toBbox(detection.box_2d),
       candidates: [],
       category: nullableText(detection.label),
       confidence: null,
       description: null,
-      id: `${response.scene_image_id}-${objectIndex}`,
+      id: `${response.data.scene_image_id}-${objectIndex}`,
       metadata: {
         attributes: {},
         category: nullableText(detection.label),
@@ -268,8 +250,8 @@ export const fetchRecommendations = async (
 ): Promise<SkuCandidate[]> => {
   const query = new URLSearchParams();
   query.append('object_indexes', String(objectIndex));
-  const response = await request<DevRecommendationResponse>(
-    `/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
+  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
   );
   const object = response.data.objects.find(
     (item) => item.object_index === objectIndex,
@@ -280,14 +262,16 @@ export const fetchRecommendations = async (
 export const searchCatalogItems = async (
   query: string,
 ): Promise<SkuCandidate[]> => {
-  const response = await request<ApiCandidate[]>(
-    `/api/v1/taggings/catalog?query=${encodeURIComponent(query)}`,
+  const response = await requestJson<ApiCandidate[]>(
+    `${API_BASE_URL}/api/v1/taggings/catalog?query=${encodeURIComponent(query)}`,
   );
   return response.map(toCandidate);
 };
 
 export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
-  const response = await request<ApiHistoryListResponse>('/history/results');
+  const response = await requestJson<ApiSuccessResponse<ApiHistoryListData>>(
+    `${API_BASE_URL}/history/results`,
+  );
   return response.data.items.map(toHistory);
 };
 
@@ -309,20 +293,23 @@ export const saveTaggingReview = async ({
     throw new Error('추천 후보의 저장 정보가 없습니다.');
   }
 
-  await request(`/tagging/scenes/${encodeURIComponent(sceneImageId)}`, {
-    body: JSON.stringify({
-      matching: [
-        {
-          match_rank: selectedSku.matchRank,
-          object_index: objectIndex,
-          similarity_score: selectedSku.score,
-          sku_code: selectedSku.sku,
-          vlm_mood: selectedSku.vlmMood,
-          xai_result: selectedSku.xaiResult,
-        },
-      ],
-    }),
-    headers: { 'Content-Type': 'application/json' },
-    method: 'PUT',
-  });
+  await requestJson<ApiSuccessResponse<{ result_ids: number[] }>>(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+    {
+      body: JSON.stringify({
+        matching: [
+          {
+            match_rank: selectedSku.matchRank,
+            object_index: objectIndex,
+            similarity_score: selectedSku.score,
+            sku_code: selectedSku.sku,
+            vlm_mood: selectedSku.vlmMood,
+            xai_result: selectedSku.xaiResult,
+          },
+        ],
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    },
+  );
 };

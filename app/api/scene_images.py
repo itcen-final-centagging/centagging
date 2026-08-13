@@ -11,6 +11,7 @@ import sqlalchemy
 from fastapi.concurrency import run_in_threadpool
 
 from app.core import config, database
+from app.schemas import common as common_schema
 from app.schemas.furniture_detection import DetectedObjectResponse
 from app.schemas.gemini_detection import GeminiDetectionResult
 from app.services import furniture_detection_service, image_validation
@@ -75,15 +76,12 @@ _UPDATE_ANALYSIS_FAILURE = sqlalchemy.text("""
 """)
 
 
-class ImageValidationResponse(pydantic.BaseModel):
+class ImageValidationData(pydantic.BaseModel):
     """저장된 업로드 이미지의 ID와 메타데이터입니다."""
 
-    status: str
     scene_image_id: int
     image: image_validation.ImageMetadata
-    detections: list[DetectedObjectResponse] = pydantic.Field(
-        default_factory=list
-    )
+    detections: list[DetectedObjectResponse] = pydantic.Field(default_factory=list)
 
 
 def _save_image(path: pathlib.Path, content: bytes) -> None:
@@ -177,13 +175,16 @@ async def _save_analysis_failure(
     await database_session.commit()
 
 
-@router.post("/tagging", response_model=ImageValidationResponse)
+@router.post(
+    "/tagging",
+    response_model=common_schema.SuccessResponse[ImageValidationData],
+)
 async def upload_scene_image(
     file: fastapi.UploadFile = fastapi.File(...),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
-) -> ImageValidationResponse:
+) -> common_schema.SuccessResponse[ImageValidationData]:
     """이미지를 검증하고 원본 파일과 메타데이터를 함께 저장합니다.
 
     Args:
@@ -222,9 +223,7 @@ async def upload_scene_image(
         extension = _IMAGE_EXTENSIONS[validated.metadata.mime_type]
         filename = f"{uuid.uuid4()}.{extension}"
         saved_path = (
-            pathlib.Path(settings.image_storage_root)
-            / "scene-images"
-            / filename
+            pathlib.Path(settings.image_storage_root) / "scene-images" / filename
         )
         _save_image(saved_path, validated.content)
 
@@ -289,9 +288,10 @@ async def upload_scene_image(
             status_code=502, detail="가구 탐지에 실패했습니다."
         ) from error
 
-    return ImageValidationResponse(
-        status="validated",
-        scene_image_id=scene_image_id,
-        image=validated.metadata,
-        detections=detected_objects,
+    return common_schema.success_response(
+        ImageValidationData(
+            scene_image_id=scene_image_id,
+            image=validated.metadata,
+            detections=detected_objects,
+        )
     )
