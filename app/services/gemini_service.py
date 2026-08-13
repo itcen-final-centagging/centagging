@@ -235,9 +235,6 @@ class GeminiService:
 
             response = client.models.embed_content(
                 model=self._settings.gemini_embedding_model,
-                # google-genai의 타입 스텁이 list[Part]를 인식하지 못해
-                # mypy가 오탐하지만, embed_content는 런타임에 list[Part]를
-                # 정상적으로 받아들입니다.
                 contents=[  # type: ignore[arg-type]
                     genai.types.Part.from_bytes(
                         data=image_bytes,

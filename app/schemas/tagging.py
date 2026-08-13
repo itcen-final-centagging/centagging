@@ -26,21 +26,6 @@ class VlmMood(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
-class XaiCriterion(BaseModel):
-    """루브릭 기준 1건의 점수와 근거입니다."""
-
-    label: typing.Literal["구조", "색상", "디테일", "맥락"]
-    score: int = Field(ge=0, le=30)
-    comment: str
-
-
-class VlmMood(BaseModel):
-    """크롭 이미지에서 읽어낸 분위기 요약입니다."""
-
-    summary: str = ""
-    tags: list[str] = Field(default_factory=list)
-
-
 class XaiResult(BaseModel):
     """XAI 판정 요약입니다."""
 
@@ -61,26 +46,6 @@ class SkuCandidate(BaseModel):
     matched_sku_image: MatchedSkuImage
     xai_result: XaiResult
 
-class SceneImageInfo(BaseModel):
-    """응답에 포함하는 장면 이미지 메타데이터입니다."""
-
-    scene_image_id: int
-    image_url: str
-    origin_name: str
-    mime_type: str
-    file_size: int
-    width_px: int
-    height_px: int
-
-# 추가 — 기존 object_metadata의 좌표 dict를 대체합니다.
-class BoundingBox(BaseModel):
-    """0~1000으로 정규화된 탐지 객체 좌표입니다."""
-
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
-
 
 class SceneImageInfo(BaseModel):
     """응답에 포함하는 장면 이미지 메타데이터입니다."""
@@ -94,7 +59,6 @@ class SceneImageInfo(BaseModel):
     height_px: int
 
 
-# 추가 — 기존 object_metadata의 좌표 dict를 대체합니다.
 class BoundingBox(BaseModel):
     """0~1000으로 정규화된 탐지 객체 좌표입니다."""
 
@@ -137,7 +101,7 @@ class SkuMatching(BaseModel):
     후보를 그대로 돌려받습니다.
     """
 
-    # scene_image.object_metadata 배열의 인덱스입니다.
+    # scene_image.bbox_coord 배열의 인덱스입니다.
     object_index: int = Field(ge=0)
     sku_code: str = Field(min_length=1)
     match_rank: int = Field(ge=1)
