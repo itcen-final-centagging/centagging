@@ -309,29 +309,19 @@ gcloud compute ssh "${VM_NAME}" \
 
 ## 10. VM에 Docker 설치
 
-VM에서 실행합니다.
+로컬 프로젝트 루트에서 설치 스크립트를 VM으로 복사합니다.
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl git rsync
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+gcloud compute scp scripts/setup/install_vm_runtime.sh \
+  "${VM_NAME}:/tmp/install_vm_runtime.sh" \
+  --zone="${ZONE}" \
+  --tunnel-through-iap
+```
 
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"${UBUNTU_CODENAME:-$VERSION_CODENAME}\") stable" \
-  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+VM에 접속하여 Docker Engine·Compose와 운영 디렉터리를 구성합니다.
 
-sudo apt-get update
-sudo apt-get install -y \
-  docker-ce \
-  docker-ce-cli \
-  containerd.io \
-  docker-buildx-plugin \
-  docker-compose-plugin
-
-sudo usermod -aG docker "${USER}"
+```bash
+sudo bash /tmp/install_vm_runtime.sh
 ```
 
 그룹 적용을 위해 SSH 연결을 종료하고 다시 접속한 뒤 확인합니다.
