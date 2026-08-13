@@ -4,6 +4,14 @@ export type ApiErrorDetail = {
   reason: string;
 };
 
+export type ApiSuccessResponse<ResponseData> = {
+  data: ResponseData;
+  meta: {
+    request_id: string;
+  };
+  status: 'success';
+};
+
 type ApiErrorPayload = {
   error?: {
     code?: unknown;

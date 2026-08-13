@@ -1,3 +1,5 @@
+import { requestJson } from '../../../lib/api-request';
+
 import type {
   FurnitureObject,
   RubricEvaluation,
@@ -6,7 +8,6 @@ import type {
   VlmMood,
   XaiResult,
 } from '../types';
-import { requestJson } from '../../../lib/api-request';
 
 type DevDetection = {
   box_2d: number[];

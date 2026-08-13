@@ -29,10 +29,14 @@ test('login sends credentials and returns the authenticated user', async (t) => 
   let request;
   globalThis.fetch = async (input, init) => {
     request = { input, init };
-    return new Response(JSON.stringify(apiUser), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data: apiUser,
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    );
   };
   t.after(() => {
     globalThis.fetch = originalFetch;
@@ -62,10 +66,14 @@ test('current user lookup sends the stored session as a Bearer token', async (t)
   let request;
   globalThis.fetch = async (input, init) => {
     request = { input, init };
-    return new Response(JSON.stringify(apiUser), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data: apiUser,
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    );
   };
   t.after(() => {
     globalThis.fetch = originalFetch;

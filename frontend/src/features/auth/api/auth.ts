@@ -1,3 +1,7 @@
+import { requestJson, type ApiSuccessResponse } from '../../../lib/api-request';
+
+export { ApiRequestError } from '../../../lib/api-request';
+
 export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
 
 export type AuthenticatedUser = {
@@ -47,7 +51,7 @@ export const createAuthorizationHeaders = (
 export const login = async (
   credentials: LoginCredentials,
 ): Promise<AuthenticatedUser> => {
-  const response = await requestJson<ApiUserResponse>(
+  const response = await requestJson<ApiSuccessResponse<ApiUserResponse>>(
     `${API_BASE_URL}/auth/login`,
     {
       body: JSON.stringify({
@@ -58,21 +62,18 @@ export const login = async (
       method: 'POST',
     },
   );
-  return toAuthenticatedUser(response);
+  return toAuthenticatedUser(response.data);
 };
 
 export const getCurrentUser = async (
   session: string,
 ): Promise<AuthenticatedUser> => {
-  const response = await requestJson<ApiUserResponse>(
+  const response = await requestJson<ApiSuccessResponse<ApiUserResponse>>(
     `${API_BASE_URL}/auth/me`,
     {
       headers: createAuthorizationHeaders(session),
       method: 'GET',
     },
   );
-  return toAuthenticatedUser(response);
+  return toAuthenticatedUser(response.data);
 };
-import { requestJson } from '../../../lib/api-request';
-
-export { ApiRequestError } from '../../../lib/api-request';
