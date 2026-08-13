@@ -462,7 +462,13 @@ class SimilarSkuService:
             None을 돌려줍니다.
         """
         try:
-            path = pathlib.Path(self.settings.sku_image_root) / image_url.lstrip("/")
+            path = pathlib.Path(image_url.replace("\\", "/"))
+            print("=== SKU IMAGE DEBUG ===")
+            print("root:", self.settings.sku_image_root)
+            print("image_url:", image_url)
+            print("path:", path)
+            print("exists:", path.exists())
+            print("is_file:", path.is_file())
             raw = path.read_bytes()
 
             with Image.open(io.BytesIO(raw)) as sku_image:
@@ -474,4 +480,6 @@ class SimilarSkuService:
         # 이미지 1건 실패로 채점 전체를 멈추지 않습니다.
         except (OSError, httpx.HTTPError):
             _LOGGER.warning("SKU 이미지를 읽지 못했습니다: %s", image_url)
+            _LOGGER.info("SKU image path: %s", path)
+            _LOGGER.info("exists: %s", path.exists())
             return None
