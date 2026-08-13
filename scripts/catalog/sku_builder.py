@@ -136,9 +136,8 @@ def build_attributes(
             attributes.update(rule.get("set") or {})
 
     return {
-        key: attributes[key]
+        key: attributes.get(key)
         for key in schema_keys
-        if attributes.get(key) is not None
     }
 
 
@@ -199,6 +198,7 @@ def build_skus(
         rows.append(
             {
                 "sku_id": None,  # 전체 취합
+                "goods_id": goods_id,
                 "sku_code": sku_code(context.category, goods_id, attributes),
                 "product_name": context.product_name,
                 "category": context.category,
