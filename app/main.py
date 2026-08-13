@@ -13,9 +13,9 @@ from app.services import user_seed
 
 @contextlib.asynccontextmanager
 async def lifespan(_: fastapi.FastAPI) -> collections.abc.AsyncIterator[None]:
-    """서버 시작 시 고정 사용자를 준비하고 종료 시 DB를 정리합니다."""
+    """서버 시작 시 고정 사용자들을 준비하고 종료 시 DB를 정리합니다."""
     try:
-        await user_seed.initialize_user()
+        await user_seed.initialize_users()
         yield
     finally:
         await database.database_engine.dispose()
