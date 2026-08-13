@@ -43,6 +43,7 @@ test('history results are mapped from the backend response', async (t) => {
             },
           ],
         },
+        meta: { request_id: 'request-123' },
       }),
       { headers: { 'Content-Type': 'application/json' }, status: 200 },
     );
@@ -80,10 +81,14 @@ test('save and history requests use their backend contracts', async (t) => {
   globalThis.fetch = async (input, init) => {
     requests.push({ init, input });
     if (init?.method === 'PUT') {
-      return new Response(JSON.stringify({ status: 'success' }), {
-        headers: { 'Content-Type': 'application/json' },
-        status: 200,
-      });
+      return new Response(
+        JSON.stringify({
+          status: 'success',
+          data: { processing_status: 'CONFIRMED', result_ids: [1] },
+          meta: { request_id: 'request-123' },
+        }),
+        { headers: { 'Content-Type': 'application/json' }, status: 200 },
+      );
     }
     return new Response(
       JSON.stringify({
@@ -107,6 +112,7 @@ test('save and history requests use their backend contracts', async (t) => {
             },
           ],
         },
+        meta: { request_id: 'request-123' },
       }),
       { headers: { 'Content-Type': 'application/json' }, status: 200 },
     );
@@ -176,6 +182,7 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
+        status: 'success',
         data: {
           objects: [
             {
@@ -208,6 +215,7 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
             },
           ],
         },
+        meta: { request_id: 'request-123' },
       }),
       { headers: { 'Content-Type': 'application/json' }, status: 200 },
     );

@@ -37,14 +37,10 @@ class TaggingHistoryListItem(pydantic.BaseModel):
     scene_image: HistorySceneImage
 
 
-class TaggingHistoryListResponse(pydantic.BaseModel):
-    """태깅 이력 목록 API 응답입니다."""
+class TaggingHistoryListData(pydantic.BaseModel):
+    """태깅 이력 목록 공통 성공 응답의 데이터 본문입니다."""
 
-    status: typing.Literal["success"]
-    data: dict[
-        typing.Literal["items"],
-        list[TaggingHistoryListItem],
-    ] = pydantic.Field(min_length=1, max_length=1)
+    items: list[TaggingHistoryListItem]
 
 
 class TaggingHistoryDetail(pydantic.BaseModel):
@@ -58,10 +54,3 @@ class TaggingHistoryDetail(pydantic.BaseModel):
     detected_object: dict[str, typing.Any]
     matched_sku: dict[str, typing.Any]
     xai_result: dict[str, typing.Any] | None
-
-
-class TaggingHistoryDetailResponse(pydantic.BaseModel):
-    """태깅 이력 상세 API 응답입니다."""
-
-    status: typing.Literal["success"]
-    data: TaggingHistoryDetail

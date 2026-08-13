@@ -12,7 +12,7 @@ import starlette.testclient
 
 from app import dependencies
 from app.api import tagging
-from app.core import config
+from app.core import config, exception_handlers, request_context
 from app.schemas import tagging as tagging_schemas
 from app.services import image_processing_service, similar_sku_service
 
@@ -171,6 +171,7 @@ def _test_settings(image_storage_root: str) -> config.Settings:
         mvp_login_id="",
         mvp_login_password="",
         image_storage_root=image_storage_root,
+        sku_image_root="",
         database=config.DatabaseSettings(
             name="", username="", password="", host="", port=5432
         ),
@@ -186,6 +187,7 @@ class GetCropImageCoordsTest(unittest.IsolatedAsyncioTestCase):
             session=_FakeSimilarSkuSession(scene_row=None),
             gemini_service=_FakeGeminiService(),
             settings=_test_settings("unused"),
+            scoring_service=unittest.mock.Mock(),
         )
 
         with self.assertRaises(similar_sku_service.SceneImageNotFoundError):
@@ -222,6 +224,7 @@ class GetCropImageCoordsTest(unittest.IsolatedAsyncioTestCase):
             session=session,
             gemini_service=_FakeGeminiService(),
             settings=_test_settings("unused"),
+            scoring_service=unittest.mock.Mock(),
         )
 
         # 순서를 바꾸고 존재하지 않는 인덱스를 섞어서 요청합니다.
@@ -293,6 +296,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
             session=session,
             gemini_service=gemini_service,
             settings=self.settings,
+            scoring_service=unittest.mock.Mock(),
         )
 
         result = await service.orchestrate_similar_skus(
@@ -354,6 +358,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
             session=session,
             gemini_service=gemini_service,
             settings=self.settings,
+            scoring_service=unittest.mock.Mock(),
         )
 
         result = await service.orchestrate_similar_skus(
@@ -378,6 +383,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
             session=session,
             gemini_service=_FailingGeminiService(),
             settings=self.settings,
+            scoring_service=unittest.mock.Mock(),
         )
 
         with self.assertRaisesRegex(RuntimeError, "embedding failed"):
@@ -407,6 +413,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
             session=session,
             gemini_service=_FakeGeminiService(),
             settings=self.settings,
+            scoring_service=unittest.mock.Mock(),
         )
 
         with self.assertRaisesRegex(RuntimeError, "scene query failed"):
@@ -443,6 +450,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
             session=session,
             gemini_service=_FakeGeminiService(),
             settings=self.settings,
+            scoring_service=unittest.mock.Mock(),
         )
 
         with self.assertRaisesRegex(RuntimeError, "candidate query failed"):
@@ -466,6 +474,8 @@ class TaggingApiTest(unittest.TestCase):
     def setUp(self) -> None:
         """tagging 라우터만 포함한 최소 앱을 구성합니다."""
         self.app = fastapi.FastAPI()
+        self.app.add_middleware(request_context.RequestIdMiddleware)
+        exception_handlers.register_exception_handlers(self.app)
         self.app.include_router(tagging.router)
         self.client = starlette.testclient.TestClient(self.app)
 
@@ -476,6 +486,16 @@ class TaggingApiTest(unittest.TestCase):
             return fake_service
 
         self.app.dependency_overrides[dependencies.get_similar_sku_service] = (
+            _provide
+        )
+
+    def _override_match_service(self, fake_service: object) -> None:
+        """get_sku_match_service 의존성을 가짜 서비스로 대체합니다."""
+
+        async def _provide() -> object:
+            return fake_service
+
+        self.app.dependency_overrides[dependencies.get_sku_match_service] = (
             _provide
         )
 
@@ -493,6 +513,9 @@ class TaggingApiTest(unittest.TestCase):
         response = self.client.get("/tagging/scenes/999")
 
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.json()["error"]["code"], "RESOURCE_NOT_FOUND"
+        )
 
     def test_passes_query_object_indexes_to_service_in_order(self) -> None:
         """반복된 object_indexes 쿼리 파라미터가 순서대로 서비스에 전달됩니다."""
@@ -505,7 +528,17 @@ class TaggingApiTest(unittest.TestCase):
                 captured["scene_id"] = scene_id
                 captured["object_indexes"] = object_indexes
                 return tagging_schemas.DetectionResult(
-                    processing_status="completed", objects=[]
+                    processing_status="completed",
+                    scene_image=tagging_schemas.SceneImageInfo(
+                        scene_image_id=scene_id,
+                        image_url="/uploads/scene.png",
+                        origin_name="scene.png",
+                        mime_type="image/png",
+                        file_size=1,
+                        width_px=1,
+                        height_px=1,
+                    ),
+                    objects=[],
                 )
 
         self._override_service(_RecordingService())
@@ -517,13 +550,64 @@ class TaggingApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(captured["scene_id"], 7)
         self.assertEqual(captured["object_indexes"], [2, 0])
+        self.assertEqual(response.json()["status"], "success")
         self.assertEqual(
-            response.json(),
-            {
-                "status": "success",
-                "data": {"processing_status": "completed", "objects": []},
+            response.json()["data"]["processing_status"], "completed"
+        )
+        self.assertEqual(
+            response.json()["meta"]["request_id"],
+            response.headers["X-Request-ID"],
+        )
+
+    def test_confirms_matching_with_common_success_response(self) -> None:
+        """SKU 확정 결과도 공통 성공 응답과 요청 ID를 반환합니다."""
+
+        class _MatchingService:
+            async def confirm_matching(
+                self,
+                scene_id: int,
+                matching: list[tagging_schemas.SkuMatching],
+            ) -> list[int]:
+                self.assertEqual(scene_id, 7)
+                self.assertEqual(matching[0].sku_code, "CHR-2041")
+                return [91]
+
+            def assertEqual(self, actual: object, expected: object) -> None:
+                """테스트 서비스 내부 값 비교를 수행합니다."""
+                if actual != expected:
+                    raise AssertionError(f"{actual!r} != {expected!r}")
+
+        self._override_match_service(_MatchingService())
+        response = self.client.put(
+            "/tagging/scenes/7",
+            json={
+                "matching": [
+                    {
+                        "object_index": 0,
+                        "sku_code": "CHR-2041",
+                        "match_rank": 1,
+                        "similarity_score": 90,
+                        "xai_result": {"summary": "유사합니다.", "criteria": []},
+                    }
+                ]
             },
         )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "success")
+        self.assertEqual(response.json()["data"]["result_ids"], [91])
+        self.assertEqual(
+            response.json()["meta"]["request_id"],
+            response.headers["X-Request-ID"],
+        )
+
+    def test_invalid_matching_request_uses_common_validation_error(self) -> None:
+        """태깅 확정 요청의 필수값 누락은 공통 422 오류로 반환합니다."""
+        response = self.client.put("/tagging/scenes/7", json={})
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["error"]["code"], "VALIDATION_ERROR")
+        self.assertEqual(response.json()["error"]["details"][0]["field"], "matching")
 
 
 if __name__ == "__main__":

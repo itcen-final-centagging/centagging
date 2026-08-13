@@ -1,4 +1,4 @@
-import { requestJson } from '../../../lib/api-request';
+import { requestJson, type ApiSuccessResponse } from '../../../lib/api-request';
 
 import type {
   FurnitureObject,
@@ -32,13 +32,11 @@ type DevCandidate = {
   xai_result: XaiResult & { vlm_mood: VlmMood };
 };
 
-type DevRecommendationResponse = {
-  data: {
-    objects: Array<{
-      object_index: number;
-      sku_candidates: DevCandidate[];
-    }>;
-  };
+type DevRecommendationData = {
+  objects: Array<{
+    object_index: number;
+    sku_candidates: DevCandidate[];
+  }>;
 };
 
 type ApiRubric = {
@@ -85,11 +83,8 @@ type ApiHistoryListItem = {
   };
 };
 
-type ApiHistoryListResponse = {
-  status: 'success';
-  data: {
-    items: ApiHistoryListItem[];
-  };
+type ApiHistoryListData = {
+  items: ApiHistoryListItem[];
 };
 
 export type TaggingAnalysis = {
@@ -218,7 +213,7 @@ export const analyzeImage = async (
   }
 
   formData.append('file', file);
-  const response = await requestJson<DevUploadResponse>(
+  const response = await requestJson<ApiSuccessResponse<DevUploadResponse>>(
     `${API_BASE_URL}/tagging`,
     {
       body: formData,
@@ -227,15 +222,15 @@ export const analyzeImage = async (
   );
 
   return {
-    analysisId: String(response.scene_image_id),
+    analysisId: String(response.data.scene_image_id),
     mode: null,
-    objects: response.detections.map((detection, objectIndex) => ({
+    objects: response.data.detections.map((detection, objectIndex) => ({
       bbox: toBbox(detection.box_2d),
       candidates: [],
       category: nullableText(detection.label),
       confidence: null,
       description: null,
-      id: `${response.scene_image_id}-${objectIndex}`,
+      id: `${response.data.scene_image_id}-${objectIndex}`,
       metadata: {
         attributes: {},
         category: nullableText(detection.label),
@@ -255,7 +250,7 @@ export const fetchRecommendations = async (
 ): Promise<SkuCandidate[]> => {
   const query = new URLSearchParams();
   query.append('object_indexes', String(objectIndex));
-  const response = await requestJson<DevRecommendationResponse>(
+  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
   );
   const object = response.data.objects.find(
@@ -274,7 +269,7 @@ export const searchCatalogItems = async (
 };
 
 export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
-  const response = await requestJson<ApiHistoryListResponse>(
+  const response = await requestJson<ApiSuccessResponse<ApiHistoryListData>>(
     `${API_BASE_URL}/history/results`,
   );
   return response.data.items.map(toHistory);
@@ -298,7 +293,7 @@ export const saveTaggingReview = async ({
     throw new Error('추천 후보의 저장 정보가 없습니다.');
   }
 
-  await requestJson(
+  await requestJson<ApiSuccessResponse<{ result_ids: number[] }>>(
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
     {
       body: JSON.stringify({
