@@ -48,10 +48,12 @@ class SceneImage(Base):
     analysis_error: orm.Mapped[typing.Optional[str]] = orm.mapped_column(
         sqlalchemy.Text
     )
-    bbox_coord: orm.Mapped[list[dict[str, float]]] = orm.mapped_column(
-        mutable.MutableList.as_mutable(postgresql.JSONB),
-        nullable=False,
-        default=list,
+    object_metadata: orm.Mapped[list[dict[str, typing.Any]]] = (
+        orm.mapped_column(
+            mutable.MutableList.as_mutable(postgresql.JSONB),
+            nullable=False,
+            default=list,
+        )
     )
     created_at: orm.Mapped[datetime.datetime] = orm.mapped_column(
         sqlalchemy.TIMESTAMP(timezone=True),

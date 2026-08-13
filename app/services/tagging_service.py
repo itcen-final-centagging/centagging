@@ -69,7 +69,7 @@ class TaggingService:
         crops = await asyncio.to_thread(
             crop_scene_objects,
             self._resolve_image_path(scene),
-            list(scene.bbox_coord),
+            list(scene.object_metadata),
         )
 
         # 2) 임베딩 및 유사 SKU 탐색

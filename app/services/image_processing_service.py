@@ -3,10 +3,12 @@
 import dataclasses
 import io
 import pathlib
+import typing
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.schemas.tagging import BoundingBox
+from app.services.sku_image_storage import SkuImageStorage
 
 
 class InvalidImageError(ValueError):
@@ -18,7 +20,7 @@ class CroppedObject:
     """장면 이미지에서 잘라낸 탐지 객체 1건입니다.
 
     Attributes:
-        crop_index: ``scene_image.bbox_coord`` 배열의 인덱스입니다.
+        crop_index: ``scene_image.object_metadata`` 배열의 인덱스입니다.
         bbox: 응답 스키마에 그대로 넣을 정규화 좌표입니다.
         image: 임베딩 호출에 사용할 PIL 이미지입니다.
         image_bytes: XAI 채점에 사용할 JPEG 바이트입니다.
@@ -82,13 +84,14 @@ def get_crop_image(image: Image.Image, bbox: dict[str, float]) -> Image.Image:
 
 def crop_scene_objects(
     image_path: pathlib.Path,
-    bbox_coords: list[dict[str, float]],
+    object_metadata: list[dict[str, typing.Any]],
 ) -> list[CroppedObject]:
-    """장면 이미지를 열어 bbox 목록만큼 탐지 객체를 잘라냅니다.
+    """장면 이미지를 열어 탐지 객체 메타데이터만큼 잘라냅니다.
 
     Args:
         image_path: 장면 원본 이미지 경로입니다.
-        bbox_coords: 0~1000 정규화 좌표 목록입니다.
+        object_metadata: 항목마다 ``bbox_coord``를 가진 탐지 객체
+            메타데이터 목록입니다. 그 밖의 키는 사용하지 않습니다.
 
     Returns:
         crop_index 오름차순의 크롭 결과 목록입니다.
@@ -100,8 +103,8 @@ def crop_scene_objects(
         with Image.open(image_path) as scene_image:
             scene_image.load()
             return [
-                _build_cropped_object(scene_image, index, bbox)
-                for index, bbox in enumerate(bbox_coords)
+                _build_cropped_object(scene_image, index, item)
+                for index, item in enumerate(object_metadata)
             ]
     except (OSError, UnidentifiedImageError) as error:
         raise InvalidImageError(
@@ -112,18 +115,19 @@ def crop_scene_objects(
 def _build_cropped_object(
     scene_image: Image.Image,
     crop_index: int,
-    bbox: dict[str, float],
+    item: dict[str, typing.Any],
 ) -> CroppedObject:
-    """크롭 1건과 채점용 JPEG 바이트를 함께 만듭니다.
+    """탐지 객체 메타데이터 1건으로 크롭과 채점용 바이트를 만듭니다.
 
     Args:
         scene_image: 열려 있는 장면 원본 이미지입니다.
-        crop_index: ``bbox_coords`` 배열에서의 인덱스입니다.
-        bbox: 0~1000 정규화 좌표입니다.
+        crop_index: ``object_metadata`` 배열에서의 인덱스입니다.
+        item: ``bbox_coord``를 포함한 탐지 객체 메타데이터입니다.
 
     Returns:
         임베딩용 이미지와 채점용 바이트를 담은 크롭 결과입니다.
     """
+    bbox = item["bbox_coord"]
     crop_image = get_crop_image(image=scene_image, bbox=bbox)
     return CroppedObject(
         crop_index=crop_index,
@@ -142,7 +146,10 @@ def parse_image_to_bytes(image: Image.Image) -> bytes:
     return buf.getvalue()
 
 
-def read_sku_image_bytes(image_url: str) -> bytes | None:
+def read_sku_image_bytes(
+    image_url: str,
+    sku_image_root: str,
+) -> bytes | None:
     """sku_image.image_url이 가리키는 파일을 JPEG 바이트로 읽습니다.
 
     Args:
