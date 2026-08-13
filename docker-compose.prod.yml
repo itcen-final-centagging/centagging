@@ -1,17 +1,26 @@
 name: centagging
 
 services:
-  db:
-    image: pgvector/pgvector:pg16@sha256:ad2e18408bf447f62092a8a5259e7df10505c5a0360bd1a1853ac8b8b0763da2
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+  cloud-sql-proxy:
+    image: ${CLOUD_SQL_PROXY_IMAGE:-gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.23.0@sha256:54e23cad9aeeedbf88ab75f993146631b878035f702b31c51885a932e0c7286c}
+    command:
+      - --private-ip
+      - --address=0.0.0.0
+      - --port=5432
+      - --health-check
+      - --http-address=0.0.0.0
+      - --http-port=9090
+      - ${CLOUD_SQL_INSTANCE_CONNECTION_NAME:?CLOUD_SQL_INSTANCE_CONNECTION_NAME must be set}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test:
+        [
+          "CMD",
+          "/cloud-sql-proxy",
+          "wait",
+          "--http-address=127.0.0.1",
+          "--http-port=9090",
+          "--max=2s",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -44,13 +53,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      POSTGRES_HOST: db
+      POSTGRES_HOST: cloud-sql-proxy
       POSTGRES_PORT: 5432
     volumes:
-      - ./uploads:/app/uploads
-      - ./data:/app/data:ro
+      - ${GCS_MOUNT_ROOT:?GCS_MOUNT_ROOT must be set}/uploads:/app/uploads
+      - ${GCS_MOUNT_ROOT:?GCS_MOUNT_ROOT must be set}/sku-images:/app/data/images:ro
+      - ./data/catalog:/app/data/catalog:ro
     depends_on:
-      db:
+      cloud-sql-proxy:
         condition: service_healthy
     healthcheck:
       test:
@@ -97,9 +107,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  postgres_data:
 
 networks:
   app_network:
