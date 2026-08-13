@@ -26,6 +26,7 @@ import json
 
 from PIL import Image
 
+from app.services.sku_image_storage import SkuImageStorage
 from scripts.embedding import db, gemini_embed, storage
 from scripts.embedding.text_builder import build_embedding_text
 
@@ -162,6 +163,7 @@ def embed_images(
     """data/images/{sku_id}/main.* 이미지를 임베딩해 sku_image(MAIN)에 적재한다."""
     already_done = set() if force or dry_run else db.fetch_image_embedded_sku_ids(conn)
     embedder = None if dry_run else gemini_embed.make_image_embedder(settings)
+    image_storage = SkuImageStorage(storage.IMAGES_DIR)
 
     for sku in skus:
         sku_id = sku["sku_id"]
@@ -183,7 +185,7 @@ def embed_images(
                 image.load()
                 embedding = embedder.embed_image(image)
 
-            relative_url = str(image_path.relative_to(storage.PROJECT_ROOT))
+            relative_url = image_storage.storage_key(image_path)
             inserted = db.upsert_sku_image(
                 conn, sku_id, relative_url, embedding, overwrite=force
             )
