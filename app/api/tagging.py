@@ -2,11 +2,11 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.dependencies import get_sku_match_service, get_tagging_service
+from app.dependencies import get_tagging_service, get_sku_match_service
+from app.schemas import common as common_schema
 from app.schemas.tagging import (
-    DetectionResponse,
+    DetectionResult,
     SkuMatchingRequest,
-    SkuMatchingResponse,
     SkuMatchingResult,
 )
 from app.repositories.scene_image_repository import SceneImageNotFoundError
@@ -19,13 +19,13 @@ router = APIRouter(prefix="/tagging", tags=["tagging"])
 @router.get("/scenes/{scene_id}")
 async def get_recommendation_sku(
     scene_id: int,
-    tagging_service: TaggingService = Depends(get_tagging_service),
-) -> DetectionResponse:
+    taggin_service: TaggingService = Depends(get_tagging_service),
+) -> common_schema.SuccessResponse[DetectionResult]:
     """장면 이미지에서 탐지된 객체들의 유사 SKU를 추천합니다.
 
     Args:
         scene_id: 조회할 장면 이미지 ID입니다.
-        tagging_service: 유사 SKU 조회 및 XAI 근거 산출 서비스입니다.
+        taggin_service: 유사 SKU 조회 및 XAI 근거 산출 서비스입니다.
 
     Returns:
         탐지된 객체 별 유사 SKU 후보 정보 목록을 반환합니다.
@@ -35,11 +35,11 @@ async def get_recommendation_sku(
             404를 반환합니다.
     """
     try:
-        result = await tagging_service.get_sku_candidates(scene_id)
+        result = await taggin_service.get_sku_candidates(scene_id)
     except SceneImageNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    return DetectionResponse(status="success", data=result)
+    return common_schema.success_response(result)
 
 
 @router.put("/scenes/{scene_id}")
@@ -47,7 +47,7 @@ async def confirm_scene_matching(
     scene_id: int,
     match_request: SkuMatchingRequest,
     match_service: sku_match.SkuMatchService = Depends(get_sku_match_service),
-) -> SkuMatchingResponse:
+) -> common_schema.SuccessResponse[SkuMatchingResult]:
     """탐지 객체별로 선택한 SKU를 최종 확정해 저장합니다.
 
     Args:
@@ -75,10 +75,9 @@ async def confirm_scene_matching(
     ) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
-    return SkuMatchingResponse(
-        status="success",
-        data=SkuMatchingResult(
+    return common_schema.success_response(
+        SkuMatchingResult(
             processing_status="CONFIRMED",
             result_ids=result_ids,
-        ),
+        )
     )

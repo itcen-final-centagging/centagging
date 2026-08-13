@@ -8,7 +8,7 @@ import fastapi
 import starlette.testclient
 
 from app.api import auth
-from app.core import database
+from app.core import database, exception_handlers, request_context
 
 
 class _FakeMappings:
@@ -86,6 +86,8 @@ class AuthApiTest(unittest.TestCase):
         """인증 라우터와 가짜 DB 세션을 준비합니다."""
         self.session = _FakeSession()
         self.app = fastapi.FastAPI()
+        self.app.add_middleware(request_context.RequestIdMiddleware)
+        exception_handlers.register_exception_handlers(self.app)
         self.app.include_router(auth.router)
 
         async def override_database_session() -> (
@@ -106,8 +108,9 @@ class AuthApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "success")
         self.assertEqual(
-            response.json(),
+            response.json()["data"],
             {
                 "user_id": 7,
                 "login_id": "user",
@@ -115,6 +118,10 @@ class AuthApiTest(unittest.TestCase):
                 "role": "USER",
                 "session": "centagging-poc-user-session",
             },
+        )
+        self.assertEqual(
+            response.json()["meta"]["request_id"],
+            response.headers["X-Request-ID"],
         )
 
     def test_login_returns_role_for_all_fixed_users(self) -> None:
@@ -143,8 +150,8 @@ class AuthApiTest(unittest.TestCase):
                 )
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json()["role"], role)
-                self.assertEqual(response.json()["session"], session)
+                self.assertEqual(response.json()["data"]["role"], role)
+                self.assertEqual(response.json()["data"]["session"], session)
 
     def test_login_rejects_wrong_password(self) -> None:
         """DB의 비밀번호 해시와 다른 비밀번호는 거부합니다."""
@@ -154,6 +161,7 @@ class AuthApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["error"]["code"], "AUTH_CREDENTIALS_INVALID")
 
     def test_me_returns_user_for_matching_bearer_session(self) -> None:
         """DB 세션과 일치하는 Bearer 값으로 현재 사용자를 조회합니다."""
@@ -163,9 +171,10 @@ class AuthApiTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["login_id"], "user")
+        self.assertEqual(response.json()["status"], "success")
+        self.assertEqual(response.json()["data"]["login_id"], "user")
         self.assertEqual(
-            response.json()["session"], "centagging-poc-user-session"
+            response.json()["data"]["session"], "centagging-poc-user-session"
         )
 
     def test_me_rejects_missing_or_mismatched_session(self) -> None:
@@ -178,6 +187,9 @@ class AuthApiTest(unittest.TestCase):
 
         self.assertEqual(missing_response.status_code, 401)
         self.assertEqual(mismatched_response.status_code, 401)
+        self.assertEqual(
+            missing_response.json()["error"]["code"], "AUTH_SESSION_INVALID"
+        )
 
     def test_auth_openapi_documents_korean_descriptions_and_error_examples(
         self,
@@ -187,46 +199,47 @@ class AuthApiTest(unittest.TestCase):
         login_operation = openapi["paths"]["/auth/login"]["post"]
         me_operation = openapi["paths"]["/auth/me"]["get"]
 
+        self.assertEqual(login_operation["summary"], "아이디와 비밀번호로 로그인")
         self.assertEqual(
-            login_operation["summary"], "아이디와 비밀번호로 로그인"
+            login_operation["responses"]["200"]["content"]["application/json"][
+                "example"
+            ]["status"],
+            "success",
+        )
+        self.assertEqual(
+            login_operation["responses"]["200"]["content"]["application/json"][
+                "example"
+            ]["data"]["login_id"],
+            "user",
         )
         self.assertEqual(
             login_operation["responses"]["401"]["content"]["application/json"][
                 "example"
-            ],
-            {"detail": "아이디 또는 비밀번호가 올바르지 않습니다."},
+            ]["error"]["code"],
+            "AUTH_CREDENTIALS_INVALID",
         )
         self.assertIn("등록된 사용자", login_operation["description"])
         self.assertEqual(
             login_operation["responses"]["200"]["description"],
-            "로그인한 사용자 정보와 고정 세션을 반환합니다.",
+            "공통 성공 응답으로 사용자 정보와 고정 세션을 반환합니다.",
         )
         self.assertEqual(
             login_operation["responses"]["422"]["content"]["application/json"][
                 "example"
-            ]["detail"][0]["loc"],
-            ["body", "login_id"],
-        )
-        validation_error_schema = openapi["components"]["schemas"][
-            "ValidationErrorDetail"
-        ]["properties"]
-        self.assertIn(
-            "요청 본문", validation_error_schema["loc"]["description"]
-        )
-        self.assertIn(
-            "실제로 전달한", validation_error_schema["input"]["description"]
+            ]["error"]["details"][0]["field"],
+            "login_id",
         )
         self.assertEqual(me_operation["summary"], "현재 로그인 사용자 조회")
         self.assertEqual(
-            me_operation["responses"]["401"]["content"]["application/json"][
-                "example"
-            ],
-            {"detail": "인증 세션이 유효하지 않습니다."},
+            me_operation["responses"]["401"]["content"]["application/json"]["example"][
+                "error"
+            ]["code"],
+            "AUTH_SESSION_INVALID",
         )
         self.assertIn("헤더는 필수", me_operation["description"])
         self.assertEqual(
             me_operation["responses"]["200"]["description"],
-            "세션과 일치하는 현재 사용자 정보를 반환합니다.",
+            "공통 성공 응답으로 현재 사용자 정보를 반환합니다.",
         )
         authorization = next(
             parameter

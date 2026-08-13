@@ -1,3 +1,7 @@
+import { requestJson, type ApiSuccessResponse } from '../../../lib/api-request';
+
+export { ApiRequestError } from '../../../lib/api-request';
+
 export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
 
 export type AuthenticatedUser = {
@@ -27,24 +31,6 @@ const API_BASE_URL =
     '',
   ) ?? '';
 
-const getErrorMessage = async (response: Response): Promise<string> => {
-  try {
-    const payload = (await response.json()) as { detail?: string };
-    return payload.detail ?? '인증 요청을 처리하지 못했습니다.';
-  } catch {
-    return '인증 요청을 처리하지 못했습니다.';
-  }
-};
-
-const request = async <ResponseData>(
-  path: string,
-  init?: RequestInit,
-): Promise<ResponseData> => {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
-  if (!response.ok) throw new Error(await getErrorMessage(response));
-  return (await response.json()) as ResponseData;
-};
-
 const toAuthenticatedUser = (response: ApiUserResponse): AuthenticatedUser => ({
   loginId: response.login_id,
   role: response.role,
@@ -65,23 +51,29 @@ export const createAuthorizationHeaders = (
 export const login = async (
   credentials: LoginCredentials,
 ): Promise<AuthenticatedUser> => {
-  const response = await request<ApiUserResponse>('/auth/login', {
-    body: JSON.stringify({
-      login_id: credentials.loginId,
-      password: credentials.password,
-    }),
-    headers: { 'Content-Type': 'application/json' },
-    method: 'POST',
-  });
-  return toAuthenticatedUser(response);
+  const response = await requestJson<ApiSuccessResponse<ApiUserResponse>>(
+    `${API_BASE_URL}/auth/login`,
+    {
+      body: JSON.stringify({
+        login_id: credentials.loginId,
+        password: credentials.password,
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+  return toAuthenticatedUser(response.data);
 };
 
 export const getCurrentUser = async (
   session: string,
 ): Promise<AuthenticatedUser> => {
-  const response = await request<ApiUserResponse>('/auth/me', {
-    headers: createAuthorizationHeaders(session),
-    method: 'GET',
-  });
-  return toAuthenticatedUser(response);
+  const response = await requestJson<ApiSuccessResponse<ApiUserResponse>>(
+    `${API_BASE_URL}/auth/me`,
+    {
+      headers: createAuthorizationHeaders(session),
+      method: 'GET',
+    },
+  );
+  return toAuthenticatedUser(response.data);
 };

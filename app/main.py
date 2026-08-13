@@ -7,7 +7,13 @@ import fastapi
 import starlette.staticfiles
 
 from app.api import auth, history, scene_images, sku, sku_search, tagging
-from app.core import config, database
+from app.core import (
+    config,
+    database,
+    exception_handlers,
+    openapi,
+    request_context,
+)
 from app.services import user_seed
 
 
@@ -27,6 +33,9 @@ app = fastapi.FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.add_middleware(request_context.RequestIdMiddleware)
+exception_handlers.register_exception_handlers(app)
+openapi.configure_common_response_openapi(app)
 
 app.include_router(auth.router)
 app.include_router(scene_images.router)

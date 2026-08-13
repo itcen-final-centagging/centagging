@@ -13,7 +13,7 @@ import starlette.datastructures
 import starlette.testclient
 
 from app.api import scene_images
-from app.core import config, database
+from app.core import config, database, exception_handlers, request_context
 from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiRawDetection,
@@ -195,6 +195,8 @@ class UploadSceneImageApiTest(unittest.TestCase):
         self.storage_directory = tempfile.TemporaryDirectory()
         self.session = _FakeSession()
         self.app = fastapi.FastAPI()
+        self.app.add_middleware(request_context.RequestIdMiddleware)
+        exception_handlers.register_exception_handlers(self.app)
         self.app.include_router(scene_images.router)
 
         async def override_database_session():
@@ -210,6 +212,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
             mvp_login_id="mvp-user",
             mvp_login_password="",
             image_storage_root=self.storage_directory.name,
+            sku_image_root="",
             database=config.DatabaseSettings(
                 name="",
                 username="",
@@ -265,9 +268,15 @@ class UploadSceneImageApiTest(unittest.TestCase):
         response = self._post_valid_image()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "validated")
-        self.assertEqual(response.json()["image"]["mime_type"], "image/png")
-        self.assertEqual(response.json()["scene_image_id"], 42)
+        self.assertEqual(response.json()["status"], "success")
+        self.assertEqual(
+            response.json()["data"]["image"]["mime_type"], "image/png"
+        )
+        self.assertEqual(response.json()["data"]["scene_image_id"], 42)
+        self.assertEqual(
+            response.json()["meta"]["request_id"],
+            response.headers["X-Request-ID"],
+        )
         assert self.session.execute_parameters is not None
         self.assertEqual(
             self.session.user_lookup_parameters,
@@ -370,7 +379,8 @@ class UploadSceneImageApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(
-            response.json()["detail"], scene_images.UPLOAD_ERROR_MESSAGE
+            response.json()["error"]["message"],
+            scene_images.UPLOAD_ERROR_MESSAGE,
         )
         self.assertIsNone(self.session.execute_parameters)
 

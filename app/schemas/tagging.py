@@ -12,19 +12,6 @@ class MatchedSkuImage(BaseModel):
     image_type: typing.Literal["MAIN", "ANGLE"]
     image_url: str
 
-class XaiCriterion(BaseModel):
-    """루브릭 기준 1건의 점수와 근거입니다."""
-
-    label: typing.Literal["구조", "색상", "디테일", "맥락"]
-    score: int = Field(ge=0, le=30)
-    comment: str
-
-class VlmMood(BaseModel):
-    """크롭 이미지에서 읽어낸 분위기 요약입니다."""
-
-    summary: str = ""
-    tags: list[str] = Field(default_factory=list)
-
 
 class XaiResult(BaseModel):
     """XAI 판정 요약입니다."""
@@ -87,13 +74,6 @@ class DetectionResult(BaseModel):
     objects: list[DetectedObject]
 
 
-class DetectionResponse(BaseModel):
-    """객체 탐지 API 응답입니다."""
-
-    status: typing.Literal["success", "error"]
-    data: DetectionResult
-
-
 class SkuMatching(BaseModel):
     """확정할 객체-SKU 매핑 1건입니다.
 
@@ -122,10 +102,3 @@ class SkuMatchingResult(BaseModel):
 
     processing_status: typing.Literal["CONFIRMED"] = "CONFIRMED"
     result_ids: list[int]
-
-
-class SkuMatchingResponse(BaseModel):
-    """SKU 확정 API 응답입니다."""
-
-    status: typing.Literal["success", "error"]
-    data: SkuMatchingResult
