@@ -53,44 +53,6 @@ _SEEDED_USERS: tuple[_SeededUser, ...] = (
     },
 )
 
-_ENSURE_USER_SCHEMA = sqlalchemy.text("""
-    DO $$
-    BEGIN
-        ALTER TABLE app_user
-        ADD COLUMN IF NOT EXISTS session VARCHAR(255);
-
-        IF NOT EXISTS (
-            SELECT 1
-            FROM pg_constraint
-            WHERE conname = 'uq_app_user_session'
-              AND conrelid = 'app_user'::regclass
-        ) THEN
-            ALTER TABLE app_user
-            ADD CONSTRAINT uq_app_user_session UNIQUE (session);
-        END IF;
-
-        ALTER TABLE app_user
-        ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'USER';
-
-        IF NOT EXISTS (
-            SELECT 1
-            FROM pg_constraint
-            WHERE conname = 'ck_app_user_role'
-              AND conrelid = 'app_user'::regclass
-        ) THEN
-            ALTER TABLE app_user
-            ADD CONSTRAINT ck_app_user_role
-            CHECK (role IN ('USER', 'ADMIN', 'SUPER_ADMIN'));
-        END IF;
-
-        COMMENT ON COLUMN app_user.session
-        IS 'POC 인증에 사용하는 고정 세션';
-        COMMENT ON COLUMN app_user.role
-        IS '사용자 역할: USER | ADMIN | SUPER_ADMIN';
-    END;
-    $$;
-    """)
-
 _UPSERT_USER = sqlalchemy.text("""
     INSERT INTO app_user (
         login_id, user_name, password_hash, session, role, is_active
@@ -110,14 +72,11 @@ _UPSERT_USER = sqlalchemy.text("""
 async def initialize_users() -> list[int]:
     """세 역할의 고정 POC 계정을 생성하거나 고정값으로 갱신합니다.
 
-    기존 DB에는 세션·역할 컬럼을 먼저 추가합니다.
-
     Returns:
         생성하거나 갱신한 사용자 ID 목록입니다.
     """
     user_ids: list[int] = []
     async with database.database_session_factory.begin() as session:
-        await session.execute(_ENSURE_USER_SCHEMA)
         for seeded_user in _SEEDED_USERS:
             user_id = typing.cast(
                 int | None,

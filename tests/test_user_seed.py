@@ -11,10 +11,6 @@ class _FakeSession:
 
     def __init__(self) -> None:
         self.stored_users: list[dict[str, object]] = []
-        self.schema_ensured = False
-
-    async def execute(self, _statement: object) -> None:
-        self.schema_ensured = True
 
     async def scalar(
         self, _statement: object, parameters: dict[str, object]
@@ -68,7 +64,6 @@ class InitializeUserTest(unittest.IsolatedAsyncioTestCase):
             user_ids = await user_seed.initialize_users()
 
         self.assertEqual(user_ids, [1, 2, 3])
-        self.assertTrue(session_factory.session.schema_ensured)
         self.assertEqual(
             session_factory.session.stored_users,
             [
