@@ -1,0 +1,106 @@
+name: centagging
+
+services:
+  db:
+    image: pgvector/pgvector:pg16@sha256:ad2e18408bf447f62092a8a5259e7df10505c5a0360bd1a1853ac8b8b0763da2
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    image: ${API_IMAGE:-centagging-api:prod}
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      APP_ENV: prod
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      MVP_LOGIN_ID: ${MVP_LOGIN_ID:?MVP_LOGIN_ID must be set}
+      MVP_LOGIN_PASSWORD: ${MVP_LOGIN_PASSWORD:?MVP_LOGIN_PASSWORD must be set}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY must be set}
+      GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
+      IMAGE_STORAGE_ROOT: ${IMAGE_STORAGE_ROOT:-uploads}
+      SKU_IMAGE_ROOT: ${SKU_IMAGE_ROOT:-data/images}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://localhost:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-centagging-frontend:prod}
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "${PUBLIC_HTTP_PORT:-80}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8501/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge
