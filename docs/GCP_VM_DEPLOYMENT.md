@@ -451,64 +451,11 @@ POSTGRES_PASSWORD_SECRET_VERSION
 
 실제 `.env.prod`는 Git에 추가하지 않고 파일 권한을 `600`으로 유지합니다.
 
-Secret Manager 값을 VM의 메모리 기반 `/run` 경로에 생성합니다. 시크릿 값은 공백 문자를 포함하지 않는 단일 행 값이어야 합니다.
+Secret Manager 값을 VM의 메모리 기반 `/run` 경로에 생성합니다. 시크릿 값은 영문자, 숫자와 `_./:@%+=,-` 문자만 사용하는 단일 행 값이어야 합니다.
 
 ```bash
 cd /opt/centagging
-
-set -euo pipefail
-set -a
-source .env.prod
-set +a
-
-sudo install -d -m 0700 \
-  -o "${USER}" \
-  -g "$(id -gn)" \
-  /run/centagging
-
-umask 077
-SECRET_ENV_TMP="$(mktemp /run/centagging/secrets.env.XXXXXX)"
-trap 'rm -f "${SECRET_ENV_TMP}"' EXIT
-
-fetch_secret() {
-  local env_name="$1"
-  local secret_id="$2"
-  local secret_version="$3"
-  local secret_value
-
-  if ! secret_value="$(gcloud secrets versions access "${secret_version}" \
-    --secret="${secret_id}")"; then
-    echo "${env_name}: failed to access Secret Manager" >&2
-    return 1
-  fi
-
-  if [[ -z "${secret_value}" || "${secret_value}" =~ [[:space:]] ]]; then
-    echo "${env_name}: empty or whitespace-containing secrets are not supported" >&2
-    return 1
-  fi
-
-  printf '%s=%s\n' "${env_name}" "${secret_value}"
-}
-
-{
-  fetch_secret GEMINI_API_KEY \
-    "${GEMINI_API_KEY_SECRET_ID}" \
-    "${GEMINI_API_KEY_SECRET_VERSION}"
-  fetch_secret POSTGRES_PASSWORD \
-    "${POSTGRES_PASSWORD_SECRET_ID}" \
-    "${POSTGRES_PASSWORD_SECRET_VERSION}"
-  fetch_secret MVP_LOGIN_ID \
-    "${MVP_LOGIN_ID_SECRET_ID}" \
-    "${MVP_LOGIN_ID_SECRET_VERSION}"
-  fetch_secret MVP_LOGIN_PASSWORD \
-    "${MVP_LOGIN_PASSWORD_SECRET_ID}" \
-    "${MVP_LOGIN_PASSWORD_SECRET_VERSION}"
-} > "${SECRET_ENV_TMP}"
-
-test "$(wc -l < "${SECRET_ENV_TMP}")" -eq 4
-chmod 600 "${SECRET_ENV_TMP}"
-mv "${SECRET_ENV_TMP}" /run/centagging/secrets.env
-trap - EXIT
+bash scripts/deploy/render_prod_secrets.sh
 ```
 
 시크릿 파일 내용을 `cat`, `echo` 또는 `docker compose config`로 출력하지 않습니다. VM 재부팅이나 시크릿 버전 변경 후에는 위 절차로 `/run/centagging/secrets.env`를 다시 생성합니다.
@@ -705,18 +652,40 @@ mount | grep centagging-gcs
 
 VM 시스템 로그와 지표를 Cloud Logging·Monitoring으로 수집하려면 Ops Agent를 설치합니다.
 
-## 18. 다음 자동화 단계
+## 18. GitHub Actions 자동 배포
 
-수동 배포와 롤백이 검증된 후 GitHub Actions를 추가합니다.
+`.github/workflows/deploy-vm.yml`은 다음 순서로 동작합니다.
 
 1. `deploy` 브랜치 Commit SHA로 API·Frontend 이미지를 빌드합니다.
-2. Artifact Registry에 불변 태그로 Push합니다.
+2. Artifact Registry에 Commit SHA 불변 태그로 Push합니다.
 3. Workload Identity Federation으로 GCP에 인증합니다.
-4. IAP SSH를 통해 VM에서 이미지를 Pull합니다.
-5. Compose 재기동 후 `/health` Smoke Test를 수행합니다.
-6. 실패하면 이전 Commit SHA 이미지로 롤백합니다.
+4. 해당 Commit의 Compose·배포 스크립트·카탈로그 파일을 묶어 IAP로 VM에 복사합니다.
+5. `scripts/deploy/deploy_vm.sh`가 Secret을 조회하고 이미지를 Pull합니다.
+6. Compose 재기동 후 `/health` Smoke Test를 수행합니다.
+7. 실패하면 배포 전 실행 중이던 API·Frontend 이미지로 복구합니다.
 
-첫 번째 GitHub Actions 버전은 `workflow_dispatch` 수동 실행만 허용합니다. 수동 실행이 안정화된 후 `deploy` 브랜치 Push 자동 실행을 추가합니다.
+GitHub의 `production` Environment에 다음 Variables를 등록합니다.
+
+```text
+GCP_PROJECT_ID
+GCP_REGION
+GCP_WORKLOAD_IDENTITY_PROVIDER
+GCP_DEPLOY_SERVICE_ACCOUNT
+GCP_ARTIFACT_REPOSITORY
+GCP_VM_NAME
+GCP_VM_ZONE
+```
+
+Workflow의 GCP 배포 서비스 계정에는 다음 권한이 필요합니다.
+
+- Workload Identity Pool의 `roles/iam.workloadIdentityUser`
+- Artifact Registry 저장소의 `roles/artifactregistry.writer`
+- 대상 VM에 대한 `roles/compute.osAdminLogin`
+- 대상 VM 또는 프로젝트의 `roles/iap.tunnelResourceAccessor`
+- VM 조회를 위한 `roles/compute.viewer`
+- VM 런타임 서비스 계정에 대한 `roles/iam.serviceAccountUser`
+
+Workflow는 `deploy` 브랜치에 Push되면 자동으로 실행됩니다. 동일 리비전 재배포가 필요한 경우에는 `deploy` 브랜치에서 `workflow_dispatch`로 수동 실행할 수 있습니다.
 
 ## 참고 문서
 

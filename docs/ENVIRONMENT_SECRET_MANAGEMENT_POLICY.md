@@ -202,8 +202,8 @@ Nginx/Frontend 컨테이너에는 애플리케이션 시크릿 환경 변수를 
 - 장기간 유효한 GCP 서비스 계정 JSON Key를 GitHub Secrets에 저장하지 않는다.
 - GitHub OIDC와 GCP Workload Identity Federation을 사용한다.
 - 신뢰 범위는 승인된 GitHub 조직, 저장소와 `deploy` 브랜치 또는 승인된 Environment로 제한한다.
-- 첫 배포 Workflow는 `workflow_dispatch` 수동 실행만 허용한다.
-- 배포가 검증된 후 `deploy` 브랜치 Push 자동 실행을 추가한다.
+- 배포 Workflow는 `deploy` 브랜치 Push 시 자동 실행한다.
+- 동일 리비전 재배포가 필요한 경우에만 `workflow_dispatch` 수동 실행을 사용한다.
 - 이미지는 Commit SHA 불변 태그로 Artifact Registry에 Push한다.
 - GitHub Actions 로그에 Secret 값, 액세스 토큰 및 해석된 환경 설정이 출력되지 않도록 검토한다.
 

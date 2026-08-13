@@ -4,6 +4,7 @@
 !.env.example
 !.env.prod.example
 .streamlit/secrets.toml
+gha-creds-*.json
 
 # Python 캐시와 테스트 산출물 / Python caches and test artifacts
 __pycache__/
