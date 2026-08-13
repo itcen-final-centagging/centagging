@@ -440,6 +440,15 @@ POSTGRES_PASSWORD_SECRET_VERSION
 
 실제 `.env.prod`는 Git에 추가하지 않고 파일 권한을 `600`으로 유지합니다.
 
+VM 배포 전 필수 도구, 운영 파일, 환경변수와 GCS 마운트 상태를 점검합니다. 이 스크립트는 설정을 변경하지 않습니다.
+
+```bash
+cd /opt/centagging
+bash scripts/deploy/check_vm_readiness.sh
+```
+
+`VM deployment readiness check passed.`가 출력된 경우에만 다음 단계로 진행합니다.
+
 Secret Manager 값을 VM의 메모리 기반 `/run` 경로에 생성합니다. 시크릿 값은 영문자, 숫자와 `_./:@%+=,-` 문자만 사용하는 단일 행 값이어야 합니다.
 
 ```bash
