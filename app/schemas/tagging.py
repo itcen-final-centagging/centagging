@@ -13,6 +13,20 @@ class MatchedSkuImage(BaseModel):
     image_url: str
 
 
+class XaiCriterion(BaseModel):
+    """루브릭 기준 1건의 점수와 근거입니다."""
+
+    label: typing.Literal["구조", "색상", "디테일", "맥락"]
+    score: int = Field(ge=0, le=30)
+    comment: str
+
+
+class VlmMood(BaseModel):
+    """크롭 이미지에서 읽어낸 분위기 요약입니다."""
+
+    summary: str = ""
+    tags: list[str] = Field(default_factory=list)
+
 class XaiResult(BaseModel):
     """XAI 판정 요약입니다."""
 
