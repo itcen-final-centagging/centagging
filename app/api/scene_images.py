@@ -60,7 +60,7 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
 _UPDATE_DETECTION_SUCCESS = sqlalchemy.text("""
     UPDATE scene_image
     SET
-        bbox_coord = CAST(:bbox_coord AS jsonb),
+        object_metadata = CAST(:object_metadata AS jsonb),
         analysis_status = :analysis_status,
         analysis_error = :analysis_error
     WHERE scene_image_id = :scene_image_id
@@ -132,11 +132,12 @@ async def _save_detection_success(
     detected_objects: list[DetectedObjectResponse],
 ) -> None:
     """탐지 결과와 성공 상태를 저장합니다."""
-    bbox_coord = []
+    object_metadata = []
     for detected_object in detected_objects:
         ymin, xmin, ymax, xmax = detected_object.box_2d
-        bbox_coord.append(
+        object_metadata.append(
             {
+                "label": detected_object.label,
                 "xmin": xmin,
                 "ymin": ymin,
                 "xmax": xmax,
@@ -150,8 +151,8 @@ async def _save_detection_success(
             "scene_image_id": scene_image_id,
             "analysis_status": "detected",
             "analysis_error": None,
-            "bbox_coord": json.dumps(
-                bbox_coord,
+            "object_metadata": json.dumps(
+                object_metadata,
                 ensure_ascii=False,
             ),
         },

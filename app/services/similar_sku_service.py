@@ -113,7 +113,7 @@ _CROP_IMAGE_COORD_QUERY = sqlalchemy.text("""
            file_size,
            width_px,
            height_px,
-           bbox_coord
+           object_metadata
       FROM scene_image
      WHERE scene_image_id = :scene_image_id
     """)
@@ -398,7 +398,7 @@ class SimilarSkuService:
         if row is None:
             raise SceneImageNotFoundError(scene_id)
 
-        coords = row["bbox_coord"]
+        coords = row["object_metadata"]
         indexed_coords = [
             (i, coords[i]) for i in object_indexes if 0 <= i < len(coords)
         ]

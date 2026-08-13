@@ -184,7 +184,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
         self.client.get("/history/results")
 
         self.assertIn(
-            "si.bbox_coord -> tr.object_index",
+            "si.object_metadata -> tr.object_index",
             self.session.executed_statement,
         )
         self.assertIn(

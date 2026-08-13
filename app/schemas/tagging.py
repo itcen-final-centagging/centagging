@@ -72,7 +72,7 @@ class SceneImageInfo(BaseModel):
     width_px: int
     height_px: int
 
-# 추가 — 기존 bbox_coord: dict를 대체합니다.
+# 추가 — 기존 object_metadata의 좌표 dict를 대체합니다.
 class BoundingBox(BaseModel):
     """0~1000으로 정규화된 탐지 객체 좌표입니다."""
 
@@ -94,7 +94,7 @@ class SceneImageInfo(BaseModel):
     height_px: int
 
 
-# 추가 — 기존 bbox_coord: dict를 대체합니다.
+# 추가 — 기존 object_metadata의 좌표 dict를 대체합니다.
 class BoundingBox(BaseModel):
     """0~1000으로 정규화된 탐지 객체 좌표입니다."""
 
@@ -137,7 +137,7 @@ class SkuMatching(BaseModel):
     후보를 그대로 돌려받습니다.
     """
 
-    # scene_image.bbox_coord 배열의 인덱스입니다.
+    # scene_image.object_metadata 배열의 인덱스입니다.
     object_index: int = Field(ge=0)
     sku_code: str = Field(min_length=1)
     match_rank: int = Field(ge=1)

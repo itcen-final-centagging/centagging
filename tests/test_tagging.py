@@ -215,7 +215,7 @@ class GetCropImageCoordsTest(unittest.IsolatedAsyncioTestCase):
         session = _FakeSimilarSkuSession(
             scene_row={
                 "image_url": "/uploads/scene.png",
-                "bbox_coord": coords,
+                "object_metadata": coords,
             }
         )
         service = similar_sku_service.SimilarSkuService(
@@ -271,7 +271,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
         ]
         scene_row = {
             "image_url": "/uploads/scene-images/scene.png",
-            "bbox_coord": bbox_coord,
+            "object_metadata": bbox_coord,
         }
         similar_row = {
             "sku_id": 1,
@@ -339,7 +339,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
         """object_indexes를 비워서 요청하면 크롭/임베딩 없이 빈 목록을 반환합니다."""
         scene_row = {
             "image_url": "/uploads/scene-images/scene.png",
-            "bbox_coord": [
+            "object_metadata": [
                 {
                     "xmin": 0.0,
                     "ymin": 0.0,
@@ -369,7 +369,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
         """임베딩 오류가 발생하면 failed 상태와 원인을 저장합니다."""
         scene_row = {
             "image_url": "/uploads/scene-images/scene.png",
-            "bbox_coord": [
+            "object_metadata": [
                 {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0}
             ],
         }
@@ -431,7 +431,7 @@ class OrchestrateSimilarSkusTest(unittest.IsolatedAsyncioTestCase):
         """후보 생성 오류는 embedded 이후 failed 상태로 전환합니다."""
         scene_row = {
             "image_url": "/uploads/scene-images/scene.png",
-            "bbox_coord": [
+            "object_metadata": [
                 {"xmin": 0.0, "ymin": 0.0, "xmax": 100.0, "ymax": 100.0}
             ],
         }

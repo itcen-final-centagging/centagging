@@ -295,10 +295,11 @@ class UploadSceneImageApiTest(unittest.TestCase):
         assert self.session.analysis_update_parameters is not None
         self.assertEqual(
             json.loads(
-                str(self.session.analysis_update_parameters["bbox_coord"])
+                str(self.session.analysis_update_parameters["object_metadata"])
             ),
             [
                 {
+                    "label": "chair",
                     "xmin": 200,
                     "ymin": 100,
                     "xmax": 800,
