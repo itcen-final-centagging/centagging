@@ -11,8 +11,10 @@ class LoginRequest(pydantic.BaseModel):
 
 
 class UserResponse(pydantic.BaseModel):
-    """로그인한 사용자에게 공개할 최소 정보입니다."""
+    """고정 세션으로 인증된 사용자 정보입니다."""
 
     user_id: int
     login_id: str
     user_name: str
+    role: str
+    session: str

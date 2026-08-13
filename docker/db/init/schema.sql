@@ -2,20 +2,27 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ------------------------------------------------------------
--- 1. app_user : 고정 관리자 계정 (FT-ACC-001 · 하드코딩, P3)
+-- 1. app_user : 고정 POC 사용자 계정 (FT-ACC-001 · 하드코딩, P3)
 -- ------------------------------------------------------------
 CREATE TABLE app_user (
     user_id       BIGSERIAL    PRIMARY KEY,
     login_id      VARCHAR(50)  NOT NULL UNIQUE,
     user_name     VARCHAR(100) NOT NULL,
     password_hash VARCHAR(255),
+    session       VARCHAR(255) UNIQUE,
+    role          VARCHAR(20)  NOT NULL DEFAULT 'USER',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_app_user_role CHECK (
+        role IN ('USER', 'ADMIN', 'SUPER_ADMIN')
+    )
 );
 
-COMMENT ON TABLE  app_user           IS '고정 관리자 계정';
+COMMENT ON TABLE  app_user           IS '고정 POC 사용자 계정';
 COMMENT ON COLUMN app_user.login_id  IS '로그인 아이디, 중복 불가';
 COMMENT ON COLUMN app_user.user_name IS '화면에 표시할 작업자 이름';
+COMMENT ON COLUMN app_user.session   IS 'POC 인증에 사용하는 고정 세션';
+COMMENT ON COLUMN app_user.role      IS '사용자 역할: USER | ADMIN | SUPER_ADMIN';
 
 -- ------------------------------------------------------------
 -- 2. scene_image : 업로드된 연출 이미지
