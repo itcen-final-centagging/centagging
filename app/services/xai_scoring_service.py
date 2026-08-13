@@ -1,5 +1,7 @@
 """크롭과 SKU 후보 이미지를 루브릭으로 채점하는 서비스입니다."""
 
+import asyncio
+import logging
 import string
 import typing
 
@@ -8,13 +10,20 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from app.core import config
-from app.schemas.tagging import XaiResult
+from app.schemas.tagging import DetectedObject, XaiResult
 from app.services.gemini_service import (
     GeminiApiError,
     GeminiConfigurationError,
     GeminiResponseInvalidError,
 )
+from app.services.image_processing_service import (
+    CroppedObject,
+    read_sku_image_bytes,
+)
 from app.services.xai_prompt import XAI_PROMPT
+
+_LOGGER = logging.getLogger(__name__)
+
 
 class ScoringCandidate(BaseModel):
     """채점 대상 SKU 후보 1건입니다."""
@@ -29,6 +38,7 @@ class ScoringCrop(BaseModel):
     crop_index: int
     crop_image_bytes: bytes
     candidates: list[ScoringCandidate] = Field(default_factory=list)
+
 
 class SkuEvaluation(BaseModel):
     sku_id: str
@@ -63,10 +73,139 @@ class XaiScoringService:
 
     def _get_client(self) -> genai.Client:
         if not self.settings.gemini_api_key:
-            raise GeminiConfigurationError("GEMINI_API_KEY가 설정되지 않았습니다.")
+            raise GeminiConfigurationError(
+                "GEMINI_API_KEY가 설정되지 않았습니다."
+            )
         if self._client is None:
             self._client = genai.Client(api_key=self.settings.gemini_api_key)
         return self._client
+
+    async def enrich_detected_objects(
+        self,
+        crops: list[CroppedObject],
+        detected_objects: list[DetectedObject],
+    ) -> list[DetectedObject]:
+        """탐지 객체에 라벨·속성·XAI 판정을 채워 넣습니다.
+
+        채점에 실패해도 임베딩 유사도 기반 응답이 유지되도록, 예외를
+        기록만 하고 입력 객체를 그대로 돌려줍니다.
+
+        Args:
+            crops: 크롭 이미지 바이트를 담은 크롭 목록입니다.
+            detected_objects: SKU 후보까지 채워진 탐지 객체 목록입니다.
+
+        Returns:
+            XAI 결과가 반영된 탐지 객체 목록입니다.
+        """
+        crop_bytes = {crop.crop_index: crop.image_bytes for crop in crops}
+        scoring_crops = await self._build_scoring_crops(
+            crop_bytes, detected_objects
+        )
+        if not scoring_crops:
+            return detected_objects
+
+        try:
+            score_result = await asyncio.to_thread(
+                self.score_all, scoring_crops
+            )
+        # 채점 실패로 추천 전체가 실패하지 않도록 폴백합니다.
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("루브릭 채점 실패, 임베딩 유사도로 대체합니다.")
+            return detected_objects
+
+        # 응답 순서가 요청 순서와 다를 수 있으므로 crop_index로 색인합니다.
+        scores = {crop.crop_index: crop for crop in score_result.crops}
+        for detected in detected_objects:
+            crop_score = scores.get(detected.object_index)
+            if crop_score is not None:
+                self._apply_crop_score(detected, crop_score)
+
+        return detected_objects
+
+    @staticmethod
+    async def _build_scoring_crops(
+        crop_bytes: dict[int, bytes],
+        detected_objects: list[DetectedObject],
+    ) -> list[ScoringCrop]:
+        """탐지 객체의 SKU 이미지를 읽어 채점 입력을 만듭니다.
+
+        Args:
+            crop_bytes: crop_index별 크롭 JPEG 바이트입니다.
+            detected_objects: SKU 후보가 채워진 탐지 객체 목록입니다.
+
+        Returns:
+            후보 이미지를 읽을 수 있었던 크롭만 담은 채점 입력입니다.
+        """
+        scoring_crops = []
+        for detected in detected_objects:
+            if detected.object_index not in crop_bytes:
+                continue
+
+            image_bytes_list = await asyncio.gather(
+                *(
+                    asyncio.to_thread(
+                        read_sku_image_bytes,
+                        candidate.matched_sku_image.image_url,
+                    )
+                    for candidate in detected.sku_candidates
+                )
+            )
+            candidates = [
+                ScoringCandidate(
+                    sku_code=candidate.sku_code,
+                    image_bytes=image_bytes,
+                )
+                for candidate, image_bytes in zip(
+                    detected.sku_candidates, image_bytes_list
+                )
+                # 이미지를 못 읽은 후보는 채점 대상에서만 제외합니다.
+                if image_bytes is not None
+            ]
+            if not candidates:
+                continue
+
+            scoring_crops.append(
+                ScoringCrop(
+                    crop_index=detected.object_index,
+                    crop_image_bytes=crop_bytes[detected.object_index],
+                    candidates=candidates,
+                )
+            )
+        return scoring_crops
+
+    @staticmethod
+    def _apply_crop_score(
+        detected: DetectedObject,
+        crop_score: CropScore,
+    ) -> None:
+        """채점 결과를 탐지 객체 1건에 반영하고 후보를 재정렬합니다.
+
+        Args:
+            detected: 채점 결과를 반영할 탐지 객체입니다.
+            crop_score: 해당 크롭의 루브릭 채점 결과입니다.
+        """
+        detected.label = crop_score.label
+        detected.confidence = crop_score.confidence
+        detected.attrs = {
+            attribute.key: attribute.value
+            for attribute in crop_score.object_attrs
+        }
+
+        evaluations = {
+            evaluation.sku_id: evaluation
+            for evaluation in crop_score.evaluations
+        }
+        for candidate in detected.sku_candidates:
+            evaluation = evaluations.get(candidate.sku_code)
+            if evaluation is None:
+                continue
+            candidate.similarity_score = evaluation.total_score
+            candidate.xai_result = evaluation.xai_result
+
+        # 점수가 높은 후보를 앞에 둡니다.
+        detected.sku_candidates.sort(
+            key=lambda candidate: candidate.similarity_score, reverse=True
+        )
 
     def score_all(self, crops: list[ScoringCrop]) -> RubricScoreResult:
         """모든 크롭과 SKU 후보를 단 한 번의 요청으로 채점합니다.
@@ -132,4 +271,6 @@ class XaiScoringService:
         except GeminiResponseInvalidError:
             raise
         except Exception as error:
-            raise GeminiApiError("Gemini 루브릭 채점 요청에 실패했습니다.") from error
+            raise GeminiApiError(
+                "Gemini 루브릭 채점 요청에 실패했습니다."
+            ) from error

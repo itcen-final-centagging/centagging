@@ -7,9 +7,8 @@ from app.core import config, database
 from app.services.gemini_service import GeminiService
 from app.services.similar_sku_service import SimilarSkuService
 from app.services.sku_match_service import SkuMatchService
-from app.services.xai_scoring_service import XaiScoringService
 from app.services.tagging_service import TaggingService
-from app.services.image_processing_service import get_crop_image
+from app.services.xai_scoring_service import XaiScoringService
 
 
 def get_tagging_service(
@@ -26,21 +25,16 @@ def get_tagging_service(
         유사 SKU 조회와 XAI 채점이 주입된 TaggingService입니다.
     """
     settings = config.get_settings()
-    gemini_service = GeminiService(settings=settings)
-    scoring_service = XaiScoringService(settings=settings)
 
     return TaggingService(
         session=session,
-        get_crop_image=get_crop_image,
         settings=settings,
         similar_sku_service=SimilarSkuService(
             session=session,
-            gemini_service=gemini_service,
+            gemini_service=GeminiService(settings=settings),
             settings=settings,
-            scoring_service=scoring_service,
         ),
-        xai_scoring_service=scoring_service,
-        gemini_service=gemini_service,
+        xai_scoring_service=XaiScoringService(settings=settings),
     )
 
 
