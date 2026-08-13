@@ -256,6 +256,9 @@ class GeminiService:
         except GeminiEmbeddingError:
             raise
         except Exception as error:
+            logging.getLogger(__name__).exception(
+                "Gemini 이미지 임베딩 실패"
+            )
             raise GeminiEmbeddingError(
-                "Gemini 이미지 임베딩에 실패했습니다."
+                f"Gemini 이미지 임베딩에 실패했습니다: {error}"
             ) from error
