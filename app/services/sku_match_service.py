@@ -32,9 +32,38 @@ _SELECT_SCENE = sqlalchemy.text("""
      WHERE scene_image_id = :scene_image_id
     """)
 
+_UPDATE_SCENE_COMPLETED = sqlalchemy.text("""
+    UPDATE scene_image
+       SET analysis_status = :analysis_status,
+           analysis_error = :analysis_error
+     WHERE scene_image_id = :scene_image_id
+    """)
+
+_MATCHING_CHANGED_SQL = """
+    ROW(
+        tagging_result.sku_id,
+        tagging_result.sku_image_id,
+        tagging_result.match_source,
+        tagging_result.match_rank,
+        tagging_result.similarity_score,
+        tagging_result.xai_result,
+        tagging_result.vlm_mood,
+        tagging_result.created_by
+    ) IS DISTINCT FROM ROW(
+        EXCLUDED.sku_id,
+        EXCLUDED.sku_image_id,
+        EXCLUDED.match_source,
+        EXCLUDED.match_rank,
+        EXCLUDED.similarity_score,
+        EXCLUDED.xai_result,
+        EXCLUDED.vlm_mood,
+        EXCLUDED.created_by
+    )
+"""
+
 # sku_code -> sku_id, 대표 이미지, 작업자를 조인 한 번으로 채워 넣습니다.
 # sku_image는 MAIN을 우선하고 없으면 가장 낮은 ID를 대표로 씁니다.
-_INSERT_TAGGING_RESULT = sqlalchemy.text("""
+_UPSERT_TAGGING_RESULT = sqlalchemy.text(f"""
     INSERT INTO tagging_result (
         scene_image_id,
         object_index,
@@ -68,6 +97,26 @@ _INSERT_TAGGING_RESULT = sqlalchemy.text("""
      WHERE sc.sku_code = :sku_code
        AND au.login_id = :login_id
        AND au.is_active = TRUE
+    ON CONFLICT (scene_image_id, object_index)
+    DO UPDATE SET
+        sku_id = EXCLUDED.sku_id,
+        sku_image_id = EXCLUDED.sku_image_id,
+        match_source = EXCLUDED.match_source,
+        match_rank = EXCLUDED.match_rank,
+        similarity_score = EXCLUDED.similarity_score,
+        xai_result = EXCLUDED.xai_result,
+        vlm_mood = EXCLUDED.vlm_mood,
+        created_by = EXCLUDED.created_by,
+        similarity_grade = CASE
+            WHEN {_MATCHING_CHANGED_SQL}
+            THEN NULL
+            ELSE tagging_result.similarity_grade
+        END,
+        status = CASE
+            WHEN {_MATCHING_CHANGED_SQL}
+            THEN 'PENDING'
+            ELSE tagging_result.status
+        END
     RETURNING result_id
     """)
 
@@ -122,8 +171,9 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
 
             result_ids = []
             for item in matching:
-                result_ids.append(await self._insert_matching(scene_id, item))
+                result_ids.append(await self._upsert_matching(scene_id, item))
 
+            await self._mark_scene_completed(scene_id)
             await self.session.commit()
 
             return result_ids
@@ -178,26 +228,26 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
         if out_of_range:
             raise ObjectIndexOutOfRangeError(sorted(out_of_range))
 
-    async def _insert_matching(
+    async def _upsert_matching(
         self,
         scene_id: int,
         item: SkuMatching,
     ) -> int:
-        """매핑 1건을 저장하고 생성된 result_id를 반환합니다.
+        """매핑 1건을 저장하거나 갱신하고 result_id를 반환합니다.
 
         Args:
             scene_id: 확정할 장면 이미지 ID입니다.
             item: 확정할 객체-SKU 매핑 1건입니다.
 
         Returns:
-            생성된 tagging_result의 result_id입니다.
+            새로 생성하거나 기존에 유지한 tagging_result의 result_id입니다.
 
         Raises:
             MatchingTargetNotFoundError: sku_code가 없거나 활성 사용자를
                 찾지 못해 INSERT 대상이 0건인 경우입니다.
         """
         result = await self.session.execute(
-            _INSERT_TAGGING_RESULT,
+            _UPSERT_TAGGING_RESULT,
             {
                 "scene_image_id": scene_id,
                 "object_index": item.object_index,
@@ -220,6 +270,21 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             raise MatchingTargetNotFoundError(item.sku_code)
 
         return int(result_id)
+
+    async def _mark_scene_completed(self, scene_id: int) -> None:
+        """태깅 결과가 저장된 연출 이미지의 처리를 완료합니다.
+
+        Args:
+            scene_id: 완료 상태로 변경할 장면 이미지 ID입니다.
+        """
+        await self.session.execute(
+            _UPDATE_SCENE_COMPLETED,
+            {
+                "scene_image_id": scene_id,
+                "analysis_status": "completed",
+                "analysis_error": None,
+            },
+        )
 
     async def _rollback(self) -> None:
         """실패한 트랜잭션을 안전하게 되돌립니다."""
