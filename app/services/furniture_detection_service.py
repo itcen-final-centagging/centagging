@@ -1,4 +1,4 @@
-"""이미지 바이트와 Vertex AI 기반 Gemini 탐지 서비스를 연결합니다."""
+"""이미지 바이트와 Gemini 탐지 서비스를 연결합니다."""
 
 from app.core.config import Settings
 from app.schemas.gemini_detection import GeminiDetectionResult
@@ -13,7 +13,7 @@ def detect_furniture_from_bytes(
 
     Args:
         image_bytes: 디코딩할 이미지 바이트입니다.
-        settings: Vertex AI와 Gemini 모델 설정입니다.
+        settings: Gemini 설정입니다.
 
     Returns:
         탐지 객체와 처리 시간이 포함된 결과입니다.

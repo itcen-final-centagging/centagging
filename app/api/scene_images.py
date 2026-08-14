@@ -81,7 +81,9 @@ class ImageValidationData(pydantic.BaseModel):
 
     scene_image_id: int
     image: image_validation.ImageMetadata
-    detections: list[DetectedObjectResponse] = pydantic.Field(default_factory=list)
+    detections: list[DetectedObjectResponse] = pydantic.Field(
+        default_factory=list
+    )
 
 
 def _save_image(path: pathlib.Path, content: bytes) -> None:
@@ -131,15 +133,18 @@ async def _save_detection_success(
 ) -> None:
     """탐지 결과와 성공 상태를 저장합니다."""
     object_metadata = []
-    for detected_object in detected_objects:
+    for object_idx, detected_object in enumerate(detected_objects):
         ymin, xmin, ymax, xmax = detected_object.box_2d
         object_metadata.append(
             {
-                "label": detected_object.label,
-                "xmin": xmin,
-                "ymin": ymin,
-                "xmax": xmax,
-                "ymax": ymax,
+                "object_idx": object_idx,
+                "bbox_coord": {
+                    "xmin": xmin,
+                    "ymin": ymin,
+                    "xmax": xmax,
+                    "ymax": ymax,
+                },
+                "attribute": {"label": detected_object.label},
             }
         )
 
@@ -223,7 +228,9 @@ async def upload_scene_image(
         extension = _IMAGE_EXTENSIONS[validated.metadata.mime_type]
         filename = f"{uuid.uuid4()}.{extension}"
         saved_path = (
-            pathlib.Path(settings.image_storage_root) / "scene-images" / filename
+            pathlib.Path(settings.image_storage_root)
+            / "scene-images"
+            / filename
         )
         _save_image(saved_path, validated.content)
 

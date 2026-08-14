@@ -207,9 +207,6 @@ class UploadSceneImageApiTest(unittest.TestCase):
         )
         settings = config.Settings(
             gemini_api_key="",
-            vertex_api_key="test-vertex-key",
-            gcp_project_id="test-project",
-            vertex_ai_location="global",
             gemini_vlm_model="",
             gemini_embedding_model="",
             mvp_login_id="mvp-user",

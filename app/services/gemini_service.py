@@ -1,6 +1,6 @@
-"""Vertex AI의 Gemini 모델을 호출하는 서비스입니다.
+"""Gemini Developer API 실제 호출 서비스입니다.
 
-Service for live Gemini model calls through Vertex AI.
+Service for live Gemini Developer API calls.
 """
 
 import io
@@ -13,7 +13,7 @@ from google.genai import errors, types
 from PIL import Image
 from pydantic import ValidationError
 
-from app.core import config, genai_client
+from app.core import config
 from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiModelDetectionResult,
@@ -23,7 +23,7 @@ from app.services.furniture_detect_prompt import FURNITURE_DETECTION_PROMPT
 
 # 오류 클래스들 모음
 class GeminiConfigurationError(RuntimeError):
-    """Vertex AI 인증 또는 라우팅 설정이 누락되었을 때 발생합니다."""
+    """Gemini API 키가 누락되었을 때 발생합니다."""
 
     code = "DETECTION_NOT_CONFIGURED"
 
@@ -71,14 +71,14 @@ class GeminiService:
         """Gemini 서비스에 필요한 설정을 초기화합니다.
 
         Args:
-            settings: Gen AI 공급자와 모델명이 담긴 애플리케이션 설정입니다.
+            settings: API 키와 모델명이 담긴 애플리케이션 설정입니다.
         """
         self._settings = settings
 
     @property
     def is_configured(self) -> bool:
-        """Vertex AI Express Mode 또는 ADC 설정 여부를 반환합니다."""
-        return genai_client.is_configured(self._settings)
+        """API 키 설정 여부를 반환합니다. 키 값 자체는 노출하지 않습니다."""
+        return bool(self._settings.gemini_api_key)
 
     def verify_connection(self) -> GeminiVerificationResult:
         """텍스트 생성과 임베딩을 각각 한 번 호출해 실제 연동을 검증합니다.
@@ -87,16 +87,17 @@ class GeminiService:
             호출한 모델명과 임베딩 차원을 담은 검증 결과입니다.
 
         Raises:
-            GeminiConfigurationError: Gen AI 설정이 누락된 경우입니다.
+            GeminiConfigurationError: Gemini API 키가 설정되지 않은 경우입니다.
             GeminiApiError: Gemini API 호출 또는 응답 검증에 실패한 경우입니다.
         """
         if not self.is_configured:
             raise GeminiConfigurationError(
-                "Vertex AI authentication is not configured."
+                "GEMINI_API_KEY is not configured. "
+                "Create .env from .env.example."
             )
 
         try:
-            client = genai_client.create_client(self._settings)
+            client = genai.Client(api_key=self._settings.gemini_api_key)
             text_response = client.models.generate_content(
                 model=self._settings.gemini_vlm_model,
                 contents="Connection verification. Reply only OK.",
@@ -137,15 +138,13 @@ class GeminiService:
             GeminiRawDetection 객체 리스트입니다.
         """
         if not self.is_configured:
-            raise GeminiConfigurationError(
-                "Vertex AI authentication is not configured."
-            )
+            raise GeminiConfigurationError("GEMINI_API_KEY is not configured.")
 
         started_at = time.perf_counter()
         object_count = 0
 
         try:
-            client = genai_client.create_client(self._settings)
+            client = genai.Client(api_key=self._settings.gemini_api_key)
 
             contents: list[types.ContentUnionDict] = [
                 image,
@@ -218,16 +217,16 @@ class GeminiService:
             임베딩 벡터(float 리스트)입니다.
 
         Raises:
-            GeminiConfigurationError: Gen AI 설정이 누락된 경우입니다.
+            GeminiConfigurationError: Gemini API 키가 설정되지 않은 경우입니다.
             GeminiEmbeddingError: 이미지 임베딩에 실패한 경우입니다.
         """
         if not self.is_configured:
             raise GeminiConfigurationError(
-                "Vertex AI 인증 설정이 누락되었습니다."
+                "GEMINI_API_KEY가 설정되지 않았습니다."
             )
 
         try:
-            client = genai_client.create_client(self._settings)
+            client = genai.Client(api_key=self._settings.gemini_api_key)
 
             image_format = (image.format or "PNG").upper()
             buffer = io.BytesIO()
@@ -236,9 +235,6 @@ class GeminiService:
 
             response = client.models.embed_content(
                 model=self._settings.gemini_embedding_model,
-                # google-genai의 타입 스텁이 list[Part]를 인식하지 못해
-                # mypy가 오탐하지만, embed_content는 런타임에 list[Part]를
-                # 정상적으로 받아들입니다.
                 contents=[  # type: ignore[arg-type]
                     genai.types.Part.from_bytes(
                         data=image_bytes,

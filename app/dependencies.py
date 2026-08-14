@@ -7,29 +7,34 @@ from app.core import config, database
 from app.services.gemini_service import GeminiService
 from app.services.similar_sku_service import SimilarSkuService
 from app.services.sku_match_service import SkuMatchService
+from app.services.tagging_service import TaggingService
 from app.services.xai_scoring_service import XaiScoringService
 
 
-def get_similar_sku_service(
+def get_tagging_service(
     session: sqlalchemy_async.AsyncSession = Depends(
         database.get_database_session
     ),
-) -> SimilarSkuService:
-    """요청 범위 세션으로 유사 SKU 조회 서비스를 조립합니다.
+) -> TaggingService:
+    """요청 범위 세션으로 태깅 오케스트레이션 서비스를 조립합니다.
 
     Args:
         session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
 
     Returns:
-        Gemini 임베딩 서비스와 설정이 주입된 SimilarSkuService입니다.
+        유사 SKU 조회와 XAI 채점이 주입된 TaggingService입니다.
     """
     settings = config.get_settings()
 
-    return SimilarSkuService(
+    return TaggingService(
         session=session,
-        gemini_service=GeminiService(settings=settings),
         settings=settings,
-        scoring_service=XaiScoringService(settings=settings),
+        similar_sku_service=SimilarSkuService(
+            session=session,
+            gemini_service=GeminiService(settings=settings),
+            settings=settings,
+        ),
+        xai_scoring_service=XaiScoringService(settings=settings),
     )
 
 
