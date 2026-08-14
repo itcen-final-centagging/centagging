@@ -7,7 +7,7 @@
 따릅니다. 번역 해석이 모호하거나 원문과 차이가 있을 때는
 [Google Python Style Guide 원문](https://google.github.io/styleguide/pyguide.html)을 기준으로 합니다.
 
-`kosa-poc-main/`은 수정하지 않는 참고 샘플이므로 이 규칙의 자동 검사 대상에서 제외합니다.
+`kosa-poc-main/`은 수정하지 않는 참고 샘플이므로 이 규칙의 검사 대상에서 제외합니다.
 
 ## 필수 규칙
 
@@ -22,13 +22,8 @@
 
 ## 로컬 검사
 
-의존성 설치 후 최초 한 번 Git 훅을 설치합니다.
-
-```powershell
-pre-commit install
-```
-
-커밋 전 또는 PR 생성 전 다음 검사를 통과해야 합니다.
+자동 Git 훅과 Python 스타일 GitHub Actions는 사용하지 않습니다.
+필요할 때 다음 검사를 수동으로 실행합니다.
 
 ```powershell
 black --check app
@@ -55,6 +50,8 @@ black app
 isort app
 ```
 
-GitHub Actions의 `Python Style / python-style` 검사가 PR과 `main`·`dev` 브랜치 푸시에서 실행됩니다.
-브랜치 Ruleset에서는 이 검사를 필수 상태 검사로 지정합니다. Git 훅은 커밋 전에 같은
-오류를 빠르게 확인하는 보조 수단입니다.
+`.pre-commit-config.yaml`도 수동 단계만 사용하므로 일반 커밋에서는 실행되지 않습니다.
+
+```powershell
+pre-commit run --hook-stage manual --all-files
+```
