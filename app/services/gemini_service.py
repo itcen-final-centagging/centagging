@@ -4,25 +4,32 @@ Service for live Gemini Developer API calls.
 """
 
 import io
+import json
 import logging
 import time
 import typing
-import json
 
 from google import genai
 from google.genai import errors, types
 from PIL import Image
 from pydantic import ValidationError
 
-from app.core import config, catalog_spec
+from app.core import catalog_spec, config
 from app.schemas.furniture_attribute import FurnitureAttributeResult
-from app.services.furniture_attribute_rules import(build_allowed_attribute_schema, validate_attribute_result)
-from app.services.prompt.attribute_prompt.furniture_attribute_prompt import FURNITURE_ATTRIBUTE_PROMPT
 from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiModelDetectionResult,
 )
-from app.services.prompt.detect_prompt.furniture_detect_prompt import FURNITURE_DETECTION_PROMPT
+from app.services.furniture_attribute_rules import (
+    build_allowed_attribute_schema,
+    validate_attribute_result,
+)
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
+    FURNITURE_ATTRIBUTE_PROMPT,
+)
+from app.services.prompt.detect_prompt.furniture_detect_prompt import (
+    FURNITURE_DETECTION_PROMPT,
+)
 
 
 # 오류 클래스들 모음
@@ -152,13 +159,13 @@ class GeminiService:
 
             category_context = json.dumps(
                 {"allowed_categories": catalog_spec.CATEGORIES},
-                ensure_ascii=False
+                ensure_ascii=False,
             )
-                
+
             contents: list[types.ContentUnionDict] = [
                 image,
                 FURNITURE_DETECTION_PROMPT,
-                category_context
+                category_context,
             ]
 
             response = client.models.generate_content(
@@ -229,37 +236,32 @@ class GeminiService:
             processing_time_ms=processing_time_ms,
         )
 
-    def extract_furniture_attributes(self, image: Image.Image, category: str)->FurnitureAttributeResult:
-        """crop 이미지에서 카테고리별 가구 속성을 추출합니다."""
+    def extract_furniture_attributes(
+        self, image: Image.Image, category: str
+    ) -> FurnitureAttributeResult:
+        """크롭 이미지에서 카테고리별 가구 속성을 추출합니다."""
         if not self.is_configured:
-            raise GeminiConfigurationError(
-                "GEMINI_API_KEY is not configured."
-            )
+            raise GeminiConfigurationError("GEMINI_API_KEY is not configured.")
 
         try:
             attribute_schema = build_allowed_attribute_schema(category)
-            attribute_context = json.dumps(
-                attribute_schema,
-                ensure_ascii=False
-            )
+            attribute_context = json.dumps(attribute_schema, ensure_ascii=False)
 
-            client = genai.Client(
-                api_key=self._settings.gemini_api_key
-            )
+            client = genai.Client(api_key=self._settings.gemini_api_key)
 
             contents: list[types.ContentUnionDict] = [
                 image,
                 FURNITURE_ATTRIBUTE_PROMPT,
-                attribute_context
+                attribute_context,
             ]
 
             response = client.models.generate_content(
-                model = self._settings.gemini_vlm_model,
-                contents = contents,
+                model=self._settings.gemini_vlm_model,
+                contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=FurnitureAttributeResult
-                )
+                    response_schema=FurnitureAttributeResult,
+                ),
             )
 
             if not response.text:
@@ -267,13 +269,9 @@ class GeminiService:
                     "Gemini 속성 응답이 비어 있습니다."
                 )
 
-            result = FurnitureAttributeResult.model_validate_json(
-                response.text
-            )
+            result = FurnitureAttributeResult.model_validate_json(response.text)
 
-            return validate_attribute_result(
-                category, result
-            )
+            return validate_attribute_result(category, result)
 
         except GeminiResponseInvalidError:
             raise
@@ -284,19 +282,19 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
-            if getattr(error, "code", None) in(401, 403):
+            if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini 인증이 실패했습니다."
                 ) from error
 
             raise GeminiInferenceError(
                 "Gemini 속성 추출 요청이 실패했습니다."
-            )
+            ) from error
 
         except ValueError as error:
             raise GeminiResponseInvalidError(
                 "Gemini 속성 결과 확인 실패했습니다."
-            )
+            ) from error
 
         except Exception as error:
             raise GeminiInferenceError(

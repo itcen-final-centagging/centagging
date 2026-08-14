@@ -1,12 +1,16 @@
+"""장면 이미지 조회를 담당하는 저장소입니다."""
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.scene_image import SceneImage
+
 
 class SceneImageNotFoundError(RuntimeError):
     """존재하지 않는 scene_image_id로 조회한 경우입니다."""
 
+
 async def get_scene_image(
-        session: AsyncSession,
-        scene_image_id: int
+    session: AsyncSession, scene_image_id: int
 ) -> SceneImage:
     """장면 이미지를 조회합니다.
 

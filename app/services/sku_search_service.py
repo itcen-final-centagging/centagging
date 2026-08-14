@@ -5,7 +5,6 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.schemas import sku_search as sku_search_schema
 
-
 _COUNT_SKUS = sqlalchemy.text("""
     SELECT COUNT(*)
     FROM sku_catalog
@@ -74,8 +73,19 @@ async def search_skus(
         items=items,
     )
 
+
 async def search_skus_detail(
-        session: sqlalchemy_async.AsyncSession,
-        sku_code: str,
-    ) -> sku_search_schema.SkuDetailData | None:
+    session: sqlalchemy_async.AsyncSession,
+    sku_code: str,
+) -> sku_search_schema.SkuDetailData | None:
+    """SKU 상세 조회의 저장소 연동 전 기본 결과를 반환합니다.
+
+    Args:
+        session: 비동기 SQLAlchemy 세션입니다.
+        sku_code: 조회할 SKU 상품 코드입니다.
+
+    Returns:
+        상세 조회가 구현되기 전이므로 None을 반환합니다.
+    """
+    _ = session, sku_code
     return None

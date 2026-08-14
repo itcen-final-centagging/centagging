@@ -1,13 +1,16 @@
 """가구 객체 탐지 API 요청 및 응답 스키마입니다."""
 
-from typing import Annotated
 import datetime
+from typing import Annotated
+
 from pydantic import BaseModel, Field, model_validator
 
 NormalizedCoordinate = Annotated[int, Field(ge=0, le=1000)]
 
 
 class BoundingBoxResponse(BaseModel):
+    """0~1000 정규화 좌표의 탐지 객체 영역입니다."""
+
     xmin: NormalizedCoordinate
     ymin: NormalizedCoordinate
     xmax: NormalizedCoordinate
@@ -15,7 +18,7 @@ class BoundingBoxResponse(BaseModel):
 
     @model_validator(mode="after")
     def validate_direction(self) -> "BoundingBoxResponse":
-        
+        """좌표의 최솟값이 최댓값보다 작은지 검증합니다."""
         if self.ymin >= self.ymax:
             raise ValueError("ymin 값은 ymax 값보다 작아야 합니다.")
 
@@ -23,6 +26,7 @@ class BoundingBoxResponse(BaseModel):
             raise ValueError("xmin 값은 xmax 값보다 작아야 합니다.")
 
         return self
+
 
 class DetectedObjectResponse(BaseModel):
     """외부 API에 노출하는 탐지 객체입니다."""
@@ -36,6 +40,8 @@ class DetectedObjectResponse(BaseModel):
 
 
 class SceneImageResponse(BaseModel):
+    """업로드되고 탐지가 완료된 장면 이미지 정보입니다."""
+
     scene_image_id: int
     image_url: str
     origin_name: str
@@ -46,6 +52,7 @@ class SceneImageResponse(BaseModel):
     width_px: int
     height_px: int
     created_at: datetime.datetime
+
 
 class FurnitureDetectionResponse(BaseModel):
     """가구 객체 탐지 API 응답입니다."""

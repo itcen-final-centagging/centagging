@@ -11,7 +11,12 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core import config, database
 from app.schemas import common as common_schema
-from app.schemas.furniture_detection import DetectedObjectResponse, FurnitureDetectionResponse, SceneImageResponse
+from app.schemas.furniture_detection import (
+    BoundingBoxResponse,
+    DetectedObjectResponse,
+    FurnitureDetectionResponse,
+    SceneImageResponse,
+)
 from app.schemas.gemini_detection import GeminiDetectionResult
 from app.services import furniture_detection_service, image_validation
 
@@ -110,18 +115,16 @@ def _build_detected_objects(
             object_idx=object_idx,
             category=detection.category,
             sub_category=None,
-            bbox_coord={
-                "xmin": round(detection.bbox_coord.xmin),
-                "ymin": round(detection.bbox_coord.ymin),
-                "xmax": round(detection.bbox_coord.xmax),
-                "ymax": round(detection.bbox_coord.ymax),
-            },
+            bbox_coord=BoundingBoxResponse(
+                xmin=round(detection.bbox_coord.xmin),
+                ymin=round(detection.bbox_coord.ymin),
+                xmax=round(detection.bbox_coord.xmax),
+                ymax=round(detection.bbox_coord.ymax),
+            ),
             confidence=detection.confidence,
             evidence=detection.evidence,
         )
-        for object_idx, detection in enumerate(
-            detection_result.detections
-        )
+        for object_idx, detection in enumerate(detection_result.detections)
     ]
 
 
@@ -177,13 +180,17 @@ async def _save_analysis_failure(
     "/tagging",
     response_model=common_schema.SuccessResponse[FurnitureDetectionResponse],
 )
-async def upload_scene_image(
+# 보상 트랜잭션 상태를 유지하므로 지역 변수가 많습니다.
+async def upload_scene_image(  # pylint: disable=too-many-locals
     file: fastapi.UploadFile = fastapi.File(...),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
 ) -> common_schema.SuccessResponse[FurnitureDetectionResponse]:
     """이미지를 검증하고 원본 파일과 메타데이터를 함께 저장합니다.
+
+    검증, 파일 저장, DB 기록과 탐지 상태 전환을 하나의 보상 트랜잭션으로
+    관리하므로 지역 변수를 단계별로 유지합니다.
 
     Args:
         file: multipart/form-data의 이미지 파일입니다.

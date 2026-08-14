@@ -8,8 +8,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-_request_id_context: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "request_id", default=None
+_request_id_context: contextvars.ContextVar[str | None] = (
+    contextvars.ContextVar("request_id", default=None)
 )
 
 
@@ -34,7 +34,10 @@ def get_or_create_request_id() -> str:
     return request_id
 
 
-class RequestIdMiddleware(BaseHTTPMiddleware):
+# Starlette 미들웨어는 dispatch만 구현합니다.
+class RequestIdMiddleware(  # pylint: disable=too-few-public-methods
+    BaseHTTPMiddleware
+):
     """요청마다 request_id를 만들고 응답 헤더에 전달합니다."""
 
     async def dispatch(

@@ -1,15 +1,19 @@
-import datetime
-import typing
-import decimal
+"""최종 객체-SKU 매핑과 검수 이력 ORM 모델입니다."""
 
-import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
+import datetime
+import decimal
+import typing
+
 import sqlalchemy
 from sqlalchemy import orm
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext import mutable
 
 from app.models.sku import Base
-class TaggingResult(Base):
+
+
+# SQLAlchemy 매핑 전용 클래스입니다.
+class TaggingResult(Base):  # pylint: disable=too-few-public-methods
     """최종 객체-SKU 매핑 + 검수 이력입니다 (``schema.sql``의 ``tagging_result``)."""
 
     __tablename__ = "tagging_result"
@@ -52,14 +56,10 @@ class TaggingResult(Base):
         sqlalchemy.CHAR(1)
     )
     xai_result: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
-        orm.mapped_column(
-            mutable.MutableDict.as_mutable(postgresql.JSONB)
-        )
+        orm.mapped_column(mutable.MutableDict.as_mutable(postgresql.JSONB))
     )
     vlm_mood: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
-        orm.mapped_column(
-            mutable.MutableDict.as_mutable(postgresql.JSONB)
-        )
+        orm.mapped_column(mutable.MutableDict.as_mutable(postgresql.JSONB))
     )
     created_by: orm.Mapped[int] = orm.mapped_column(
         sqlalchemy.BigInteger,

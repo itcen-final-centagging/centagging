@@ -27,6 +27,7 @@ class VlmMood(BaseModel):
     summary: str = ""
     tags: list[str] = Field(default_factory=list)
 
+
 class XaiResult(BaseModel):
     """XAI 판정 요약입니다."""
 

@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 
+
 class FurnitureAttributeResult(BaseModel):
     """crop 이미지에서 추출한 가구 속성입니다."""
 

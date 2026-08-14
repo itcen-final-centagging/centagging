@@ -232,7 +232,12 @@ class SimilarSkuService:
         )
 
         main_image = orm.aliased(SkuImage, name="main_image")
-        min_distance = sqlalchemy.func.min(candidate.c.distance)
+        # SQLAlchemy의 동적 반환 타입은 Pylint가 추론하지 못합니다.
+        min_distance = (
+            sqlalchemy.func.min(  # pylint: disable=assignment-from-no-return
+                candidate.c.distance
+            )
+        )
 
         stmt = (
             sqlalchemy.select(

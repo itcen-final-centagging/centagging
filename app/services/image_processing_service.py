@@ -14,6 +14,7 @@ from app.services.sku_image_storage import SkuImageStorage
 class InvalidImageError(ValueError):
     """업로드된 이미지가 유효하지 않을 때 발생합니다."""
 
+
 class InvalidBoundingBoxError(ValueError):
     """bounding box 좌표가 유효하지 않을 때 발생합니다."""
 
@@ -82,12 +83,12 @@ def get_crop_image(image: Image.Image, bbox: dict[str, float]) -> Image.Image:
     xmax = bbox["xmax"]
     ymax = bbox["ymax"]
 
-    if not (0<= xmin < xmax <= 1000):
+    if not 0 <= xmin < xmax <= 1000:
         raise InvalidBoundingBoxError(
             "bbox는 0 <= xmin < xmax <= 1000을 만족해야 합니다."
         )
 
-    if not (0 <= ymin < ymax <= 1000):
+    if not 0 <= ymin < ymax <= 1000:
         raise InvalidBoundingBoxError(
             "bbox는 0 <= ymin < ymax <= 1000을 만족해야 합니다."
         )
@@ -161,7 +162,7 @@ def _build_cropped_object(
 
 
 def parse_image_to_bytes(image: Image.Image) -> bytes:
-    """PIL 이미지를 JPEG 바이트로 변환합니다. (크롭 이미지용)"""
+    """PIL 이미지를 JPEG 바이트로 변환합니다(크롭 이미지용)."""
     buf = io.BytesIO()
     image.convert("RGB").save(
         buf, format="JPEG", optimize=True

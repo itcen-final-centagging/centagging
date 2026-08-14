@@ -1,6 +1,5 @@
 """Crop 이미지의 가구 속성 추출 프롬프트를 정의합니다."""
 
-
 FURNITURE_ATTRIBUTE_PROMPT = """
 You are a furniture attribute extraction model.
 

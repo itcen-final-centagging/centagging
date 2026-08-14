@@ -5,15 +5,17 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core import database
 from app.repositories import tagging_history_repository
-from app.schemas import history as history_schema
 from app.schemas import common as common_schema
+from app.schemas import history as history_schema
 
 router = fastapi.APIRouter(prefix="/history", tags=["history"])
 
 
 @router.get(
     "/results",
-    response_model=common_schema.SuccessResponse[history_schema.TaggingHistoryListData],
+    response_model=common_schema.SuccessResponse[
+        history_schema.TaggingHistoryListData
+    ],
 )
 async def list_tagging_history(
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
@@ -36,7 +38,9 @@ async def list_tagging_history(
 
 @router.get(
     "/results/{result_id}",
-    response_model=common_schema.SuccessResponse[history_schema.TaggingHistoryDetail],
+    response_model=common_schema.SuccessResponse[
+        history_schema.TaggingHistoryDetail
+    ],
 )
 async def get_tagging_history_detail(
     result_id: int,

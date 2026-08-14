@@ -11,7 +11,8 @@ from sqlalchemy.ext import mutable
 from app.models.sku import Base
 
 
-class SceneImage(Base):
+# SQLAlchemy 매핑 전용 클래스입니다.
+class SceneImage(Base):  # pylint: disable=too-few-public-methods
     """업로드된 연출 이미지입니다 (``schema.sql``의 ``scene_image``)."""
 
     __tablename__ = "scene_image"

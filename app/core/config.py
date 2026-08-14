@@ -16,7 +16,8 @@ class DatabaseSettings:
 
 
 @dataclasses.dataclass(frozen=True)
-class Settings:
+# 런타임 설정값을 평면 구조로 관리합니다.
+class Settings:  # pylint: disable=too-many-instance-attributes
     """Application settings read from the runtime environment."""
 
     gemini_api_key: str

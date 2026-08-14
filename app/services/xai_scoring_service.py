@@ -41,6 +41,8 @@ class ScoringCrop(BaseModel):
 
 
 class SkuEvaluation(BaseModel):
+    """SKU 후보 한 건의 루브릭 채점 결과입니다."""
+
     sku_id: str
     status: typing.Literal["Matched", "Rejected"]
     total_score: int = Field(ge=0, le=100)
@@ -48,11 +50,15 @@ class SkuEvaluation(BaseModel):
 
 
 class ObjectAttribute(BaseModel):
+    """탐지 객체에서 확인한 속성의 키와 값입니다."""
+
     key: str
     value: str
 
 
 class CropScore(BaseModel):
+    """크롭 객체 한 건의 속성과 SKU 평가 결과입니다."""
+
     crop_index: int
     label: str = ""
     confidence: int = Field(default=0, ge=0, le=100)
@@ -61,6 +67,8 @@ class CropScore(BaseModel):
 
 
 class RubricScoreResult(BaseModel):
+    """모든 크롭 객체의 루브릭 채점 결과입니다."""
+
     crops: list[CropScore] = Field(default_factory=list)
 
 
@@ -68,6 +76,7 @@ class XaiScoringService:
     """모든 크롭·후보를 한 번의 VLM 요청으로 채점하는 서비스입니다."""
 
     def __init__(self, settings: config.Settings) -> None:
+        """Gemini 설정을 저장하고 지연 초기화 상태를 준비합니다."""
         self.settings = settings
         self._client: genai.Client | None = None
 

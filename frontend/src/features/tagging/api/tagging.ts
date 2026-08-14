@@ -122,9 +122,7 @@ const API_BASE_URL =
     '',
   ) ?? '';
 
-const toBbox = (
-  bbox: ApiBoundingBox,
-): [number, number, number, number] => [
+const toBbox = (bbox: ApiBoundingBox): [number, number, number, number] => [
   bbox.ymin,
   bbox.xmin,
   bbox.ymax,

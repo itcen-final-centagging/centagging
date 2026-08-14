@@ -2,14 +2,14 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.dependencies import get_tagging_service, get_sku_match_service
+from app.dependencies import get_sku_match_service, get_tagging_service
+from app.repositories.scene_image_repository import SceneImageNotFoundError
 from app.schemas import common as common_schema
 from app.schemas.tagging import (
     DetectionResult,
     SkuMatchingRequest,
     SkuMatchingResult,
 )
-from app.repositories.scene_image_repository import SceneImageNotFoundError
 from app.services import sku_match_service as sku_match
 from app.services.tagging_service import TaggingService
 
@@ -20,8 +20,7 @@ router = APIRouter(prefix="/tagging", tags=["tagging"])
 async def get_recommendation_sku(
     scene_id: int,
     object_idxs: list[int] | None = Query(
-        default=None,
-        description="탐지 객체 인덱스 목록입니다. "
+        default=None, description="탐지 객체 인덱스 목록입니다. "
     ),
     taggin_service: TaggingService = Depends(get_tagging_service),
 ) -> common_schema.SuccessResponse[DetectionResult]:
@@ -40,7 +39,10 @@ async def get_recommendation_sku(
             404를 반환합니다.
     """
     try:
-        result = await taggin_service.get_sku_candidates(scene_id)
+        result = await taggin_service.get_sku_candidates(
+            scene_id,
+            object_idxs=object_idxs,
+        )
     except SceneImageNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
