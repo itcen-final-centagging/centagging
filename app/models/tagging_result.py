@@ -57,18 +57,6 @@ class TaggingResult(Base):  # pylint: disable=too-few-public-methods
     xai_result: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
         orm.mapped_column(mutable.MutableDict.as_mutable(postgresql.JSONB))
     )
-    xai_status: orm.Mapped[
-        typing.Optional[typing.Literal["COMPLETED", "FALLBACK"]]
-    ] = orm.mapped_column(sqlalchemy.String(20))
-    xai_fallback_reason: orm.Mapped[
-        typing.Optional[
-            typing.Literal[
-                "RATE_LIMITED",
-                "PROCESSING_ERROR",
-                "UNAVAILABLE",
-            ]
-        ]
-    ] = orm.mapped_column(sqlalchemy.String(30))
     vlm_mood: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
         orm.mapped_column(mutable.MutableDict.as_mutable(postgresql.JSONB))
     )

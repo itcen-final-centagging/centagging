@@ -5,6 +5,7 @@ import tempfile
 import types
 import typing
 import unittest
+from unittest import mock
 
 from google.genai import errors
 from PIL import Image
@@ -122,12 +123,36 @@ def _build_xai_request(
 class XaiScoringServiceTest(unittest.TestCase):
     """Gemini 오류를 XAI 도메인 오류로 변환하는지 검증합니다."""
 
+    def test_builds_client_through_shared_genai_factory(self) -> None:
+        """XAI 채점기도 공통 Gen AI 클라이언트 정책을 사용합니다."""
+        settings = typing.cast(
+            config.Settings,
+            types.SimpleNamespace(
+                gemini_api_key="test-key",
+                vertex_api_key="",
+                gcp_project_id="",
+            ),
+        )
+        client = object()
+        service = xai_scoring_service.XaiScoringService(settings)
+
+        with mock.patch(
+            "app.core.genai_client.create_client",
+            return_value=client,
+        ) as create_client:
+            result = service._get_client()  # pylint: disable=protected-access
+
+        self.assertIs(result, client)
+        create_client.assert_called_once_with(settings)
+
     def test_exposes_rate_limit_as_distinct_xai_error(self) -> None:
         """Gemini 429를 일반 채점 실패와 구분합니다."""
         settings = typing.cast(
             config.Settings,
             types.SimpleNamespace(
                 gemini_api_key="test-key",
+                vertex_api_key="",
+                gcp_project_id="",
                 gemini_vlm_model="test-vlm",
             ),
         )
@@ -154,26 +179,22 @@ class XaiScoringServiceTest(unittest.TestCase):
 
 
 class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
-    """추천 후보에 노출되는 XAI 폴백 상태를 검증합니다."""
+    """XAI 실패 시에도 추천 후보를 유지하는지 검증합니다."""
 
-    async def test_rate_limit_keeps_candidate_with_fallback_status(
+    async def test_rate_limit_keeps_candidate(
         self,
     ) -> None:
-        """429가 발생해도 후보를 유지하고 RATE_LIMITED를 노출합니다."""
+        """429가 발생해도 임베딩 유사도 후보를 유지합니다."""
         with tempfile.TemporaryDirectory() as temp_dir:
             settings, crop, detected = _build_xai_request(temp_dir)
             service = _RateLimitedScoringService(settings)
             objects = await service.enrich_detected_objects([crop], [detected])
 
         self.assertEqual(len(objects[0].sku_candidates), 1)
-        self.assertEqual(objects[0].sku_candidates[0].xai_status, "FALLBACK")
-        self.assertEqual(
-            objects[0].sku_candidates[0].xai_fallback_reason,
-            "RATE_LIMITED",
-        )
+        self.assertEqual(objects[0].sku_candidates[0].similarity_score, 91)
 
-    async def test_success_marks_candidate_as_completed(self) -> None:
-        """Gemini 채점 성공 후보는 폴백 원인을 제거합니다."""
+    async def test_success_applies_xai_score(self) -> None:
+        """Gemini 채점 성공 후보에는 XAI 점수를 반영합니다."""
         with tempfile.TemporaryDirectory() as temp_dir:
             settings, crop, detected = _build_xai_request(temp_dir)
             service = _SuccessfulScoringService(settings)
@@ -181,9 +202,8 @@ class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
             objects = await service.enrich_detected_objects([crop], [detected])
 
         candidate = objects[0].sku_candidates[0]
-        self.assertEqual(candidate.xai_status, "COMPLETED")
-        self.assertIsNone(candidate.xai_fallback_reason)
         self.assertEqual(candidate.similarity_score, 93)
+        self.assertEqual(candidate.xai_result.summary, "구조와 색상이 유사합니다.")
 
 
 if __name__ == "__main__":

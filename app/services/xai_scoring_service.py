@@ -9,12 +9,8 @@ from google import genai
 from google.genai import errors, types
 from pydantic import BaseModel, Field
 
-from app.core import config
-from app.schemas.tagging import (
-    DetectedObject,
-    XaiFallbackReason,
-    XaiResult,
-)
+from app.core import config, genai_client
+from app.schemas.tagging import DetectedObject, XaiResult
 from app.services.gemini_service import (
     GeminiApiError,
     GeminiConfigurationError,
@@ -130,12 +126,10 @@ class XaiScoringService:
             _LOGGER.warning(
                 "Gemini 요청 한도 초과, 임베딩 유사도로 대체합니다."
             )
-            self._mark_fallback(detected_objects, "RATE_LIMITED")
             return detected_objects
         # 채점 실패로 추천 전체가 실패하지 않도록 폴백합니다.
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("루브릭 채점 실패, 임베딩 유사도로 대체합니다.")
-            self._mark_fallback(detected_objects, "PROCESSING_ERROR")
             return detected_objects
 
         # 응답 순서가 요청 순서와 다를 수 있으므로 crop_index로 색인합니다.
@@ -228,29 +222,11 @@ class XaiScoringService:
                 continue
             candidate.similarity_score = evaluation.total_score
             candidate.xai_result = evaluation.xai_result
-            candidate.xai_status = "COMPLETED"
-            candidate.xai_fallback_reason = None
 
         # 점수가 높은 후보를 앞에 둡니다.
         detected.sku_candidates.sort(
             key=lambda candidate: candidate.similarity_score, reverse=True
         )
-
-    @staticmethod
-    def _mark_fallback(
-        detected_objects: list[DetectedObject],
-        reason: XaiFallbackReason,
-    ) -> None:
-        """모든 SKU 후보에 XAI 폴백 원인을 기록합니다.
-
-        Args:
-            detected_objects: 폴백 상태를 기록할 탐지 객체 목록입니다.
-            reason: 호출자가 화면과 저장소에 전달할 폴백 원인입니다.
-        """
-        for detected in detected_objects:
-            for candidate in detected.sku_candidates:
-                candidate.xai_status = "FALLBACK"
-                candidate.xai_fallback_reason = reason
 
     def score_all(self, crops: list[ScoringCrop]) -> RubricScoreResult:
         """모든 크롭과 SKU 후보를 단 한 번의 요청으로 채점합니다.

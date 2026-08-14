@@ -141,8 +141,6 @@ def _matching(
             summary="구조와 색상이 유사합니다.",
             criteria=[],
         ),
-        xai_status="COMPLETED",
-        xai_fallback_reason=None,
         vlm_mood=tagging.VlmMood(
             summary="따뜻한 거실 분위기입니다.",
             tags=["내추럴"],
@@ -169,8 +167,6 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stored["match_source"], "RECOMMEND")
         self.assertEqual(stored["match_rank"], 2)
         self.assertEqual(stored["similarity_score"], 0.92)
-        self.assertEqual(stored["xai_status"], "COMPLETED")
-        self.assertIsNone(stored["xai_fallback_reason"])
         insert_sql = str(session.statements[1])
         self.assertNotIn("tag_values", insert_sql)
         self.assertIn("object_index", insert_sql)
@@ -181,8 +177,8 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
             insert_sql,
         )
         self.assertIn("CAST(:xai_result AS jsonb)", insert_sql)
-        self.assertIn("xai_status", insert_sql)
-        self.assertIn("xai_fallback_reason", insert_sql)
+        self.assertNotIn("xai_status", insert_sql)
+        self.assertNotIn("xai_fallback_reason", insert_sql)
         self.assertIn("CAST(:vlm_mood AS jsonb)", insert_sql)
         self.assertEqual(
             json.loads(typing.cast(str, stored["xai_result"])),
@@ -273,8 +269,8 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
 class TaggingResultDdlTest(unittest.TestCase):
     """초기화 DDL의 XAI JSONB 계약을 검증합니다."""
 
-    def test_validates_current_xai_shape_and_fallback_state(self) -> None:
-        """구형 total/verdict 대신 summary/criteria와 상태를 검사합니다."""
+    def test_keeps_xai_json_without_fallback_state_columns(self) -> None:
+        """XAI JSON 구조만 유지하고 별도 상태 컬럼은 만들지 않습니다."""
         schema_sql = (
             pathlib.Path(__file__).parents[1]
             / "docker"
@@ -285,8 +281,7 @@ class TaggingResultDdlTest(unittest.TestCase):
 
         self.assertIn("xai_result ? 'summary'", schema_sql)
         self.assertIn("xai_result ? 'criteria'", schema_sql)
-        self.assertIn("xai_status = 'FALLBACK'", schema_sql)
-        self.assertIn("xai_status IS NOT NULL", schema_sql)
-        self.assertIn("xai_fallback_reason IS NOT NULL", schema_sql)
-        self.assertIn("'RATE_LIMITED'", schema_sql)
+        self.assertNotIn("xai_status", schema_sql)
+        self.assertNotIn("xai_fallback_reason", schema_sql)
+        self.assertNotIn("ck_result_xai_status", schema_sql)
         self.assertNotIn("xai_result->>'total'", schema_sql)

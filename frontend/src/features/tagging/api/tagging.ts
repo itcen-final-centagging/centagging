@@ -6,9 +6,7 @@ import type {
   SkuCandidate,
   TaggingHistory,
   VlmMood,
-  XaiFallbackReason,
   XaiResult,
-  XaiStatus,
 } from '../types';
 
 type DevDetection = {
@@ -32,8 +30,6 @@ type DevCandidate = {
   sku_code: string;
   sub_category: string | null;
   xai_result: XaiResult & { vlm_mood: VlmMood };
-  xai_fallback_reason: XaiFallbackReason | null;
-  xai_status: XaiStatus;
 };
 
 type DevRecommendationData = {
@@ -152,13 +148,11 @@ const toDevCandidate = (
   sku: candidate.sku_code,
   vectorScore: candidate.similarity_score / 100,
   vlmMood: candidate.xai_result.vlm_mood,
-  xaiFallbackReason: candidate.xai_fallback_reason,
   xaiReason: nullableText(candidate.xai_result.summary),
   xaiResult: {
     criteria: candidate.xai_result.criteria,
     summary: candidate.xai_result.summary,
   },
-  xaiStatus: candidate.xai_status,
 });
 
 const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
@@ -182,10 +176,8 @@ const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
   sku: candidate.sku,
   vectorScore: candidate.vector_score,
   vlmMood: null,
-  xaiFallbackReason: null,
   xaiReason: candidate.rubric.xai_reason,
   xaiResult: null,
-  xaiStatus: null,
 });
 
 const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
@@ -296,8 +288,7 @@ export const saveTaggingReview = async ({
     selectedSku.matchRank === null ||
     selectedSku.score === null ||
     selectedSku.vlmMood === null ||
-    selectedSku.xaiResult === null ||
-    selectedSku.xaiStatus === null
+    selectedSku.xaiResult === null
   ) {
     throw new Error('추천 후보의 저장 정보가 없습니다.');
   }
@@ -314,8 +305,6 @@ export const saveTaggingReview = async ({
             sku_code: selectedSku.sku,
             vlm_mood: selectedSku.vlmMood,
             xai_result: selectedSku.xaiResult,
-            xai_status: selectedSku.xaiStatus,
-            xai_fallback_reason: selectedSku.xaiFallbackReason,
           },
         ],
       }),

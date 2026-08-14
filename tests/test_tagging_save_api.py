@@ -45,11 +45,7 @@ class TaggingSaveApiTest(unittest.TestCase):
         )
         self.client = starlette.testclient.TestClient(self.app)
 
-    def _save_matching(
-        self,
-        xai_status: str = "COMPLETED",
-        xai_fallback_reason: str | None = None,
-    ) -> httpx.Response:
+    def _save_matching(self) -> httpx.Response:
         """유효한 태깅 결과 저장 요청을 전송합니다."""
         return self.client.put(
             "/tagging/scenes/7",
@@ -64,8 +60,6 @@ class TaggingSaveApiTest(unittest.TestCase):
                             "summary": "후보를 찾지 못했습니다.",
                             "criteria": [],
                         },
-                        "xai_status": xai_status,
-                        "xai_fallback_reason": xai_fallback_reason,
                         "vlm_mood": {"summary": "", "tags": []},
                     }
                 ]
@@ -115,17 +109,6 @@ class TaggingSaveApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["error"]["code"], "VALIDATION_ERROR")
-
-    def test_requires_reason_when_xai_uses_fallback(self) -> None:
-        """FALLBACK 저장에는 화면과 이력에 남길 원인이 필요합니다."""
-        response = self._save_matching(
-            xai_status="FALLBACK",
-            xai_fallback_reason=None,
-        )
-
-        self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["error"]["code"], "VALIDATION_ERROR")
-
 
 if __name__ == "__main__":
     unittest.main()

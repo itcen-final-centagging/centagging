@@ -2,7 +2,7 @@
 
 import typing
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class MatchedSkuImage(BaseModel):
@@ -36,14 +36,6 @@ class XaiResult(BaseModel):
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
-XaiStatus = typing.Literal["COMPLETED", "FALLBACK"]
-XaiFallbackReason = typing.Literal[
-    "RATE_LIMITED",
-    "PROCESSING_ERROR",
-    "UNAVAILABLE",
-]
-
-
 class SkuCandidate(BaseModel):
     """탐지된 객체 1건에 대한 SKU 후보입니다."""
 
@@ -55,8 +47,6 @@ class SkuCandidate(BaseModel):
     similarity_score: int
     matched_sku_image: MatchedSkuImage
     xai_result: XaiResult
-    xai_status: XaiStatus = "FALLBACK"
-    xai_fallback_reason: XaiFallbackReason | None = "UNAVAILABLE"
 
 
 class SceneImageInfo(BaseModel):
@@ -112,18 +102,7 @@ class SkuMatching(BaseModel):
     match_rank: int = Field(ge=1)
     similarity_score: int = Field(ge=0, le=100)
     xai_result: XaiResult
-    xai_status: XaiStatus
-    xai_fallback_reason: XaiFallbackReason | None
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
-
-    @model_validator(mode="after")
-    def validate_xai_fallback(self) -> "SkuMatching":
-        """XAI 상태와 폴백 원인의 조합을 검증합니다."""
-        if self.xai_status == "FALLBACK" and self.xai_fallback_reason is None:
-            raise ValueError("XAI 폴백 원인이 필요합니다.")
-        if self.xai_status == "COMPLETED" and self.xai_fallback_reason:
-            raise ValueError("완료된 XAI에는 폴백 원인을 지정할 수 없습니다.")
-        return self
 
 
 class SkuMatchingRequest(BaseModel):

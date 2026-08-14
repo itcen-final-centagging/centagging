@@ -133,8 +133,6 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "summary": "형태와 색상이 유사합니다.",
                 "criteria": [],
             },
-            "xai_status": "FALLBACK",
-            "xai_fallback_reason": "RATE_LIMITED",
         }
         self.session = _FakeSession(rows, detail_row)
         self.app = fastapi.FastAPI()
@@ -217,7 +215,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_index " "-> 'bbox_coord' AS bbox",
+            "si.object_metadata -> tr.object_index "
+            "-> 'bbox_coord' AS bbox",
             query,
         )
         self.assertIn(
@@ -288,8 +287,6 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "criteria": [],
             },
         )
-        self.assertEqual(data["xai_status"], "FALLBACK")
-        self.assertEqual(data["xai_fallback_reason"], "RATE_LIMITED")
         self.assertEqual(
             response.json()["meta"]["request_id"],
             response.headers["X-Request-ID"],
