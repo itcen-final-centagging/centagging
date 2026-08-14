@@ -11,6 +11,7 @@ import {
 import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ObjectCropPreview } from '@/features/tagging/components/ImagePreview';
+import { XaiFallbackNotice } from '@/features/tagging/components/XaiFallbackNotice';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import { cn } from '@/lib/utils';
 
@@ -49,6 +50,7 @@ export const RecommendationPanel = () => {
       ]
     : [null, null, null, null];
   const isConfirmed = selectedSku?.sku === focusedCandidate.sku;
+  const isXaiFallback = focusedCandidate.xaiStatus === 'FALLBACK';
 
   return (
     <section>
@@ -168,9 +170,16 @@ export const RecommendationPanel = () => {
                   : `${focusedCandidate.score}%`}
               </p>
               <p className="text-[11px] font-semibold text-text-tertiary">
-                최종 매칭 점수
+                {isXaiFallback ? '임베딩 유사도' : '최종 매칭 점수'}
               </p>
             </div>
+          </div>
+
+          <div className="mt-5">
+            <XaiFallbackNotice
+              reason={focusedCandidate.xaiFallbackReason}
+              status={focusedCandidate.xaiStatus}
+            />
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.92fr)]">
@@ -203,11 +212,12 @@ export const RecommendationPanel = () => {
             <div className="rounded-xl border border-border p-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold text-text-secondary">
-                  VLM 루브릭 채점
+                  {isXaiFallback ? 'VLM 루브릭 채점 미완료' : 'VLM 루브릭 채점'}
                 </p>
                 <span className="text-sm font-extrabold text-text-primary">
-                  {focusedCandidate.rubric?.totalScore ?? 'null'}
-                  /100
+                  {isXaiFallback
+                    ? '폴백'
+                    : `${focusedCandidate.rubric?.totalScore ?? 'null'}/100`}
                 </span>
               </div>
               <div className="mt-4 space-y-3">
@@ -230,16 +240,22 @@ export const RecommendationPanel = () => {
                         />
                       </span>
                       <span className="text-right text-xs font-bold text-emerald-700">
-                        {value === null ? 'null' : `${value}/${maximum}`}
+                        {isXaiFallback
+                          ? '미분석'
+                          : value === null
+                            ? 'null'
+                            : `${value}/${maximum}`}
                       </span>
                     </div>
                   );
                 })}
               </div>
               <p className="mt-4 border-t border-neutral-100 pt-3 text-xs leading-5 text-text-secondary">
-                {focusedCandidate.rubric?.xaiReason ??
-                  focusedCandidate.xaiReason ??
-                  'null'}
+                {isXaiFallback
+                  ? 'XAI 근거 대신 임베딩 유사도 결과를 표시합니다.'
+                  : (focusedCandidate.rubric?.xaiReason ??
+                    focusedCandidate.xaiReason ??
+                    'null')}
               </p>
             </div>
           </div>

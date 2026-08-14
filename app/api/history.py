@@ -3,17 +3,21 @@
 import fastapi
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
+from app import dependencies
 from app.core import database
 from app.repositories import tagging_history_repository
-from app.schemas import history as history_schema
 from app.schemas import common as common_schema
+from app.schemas import history as history_schema
+from app.services import sku_image_storage
 
 router = fastapi.APIRouter(prefix="/history", tags=["history"])
 
 
 @router.get(
     "/results",
-    response_model=common_schema.SuccessResponse[history_schema.TaggingHistoryListData],
+    response_model=common_schema.SuccessResponse[
+        history_schema.TaggingHistoryListData
+    ],
 )
 async def list_tagging_history(
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
@@ -36,12 +40,17 @@ async def list_tagging_history(
 
 @router.get(
     "/results/{result_id}",
-    response_model=common_schema.SuccessResponse[history_schema.TaggingHistoryDetail],
+    response_model=common_schema.SuccessResponse[
+        history_schema.TaggingHistoryDetail
+    ],
 )
 async def get_tagging_history_detail(
     result_id: int,
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
+    ),
+    image_storage: sku_image_storage.SkuImageStorage = fastapi.Depends(
+        dependencies.get_sku_image_storage
     ),
 ) -> common_schema.SuccessResponse[history_schema.TaggingHistoryDetail]:
     """결과 ID에 해당하는 태깅 이력 상세를 조회합니다.
@@ -49,6 +58,7 @@ async def get_tagging_history_detail(
     Args:
         result_id: 조회할 태깅 결과 ID입니다.
         session: 요청 범위의 비동기 DB 세션입니다.
+        image_storage: SKU 이미지 공개 URL 변환기입니다.
 
     Returns:
         연출 이미지와 확정 SKU가 포함된 태깅 이력 상세입니다.
@@ -59,6 +69,7 @@ async def get_tagging_history_detail(
     detail = await tagging_history_repository.get_tagging_history_detail(
         session,
         result_id,
+        image_storage,
     )
     if detail is None:
         raise fastapi.HTTPException(

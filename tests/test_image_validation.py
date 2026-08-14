@@ -308,11 +308,14 @@ class UploadSceneImageApiTest(unittest.TestCase):
             ),
             [
                 {
-                    "label": "chair",
-                    "xmin": 200,
-                    "ymin": 100,
-                    "xmax": 800,
-                    "ymax": 700,
+                    "object_idx": 0,
+                    "bbox_coord": {
+                        "xmin": 200,
+                        "ymin": 100,
+                        "xmax": 800,
+                        "ymax": 700,
+                    },
+                    "attribute": {"label": "chair"},
                 }
             ],
         )

@@ -67,7 +67,7 @@ COMMENT ON COLUMN scene_image.file_size            IS '연출 이미지 파일 �
 COMMENT ON COLUMN scene_image.analysis_error       IS '탐지·임베딩·SKU 후보 생성 실패 사유';
 COMMENT ON COLUMN scene_image.analysis_status      IS '태깅 처리 상태: pending | detected | embedded | completed | failed';
 COMMENT ON COLUMN scene_image.created_at           IS '연출 이미지 업로드 일시';
-COMMENT ON COLUMN scene_image.object_metadata      IS '탐지 객체 메타데이터 배열 [{label,xmin,ymin,xmax,ymax}, ...]';
+COMMENT ON COLUMN scene_image.object_metadata      IS '탐지 객체 메타데이터 배열 [{object_idx,bbox_coord:{xmin,ymin,xmax,ymax},attribute:{label}}, ...]';
 COMMENT ON COLUMN scene_image.width_px             IS '이미지 너비(pixel)';
 COMMENT ON COLUMN scene_image.height_px            IS '이미지 높이(pixel)';
 
@@ -147,14 +147,12 @@ COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
 --    scene_image.object_metadata 배열의 object_index로 탐지 객체를 식별한다.
 --    이미지 1장에서 객체 N개를 태깅하면 N행이 생성됨
 --
---    xai_result 구조 (루브릭 채점, PoC vlm_client.py 기준)
---      { "structure": 29, "color":  7, "detail": 17, "context": 15,
---        "total": 68, "verdict": "REVIEW",
---        "reason": "등받이 곡률·암레스트 각도 등 구조는 거의 동일하나
---                   연출샷은 화이트 바디, 해당 SKU 는 올 블랙 모델입니다." }
---      배점 : structure 30 / color 30 / detail 20 / context 20 = 100
---      판정 : total >= 70 MATCH · 55~69 REVIEW · 55 미만 REJECT
---      카탈로그 검색으로 직접 지정한 건은 채점을 돌리지 않으므로 NULL
+--    xai_result 구조 (현재 API 응답·저장 계약)
+--      { "summary": "구조와 색상이 유사합니다.",
+--        "criteria": [
+--          { "label": "구조", "score": 29, "comment": "..." }
+--        ] }
+--      Gemini 채점 성공 여부는 xai_status와 xai_fallback_reason으로 구분한다.
 -- ------------------------------------------------------------
 CREATE TABLE tagging_result (
     result_id        BIGSERIAL   PRIMARY KEY,
@@ -168,6 +166,8 @@ CREATE TABLE tagging_result (
     similarity_score NUMERIC(6,4),
     similarity_grade CHAR(1)     CHECK (similarity_grade IN ('상','중','하')),
     xai_result       JSONB,
+    xai_status       VARCHAR(20),
+    xai_fallback_reason VARCHAR(30),
     status           VARCHAR(20) NOT NULL DEFAULT 'PENDING'
                      CHECK (status IN ('PENDING', 'ACTIVE', 'DEACTIVE')),
     vlm_mood         JSONB,
@@ -183,12 +183,30 @@ CREATE TABLE tagging_result (
              AND match_rank IS NOT NULL AND similarity_score IS NOT NULL)
     ),
     CONSTRAINT ck_result_score CHECK (similarity_score IS NULL OR similarity_score BETWEEN 0 AND 1),
-    -- 루브릭이 기록됐다면 총점 0~100, 판정값은 3종 중 하나
+    -- 루브릭이 기록됐다면 현재 summary/criteria 구조여야 한다.
     CONSTRAINT ck_result_xai CHECK (
         xai_result IS NULL OR (
-            (xai_result->>'total')::int BETWEEN 0 AND 100
-        AND xai_result->>'verdict' IN ('MATCH','REVIEW','REJECT')
+            jsonb_typeof(xai_result) = 'object'
+        AND xai_result ? 'summary'
+        AND xai_result ? 'criteria'
+        AND jsonb_typeof(xai_result->'summary') = 'string'
+        AND jsonb_typeof(xai_result->'criteria') = 'array'
         )
+    ),
+    CONSTRAINT ck_result_xai_status CHECK (
+        (match_source = 'SEARCH'
+             AND xai_status IS NULL AND xai_fallback_reason IS NULL)
+     OR (match_source = 'RECOMMEND'
+             AND xai_status IS NOT NULL
+             AND (
+                 (xai_status = 'COMPLETED'
+                      AND xai_fallback_reason IS NULL)
+              OR (xai_status = 'FALLBACK'
+                      AND xai_fallback_reason IS NOT NULL
+                      AND xai_fallback_reason IN (
+                          'RATE_LIMITED', 'PROCESSING_ERROR', 'UNAVAILABLE'
+                      ))
+             ))
     )
 );
 
@@ -204,5 +222,7 @@ COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 �
 COMMENT ON COLUMN tagging_result.similarity_score IS '선택 시점의 임베딩 유사도 (0~1)';
 COMMENT ON COLUMN tagging_result.similarity_grade IS '화면 표시용 등급 상/중/하';
 COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 위 주석의 JSON 구조 참고';
+COMMENT ON COLUMN tagging_result.xai_status       IS 'XAI 채점 상태: COMPLETED | FALLBACK';
+COMMENT ON COLUMN tagging_result.xai_fallback_reason IS 'XAI 폴백 원인: RATE_LIMITED | PROCESSING_ERROR | UNAVAILABLE';
 COMMENT ON COLUMN tagging_result.status           IS '최종 관리자 검수 상태: PENDING | ACTIVE | DEACTIVE';
 COMMENT ON COLUMN tagging_result.vlm_mood         IS '연출 이미지 분위기 요약과 태그';

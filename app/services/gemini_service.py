@@ -33,6 +33,12 @@ class GeminiApiError(RuntimeError):
     code = "API_CALL_FAIL"
 
 
+class GeminiRateLimitError(GeminiApiError):
+    """Gemini 요청 한도를 초과했을 때 발생합니다."""
+
+    code = "RATE_LIMITED"
+
+
 class GeminiAuthenticationError(GeminiApiError):
     """Gemini 인증에 실패할 때 발생합니다."""
 

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
 
 const loadTaggingApi = async (t) => {
@@ -14,6 +16,87 @@ const loadTaggingApi = async (t) => {
   t.after(() => server.close());
   return server.ssrLoadModule('/src/features/tagging/api/tagging.ts');
 };
+
+const loadSaveWorkflow = async (t) => {
+  const server = await createServer({
+    appType: 'custom',
+    logLevel: 'silent',
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    server: { middlewareMode: true },
+  });
+  t.after(() => server.close());
+  return server.ssrLoadModule(
+    '/src/features/tagging/services/save-tagging-workflow.ts',
+  );
+};
+
+const loadXaiFallbackNotice = async (t) => {
+  const server = await createServer({
+    appType: 'custom',
+    logLevel: 'silent',
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    server: { middlewareMode: true },
+  });
+  t.after(() => server.close());
+  return server.ssrLoadModule(
+    '/src/features/tagging/components/XaiFallbackNotice.tsx',
+  );
+};
+
+test('history refresh failure does not undo a successful save', async (t) => {
+  const { saveTaggingAndRefreshHistory } = await loadSaveWorkflow(t);
+  const events = [];
+
+  const result = await saveTaggingAndRefreshHistory({
+    onSaved: () => events.push('saved'),
+    refreshHistory: async () => {
+      events.push('history');
+      throw new Error('이력 서버 오류');
+    },
+    save: async () => events.push('put'),
+  });
+
+  assert.deepEqual(events, ['put', 'saved', 'history']);
+  assert.deepEqual(result, {
+    historyError: '이력 서버 오류',
+  });
+});
+
+test('save failure does not mark saved or refresh history', async (t) => {
+  const { saveTaggingAndRefreshHistory } = await loadSaveWorkflow(t);
+  const events = [];
+
+  await assert.rejects(
+    saveTaggingAndRefreshHistory({
+      onSaved: () => events.push('saved'),
+      refreshHistory: async () => {
+        events.push('history');
+        return [];
+      },
+      save: async () => {
+        events.push('put');
+        throw new Error('저장 서버 오류');
+      },
+    }),
+    /저장 서버 오류/,
+  );
+
+  assert.deepEqual(events, ['put']);
+});
+
+test('rate-limited XAI is explained as an embedding fallback', async (t) => {
+  const { XaiFallbackNotice } = await loadXaiFallbackNotice(t);
+
+  const markup = renderToStaticMarkup(
+    React.createElement(XaiFallbackNotice, {
+      reason: 'RATE_LIMITED',
+      status: 'FALLBACK',
+    }),
+  );
+
+  assert.match(markup, /Gemini 요청 한도를 초과/);
+  assert.match(markup, /이미지 유사도 기준/);
+});
 
 test('history results are mapped from the backend response', async (t) => {
   const { fetchTaggingHistory } = await loadTaggingApi(t);
@@ -142,6 +225,8 @@ test('save and history requests use their backend contracts', async (t) => {
         ],
         summary: 'The structure and color are similar.',
       },
+      xaiStatus: 'COMPLETED',
+      xaiFallbackReason: null,
     },
   });
   const history = await fetchTaggingHistory();
@@ -169,6 +254,8 @@ test('save and history requests use their backend contracts', async (t) => {
           ],
           summary: 'The structure and color are similar.',
         },
+        xai_status: 'COMPLETED',
+        xai_fallback_reason: null,
       },
     ],
   });
@@ -210,6 +297,8 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
                       tags: ['natural'],
                     },
                   },
+                  xai_status: 'COMPLETED',
+                  xai_fallback_reason: null,
                 },
               ],
             },
@@ -230,7 +319,9 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
       matchRank: candidate.matchRank,
       score: candidate.score,
       vlmMood: candidate.vlmMood,
+      xaiFallbackReason: candidate.xaiFallbackReason,
       xaiResult: candidate.xaiResult,
+      xaiStatus: candidate.xaiStatus,
     },
     {
       matchRank: 1,
@@ -239,6 +330,7 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
         summary: 'A warm living room.',
         tags: ['natural'],
       },
+      xaiFallbackReason: null,
       xaiResult: {
         criteria: [
           {
@@ -249,6 +341,7 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
         ],
         summary: 'The structure and color are similar.',
       },
+      xaiStatus: 'COMPLETED',
     },
   );
 });
