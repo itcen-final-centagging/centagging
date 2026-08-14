@@ -80,6 +80,8 @@ CREATE TABLE sku_catalog (
     product_name VARCHAR(200) NOT NULL,
     category     VARCHAR(50),
     sub_category VARCHAR(50),
+    brand        VARCHAR(50),
+    price        INTEGER,
     key_features JSONB        NOT NULL DEFAULT '[]'::jsonb,
     attributes   JSONB        NOT NULL DEFAULT '{}'::jsonb,
     text_embedding VECTOR(3072),

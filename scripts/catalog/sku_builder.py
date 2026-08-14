@@ -195,16 +195,26 @@ def build_skus(
             continue
         seen.add(identity)
 
+        # sku_code는 brand/price를 포함한 전체 속성 기준으로 기존과
+        # 동일하게 해시한다(재생성 시 코드가 바뀌지 않도록 유지).
+        code = sku_code(context.category, goods_id, attributes)
+
+        stored_attributes = dict(attributes)
+        brand = stored_attributes.pop("brand", None)
+        price = stored_attributes.pop("selling_price", None)
+
         rows.append(
             {
                 "sku_id": None,  # 전체 취합
                 "goods_id": goods_id,
-                "sku_code": sku_code(context.category, goods_id, attributes),
+                "sku_code": code,
                 "product_name": context.product_name,
                 "category": context.category,
                 "sub_category": context.sub_category,
+                "brand": brand,
+                "price": price,
                 "key_features": context.key_features,
-                "attributes": attributes,
+                "attributes": stored_attributes,
             }
         )
 

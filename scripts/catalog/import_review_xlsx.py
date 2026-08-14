@@ -273,6 +273,8 @@ def build_final_skus(
                 "sub_category",
                 "",
             ),
+            "brand": sku.get("brand"),
+            "price": sku.get("price"),
             "key_features": sku.get(
                 "key_features",
                 [],
@@ -334,6 +336,8 @@ def build_final_skus(
                     "sub_category",
                     "",
                 ),
+                "brand": None,
+                "price": None,
                 "key_features": [],
                 "attributes": {},
             }
@@ -370,6 +374,15 @@ def build_final_skus(
             attribute,
             final_value,
         )
+
+        # brand/selling_price는 attributes가 아니라 최상위 필드로 저장한다.
+        if attribute == "brand":
+            final_skus[sku_id]["brand"] = final_value
+            continue
+
+        if attribute == "selling_price":
+            final_skus[sku_id]["price"] = final_value
+            continue
 
         attributes_by_sku[
             sku_id

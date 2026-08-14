@@ -64,11 +64,12 @@ def upsert_sku_metadata(conn: psycopg.Connection, sku: dict[str, Any]) -> bool:
             """
             INSERT INTO sku_catalog (
                 sku_id, sku_code, product_name, category, sub_category,
-                key_features, attributes
+                brand, price, key_features, attributes
             )
             VALUES (
                 %(sku_id)s, %(sku_code)s, %(product_name)s, %(category)s,
-                %(sub_category)s, %(key_features)s, %(attributes)s
+                %(sub_category)s, %(brand)s, %(price)s, %(key_features)s,
+                %(attributes)s
             )
             ON CONFLICT (sku_id) DO NOTHING
             """,
@@ -78,6 +79,8 @@ def upsert_sku_metadata(conn: psycopg.Connection, sku: dict[str, Any]) -> bool:
                 "product_name": sku["product_name"],
                 "category": sku["category"],
                 "sub_category": sku.get("sub_category"),
+                "brand": sku.get("brand"),
+                "price": sku.get("price"),
                 "key_features": Json(sku.get("key_features") or []),
                 "attributes": Json(sku.get("attributes") or {}),
             },
