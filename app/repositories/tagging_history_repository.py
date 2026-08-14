@@ -4,6 +4,7 @@ import sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.schemas import history as history_schema
+from app.services import sku_image_storage
 
 _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
     SELECT tr.result_id,
@@ -113,12 +114,14 @@ async def list_tagging_history(
 async def get_tagging_history_detail(
     session: sqlalchemy_async.AsyncSession,
     result_id: int,
+    image_storage: sku_image_storage.SkuImageStorage,
 ) -> history_schema.TaggingHistoryDetail | None:
     """결과 ID에 해당하는 태깅 이력 상세를 조회합니다.
 
     Args:
         session: 요청 범위의 비동기 DB 세션입니다.
         result_id: 조회할 태깅 결과 ID입니다.
+        image_storage: SKU 이미지 공개 URL 변환기입니다.
 
     Returns:
         태깅 이력 상세이며, 결과가 없으면 None입니다.
@@ -156,7 +159,11 @@ async def get_tagging_history_detail(
                 "product_name": row["product_name"],
                 "brand": row["brand"],
                 "price": row["price"],
-                "image_url": row["sku_image_url"],
+                "image_url": (
+                    image_storage.public_url(row["sku_image_url"])
+                    if row["sku_image_url"] is not None
+                    else None
+                ),
                 "category": row["category"],
                 "sub_category": row["sub_category"],
                 "attrs": row["attributes"],

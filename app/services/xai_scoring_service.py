@@ -147,6 +147,7 @@ class XaiScoringService:
                         read_sku_image_bytes,
                         candidate.matched_sku_image.image_url,
                         self.settings.sku_image_root,
+                        self.settings.image_storage_root,
                     )
                     for candidate in detected.sku_candidates
                 )

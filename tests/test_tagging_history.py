@@ -125,7 +125,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
             "product_name": "메쉬 사무용 의자",
             "brand": "센터퍼니처",
             "price": 249000,
-            "sku_image_url": "/uploads/sku-images/CHR-9901_main.jpg",
+            "sku_image_url": r"data\images\9901\main.jpg",
             "category": "의자",
             "sub_category": "학생·사무용의자",
             "attributes": {"color": "화이트", "material": "메쉬"},
@@ -279,7 +279,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
         self.assertEqual(data["matched_sku"]["sku_code"], "CHR-9901")
         self.assertEqual(
             data["matched_sku"]["image_url"],
-            "/uploads/sku-images/CHR-9901_main.jpg",
+            "/sku-images/9901/main.jpg",
         )
         self.assertEqual(
             data["xai_result"],
