@@ -15,6 +15,7 @@ import {
   saveTaggingReview,
   searchCatalogItems,
 } from '../api/tagging';
+import { saveTaggingAndRefreshHistory } from '../services/save-tagging-workflow';
 import { validateImage } from '../utils/image';
 
 import type {
@@ -35,6 +36,7 @@ type TaggingWorkflowContextValue = {
   clearUploadError: () => void;
   detectedObjects: FurnitureObject[];
   history: TaggingHistory[];
+  historyError?: string;
   isRecommendationLoading: boolean;
   loadSelectedObjectRecommendations: () => Promise<void>;
   redetect: (description: string) => Promise<void>;
@@ -70,15 +72,27 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
   const [analysisScenario, setAnalysisScenario] =
     useState<AnalysisScenario>('detected');
   const [history, setHistory] = useState<TaggingHistory[]>([]);
+  const [historyError, setHistoryError] = useState<string>();
   const [isRecommendationLoading, setIsRecommendationLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     void fetchTaggingHistory()
       .then((nextHistory) => {
-        if (isMounted) setHistory(nextHistory);
+        if (isMounted) {
+          setHistory(nextHistory);
+          setHistoryError(undefined);
+        }
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        if (isMounted) {
+          setHistoryError(
+            error instanceof Error
+              ? error.message
+              : '이력을 불러오지 못했습니다.',
+          );
+        }
+      });
     return () => {
       isMounted = false;
     };
@@ -212,15 +226,23 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
   const saveTagging = useCallback(async (): Promise<void> => {
     if (!analysisId || !selectedObject || !selectedSku) return;
     setStage('saving');
+    setWorkflowError(undefined);
     try {
-      await saveTaggingReview({
-        objectIndex: selectedObject.objectIndex,
-        sceneImageId: analysisId,
-        selectedSku,
+      const result = await saveTaggingAndRefreshHistory({
+        onSaved: () => {
+          setStage('saved');
+          setHistoryError(undefined);
+        },
+        refreshHistory: fetchTaggingHistory,
+        save: () =>
+          saveTaggingReview({
+            objectIndex: selectedObject.objectIndex,
+            sceneImageId: analysisId,
+            selectedSku,
+          }),
       });
-      const nextHistory = await fetchTaggingHistory();
-      setHistory(nextHistory);
-      setStage('saved');
+      if (result.history) setHistory(result.history);
+      setHistoryError(result.historyError);
     } catch (error) {
       setWorkflowError(
         error instanceof Error
@@ -257,6 +279,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       clearUploadError: () => setUploadError(undefined),
       detectedObjects,
       history,
+      historyError,
       isRecommendationLoading,
       loadSelectedObjectRecommendations,
       redetect,
@@ -281,6 +304,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       catalogResults,
       detectedObjects,
       history,
+      historyError,
       isRecommendationLoading,
       loadSelectedObjectRecommendations,
       redetect,

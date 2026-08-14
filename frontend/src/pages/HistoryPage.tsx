@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 
 export const HistoryPage: React.FC = () => {
-  const { history, resetWorkflow } = useTaggingWorkflow();
+  const { history, historyError, resetWorkflow } = useTaggingWorkflow();
 
   return (
     <div className="px-6 py-6 pb-10">
@@ -21,7 +21,15 @@ export const HistoryPage: React.FC = () => {
       <p className="mt-1 text-sm leading-6 text-text-secondary">
         저장된 상품 연결과 태깅 결과를 최신순으로 확인합니다.
       </p>
-      {history.length === 0 ? (
+      {historyError ? (
+        <p
+          className="mt-6 rounded-md border border-warning-200 bg-warning-50 px-4 py-3 text-sm font-semibold text-warning-700"
+          role="alert"
+        >
+          최신 이력을 불러오지 못했습니다. {historyError}
+        </p>
+      ) : null}
+      {history.length === 0 && !historyError ? (
         <section className="studio-surface mt-6 flex min-h-90 flex-col items-center justify-center px-6 text-center">
           <span className="flex size-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
             <Clock3 size={28} />
@@ -40,7 +48,8 @@ export const HistoryPage: React.FC = () => {
             <Plus size={17} />새 태깅 작업
           </Link>
         </section>
-      ) : (
+      ) : null}
+      {history.length > 0 ? (
         <section className="mt-6 max-w-4xl">
           <p className="mb-3 text-sm font-bold text-text-primary">
             저장된 작업{' '}
@@ -83,7 +92,7 @@ export const HistoryPage: React.FC = () => {
             ))}
           </div>
         </section>
-      )}
+      ) : null}
     </div>
   );
 };
