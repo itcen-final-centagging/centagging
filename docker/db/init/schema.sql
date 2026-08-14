@@ -67,7 +67,7 @@ COMMENT ON COLUMN scene_image.file_size            IS '연출 이미지 파일 �
 COMMENT ON COLUMN scene_image.analysis_error       IS '탐지·임베딩·SKU 후보 생성 실패 사유';
 COMMENT ON COLUMN scene_image.analysis_status      IS '태깅 처리 상태: pending | detected | embedded | completed | failed';
 COMMENT ON COLUMN scene_image.created_at           IS '연출 이미지 업로드 일시';
-COMMENT ON COLUMN scene_image.object_metadata      IS '탐지 객체 메타데이터 배열 [{label,xmin,ymin,xmax,ymax}, ...]';
+COMMENT ON COLUMN scene_image.object_metadata      IS '탐지 객체 메타데이터 배열 [{object_idx,bbox_coord:{xmin,ymin,xmax,ymax},attribute:{label}}, ...]';
 COMMENT ON COLUMN scene_image.width_px             IS '이미지 너비(pixel)';
 COMMENT ON COLUMN scene_image.height_px            IS '이미지 높이(pixel)';
 

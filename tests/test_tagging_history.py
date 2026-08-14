@@ -187,17 +187,24 @@ class TaggingHistoryApiTest(unittest.TestCase):
             },
         )
 
-    def test_queries_bbox_by_object_index_in_newest_first_order(self) -> None:
-        """객체 좌표를 선택하고 저장 시각 최신순으로 조회합니다."""
+    def test_queries_new_object_metadata_by_object_index(self) -> None:
+        """새 객체 메타데이터에서 라벨과 좌표를 조회합니다."""
         self.client.get("/history/results")
+        query = " ".join(self.session.executed_statement.split())
 
         self.assertIn(
-            "si.object_metadata -> tr.object_index",
-            self.session.executed_statement,
+            "si.object_metadata -> tr.object_index "
+            "-> 'attribute' ->> 'label' AS object_name",
+            query,
+        )
+        self.assertIn(
+            "si.object_metadata -> tr.object_index "
+            "-> 'bbox_coord' AS bbox",
+            query,
         )
         self.assertIn(
             "ORDER BY tr.created_at DESC, tr.result_id DESC",
-            self.session.executed_statement,
+            query,
         )
 
     def test_returns_saved_tagging_history_detail(self) -> None:

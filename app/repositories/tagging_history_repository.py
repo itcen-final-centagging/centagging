@@ -9,7 +9,10 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
     SELECT tr.result_id,
            sc.sku_code,
            sc.product_name,
-           sc.category AS object_name,
+           si.object_metadata
+               -> tr.object_index
+               -> 'attribute'
+               ->> 'label' AS object_name,
            tr.similarity_score,
            au.user_name AS created_by,
            tr.created_at,

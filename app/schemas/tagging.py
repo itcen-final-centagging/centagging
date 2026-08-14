@@ -95,7 +95,7 @@ class SkuMatching(BaseModel):
     후보를 그대로 돌려받습니다.
     """
 
-    # scene_image.bbox_coord 배열의 인덱스입니다.
+    # scene_image.object_metadata 배열의 인덱스입니다.
     object_index: int = Field(ge=0)
     sku_code: str = Field(min_length=1)
     match_rank: int = Field(ge=1)
