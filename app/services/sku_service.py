@@ -13,11 +13,10 @@ import uuid
 
 import pydantic
 import sqlalchemy
-from google import genai
 from google.genai import types
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
-from app.core import config
+from app.core import config, genai_client
 from app.models import sku as sku_models
 from app.services import sku_attributes
 
@@ -25,7 +24,7 @@ _UPLOAD_SUBDIR = "sku"
 
 
 class SkuConfigurationError(RuntimeError):
-    """Gemini API 키가 누락된 경우 발생합니다."""
+    """Google Gen AI 인증 설정이 누락된 경우 발생합니다."""
 
 
 class SkuExtractionError(RuntimeError):
@@ -112,7 +111,7 @@ def extract_metadata(
     카테고리) 2차 호출 없이 attributes를 빈 dict로 둡니다.
 
     Args:
-        settings: Gemini API 키와 모델명이 담긴 애플리케이션 설정입니다.
+        settings: Google Gen AI 인증과 모델명이 담긴 설정입니다.
         image_bytes: 분석할 이미지의 원본 바이트입니다.
         mime_type: 이미지의 MIME 타입입니다.
 
@@ -120,18 +119,17 @@ def extract_metadata(
         추출된 category, sub_category, space, attributes입니다.
 
     Raises:
-        SkuConfigurationError: Gemini API 키가 설정되지 않은 경우입니다.
+        SkuConfigurationError: Google Gen AI 인증 설정이 없는 경우입니다.
         SkuExtractionError: Gemini 호출 또는 응답 파싱에 실패한
             경우입니다.
     """
-    if not settings.gemini_api_key:
+    if not genai_client.is_configured(settings):
         raise SkuConfigurationError(
-            "GEMINI_API_KEY is not configured. "
-            "Create .env from .env.example."
+            "Google Gen AI authentication is not configured."
         )
 
     try:
-        client = genai.Client(api_key=settings.gemini_api_key)
+        client = genai_client.create_client(settings)
         image_part = types.Part.from_bytes(
             data=image_bytes, mime_type=mime_type
         )

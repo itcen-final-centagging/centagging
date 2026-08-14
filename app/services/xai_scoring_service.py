@@ -9,7 +9,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from app.core import config
+from app.core import config, genai_client
 from app.schemas.tagging import DetectedObject, XaiResult
 from app.services.gemini_service import (
     GeminiApiError,
@@ -72,12 +72,12 @@ class XaiScoringService:
         self._client: genai.Client | None = None
 
     def _get_client(self) -> genai.Client:
-        if not self.settings.gemini_api_key:
+        if not genai_client.is_configured(self.settings):
             raise GeminiConfigurationError(
-                "GEMINI_API_KEY가 설정되지 않았습니다."
+                "Google Gen AI 인증 설정이 누락되었습니다."
             )
         if self._client is None:
-            self._client = genai.Client(api_key=self.settings.gemini_api_key)
+            self._client = genai_client.create_client(self.settings)
         return self._client
 
     async def enrich_detected_objects(
@@ -219,7 +219,8 @@ class XaiScoringService:
 
         Raises:
             ValueError: 채점 대상이 하나도 없는 경우입니다.
-            GeminiConfigurationError: API 키가 없는 경우입니다.
+            GeminiConfigurationError: Google Gen AI 인증 설정이 없는
+                경우입니다.
             GeminiResponseInvalidError: 응답이 비어 있는 경우입니다.
             GeminiApiError: SDK 호출이 실패한 경우입니다.
         """
