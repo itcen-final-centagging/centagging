@@ -3,35 +3,31 @@
 import asyncio
 import collections.abc
 import logging
-import pathlib
 import typing
 
 import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import pydantic
 import sqlalchemy
-from PIL import Image
+from sqlalchemy import orm
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core import config
+from app.models.sku import SkuCatalog, SkuImage
 from app.schemas.tagging import (
-    BoundingBox,
     DetectedObject,
-    DetectionResult,
     MatchedSkuImage,
-    SceneImageInfo,
     SkuCandidate,
-    VlmMood,
-    XaiCriterion,
     XaiResult,
 )
 from app.services.gemini_service import GeminiService
-from app.services.image_processing_service import get_crop_image
-from app.services.sku_image_storage import SkuImageStorage
-from app.services.xai_scoring_service import XaiScoringService
+from app.services.image_processing_service import CroppedObject
 
 EMBEDDING_DIMENSIONS = 3072
 CANDIDATE_LIMIT = 30
 DEFAULT_RESULT_LIMIT = 5
+EMBED_CONCURRENCY = 2
+NO_XAI_SUMMARY = "XAI 판정 결과가 없습니다."
+_HALFVEC = pgvector_sa.HALFVEC(EMBEDDING_DIMENSIONS)
 
 
 class SceneImageNotFoundError(RuntimeError):
@@ -51,79 +47,11 @@ class SimilarSku(pydantic.BaseModel):
     product_name: str
     image_url: str
     image_type: typing.Literal["MAIN", "ANGLE"]
-    category: str
-    sub_category: str
-    attributes: dict[str, typing.Any]
+    category: str | None = None
+    sub_category: str | None = None
+    attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
     similarity: float
 
-
-class SceneCropData(typing.TypedDict):
-    """scene_image에서 조회한 원본 이미지 경로와 대상 좌표입니다."""
-
-    scene_image: SceneImageInfo
-    image_url: str
-    indexed_coords: list[tuple[int, dict[str, float]]]
-
-
-_SIMILAR_SKU_QUERY = sqlalchemy.text("""
-    WITH candidate AS (
-        SELECT si.sku_id,
-               si.sku_image_id,
-               si.image_url,
-               si.image_type,
-               si.embedding::halfvec(3072)
-                   <=> CAST(:embedding AS halfvec(3072)) AS distance
-          FROM sku_image si
-         WHERE si.embedding IS NOT NULL
-         ORDER BY distance
-         LIMIT :candidate_limit
-    ),
-    best_per_sku AS (
-        SELECT DISTINCT ON (c.sku_id)
-               c.sku_id, c.sku_image_id, c.image_url, c.image_type, c.distance
-          FROM candidate c
-         ORDER BY c.sku_id, c.distance
-    )
-    SELECT b.sku_id,
-           b.sku_image_id,
-           b.image_url,
-           b.image_type,
-           sc.sku_code,
-           sc.product_name,
-           sc.category,
-           sc.sub_category,
-           sc.attributes,
-           1 - b.distance AS similarity
-      FROM best_per_sku b
-      JOIN sku_catalog sc ON sc.sku_id = b.sku_id
-     ORDER BY b.distance
-     LIMIT :result_limit
-    """).bindparams(
-    sqlalchemy.bindparam(
-        "embedding",
-        type_=pgvector_sa.Vector(EMBEDDING_DIMENSIONS),
-    )
-)
-
-_CROP_IMAGE_COORD_QUERY = sqlalchemy.text("""
-    SELECT scene_image_id,
-           image_url,
-           origin_name,
-           mime_type,
-           file_size,
-           width_px,
-           height_px,
-           object_metadata
-      FROM scene_image
-     WHERE scene_image_id = :scene_image_id
-    """)
-
-_UPDATE_ANALYSIS_STATUS = sqlalchemy.text("""
-    UPDATE scene_image
-       SET analysis_status = :analysis_status,
-           analysis_error = :analysis_error
-     WHERE scene_image_id = :scene_image_id
-    """)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -136,7 +64,6 @@ class SimilarSkuService:
         session: sqlalchemy_async.AsyncSession,
         gemini_service: GeminiService,
         settings: config.Settings,
-        scoring_service: XaiScoringService,
     ) -> None:
         """서비스가 사용할 세션과 의존 객체를 주입받습니다.
 
@@ -148,291 +75,140 @@ class SimilarSkuService:
         self.session = session
         self.gemini_service = gemini_service
         self.settings = settings
-        self.scoring_service = scoring_service
-        self.sku_image_storage = SkuImageStorage(settings.sku_image_root)
+        self._embed_semaphore = asyncio.Semaphore(EMBED_CONCURRENCY)
 
-    async def orchestrate_similar_skus(
+    async def build_detected_objects(
         self,
-        scene_id: int,
-        object_indexes: list[int],
-    ) -> DetectionResult:
-        """탐지 객체별로 크롭·임베딩·유사 SKU 조회를 순서대로 수행합니다.
+        crops: list[CroppedObject],
+    ) -> list[DetectedObject]:
+        """크롭 목록으로 SKU 후보까지 채운 탐지 객체를 만듭니다.
+
+        임베딩은 외부 API 왕복이라 ``asyncio.gather``로 동시에 호출합니다.
+        유사도 조회는 요청 범위 ``AsyncSession``을 공유하며 세션은 동시
+        사용이 불가능하므로 순차로 실행합니다.
 
         Args:
-            scene_id: 조회할 장면 이미지 ID입니다.
-            object_indexes: 추천을 조회할 탐지 객체 인덱스 목록입니다.
+            crops: 장면 이미지에서 잘라낸 탐지 객체 목록입니다.
 
         Returns:
-            요청한 탐지 객체별 유사 SKU 후보가 담긴 결과입니다.
-
-        Raises:
-            SceneImageNotFoundError: scene_id에 해당하는 장면 이미지가
-                없는 경우입니다.
+            sku_candidates까지 채워진 탐지 객체 목록입니다. label과
+            confidence 등 XAI 관련 필드는 아직 기본값입니다.
         """
-        try:
-            scene = await self.get_crop_image_coords(scene_id, object_indexes)
+        if not crops:
+            return []
 
-            if not scene["indexed_coords"]:
-                return DetectionResult(
-                    processing_status="DETECTED",
-                    scene_image=scene["scene_image"],
-                    objects=[],
-                )
-
-            image_path = pathlib.Path(self.settings.image_storage_root) / scene[
-                "image_url"
-            ].removeprefix("/uploads/")
-
-            embedded_objects = []
-            with Image.open(image_path, "r") as scene_image:
-                for object_index, coord in scene["indexed_coords"]:
-                    crop_image = get_crop_image(scene_image, coord)
-                    embedding = await asyncio.to_thread(
-                        self.gemini_service.embed_image, crop_image
-                    )
-                    embedded_objects.append({
-                        "object_index": object_index,
-                        "coord": coord,
-                        "embedding": embedding,
-                        "crop_image": crop_image,
-                    })
-
-            await self._update_analysis_status(scene_id, "embedded")
-
-            objects = []
-            for item in embedded_objects:
-                object_index = item["object_index"]
-                coord = item["coord"]
-                embedding = item["embedding"]
-                crop_image = item["crop_image"]
-                similar_skus = await self.find_similar_skus(embedding)
-                similar_images = []
-
-                for similar_sku in similar_skus:
-                    similar_images.append(
-                        self.sku_image_storage.read_jpeg(similar_sku.image_url)
-                    )
-
-                # SKU 이미지를 읽어온 후보만 채점 대상으로 넘깁니다.
-                sku_images = {
-                    sku.sku_code: image
-                    for sku, image in zip(similar_skus, similar_images)
-                    if image is not None
-                }
-                crop_score = None
-                if sku_images:
-                    try:
-                        rubric = await asyncio.to_thread(
-                            self.scoring_service.scoring_by_xai,
-                            object_index,
-                            crop_image,
-                            sku_images,
-                        )
-                        crop_score = rubric.crops[0] if rubric.crops else None
-                    # 채점 실패로 추천 전체가 실패하지 않도록 폴백합니다.
-                    except Exception:  # pylint: disable=broad-exception-caught
-                        _LOGGER.exception(
-                            "루브릭 채점 실패, 임베딩 유사도로 대체합니다: "
-                            "object_index=%s",
-                            object_index,
-                        )
-
-                evaluations_by_sku = (
-                    {e.sku_id: e for e in crop_score.evaluations}
-                    if crop_score
-                    else {}
-                )
-
-                sku_candidates = []
-                for sku in similar_skus:
-                    evaluation = evaluations_by_sku.get(sku.sku_code)
-                    if evaluation is not None:
-                        similarity_score = evaluation.total_score
-                        xai_result = XaiResult(
-                            summary=evaluation.xai_result.summary,
-                            criteria=[
-                                XaiCriterion(
-                                    label=c.label,
-                                    score=c.score,
-                                    comment=c.comment,
-                                )
-                                for c in evaluation.xai_result.criteria
-                            ],
-                            vlm_mood=VlmMood(
-                                summary=evaluation.xai_result.vlm_mood.summary,
-                                tags=list(
-                                    evaluation.xai_result.vlm_mood.tags
-                                ),
-                            ),
-                        )
-                    else:
-                        # 채점 결과가 없으면 임베딩 유사도로 폴백합니다.
-                        similarity_score = int(sku.similarity * 100)
-                        xai_result = XaiResult(
-                            summary=(
-                                "XAI 판정 요약은 아직 구현되지 "
-                                "않았습니다."
-                            )
-                        )
-
-                    sku_candidates.append(
-                        SkuCandidate(
-                            sku_code=sku.sku_code,
-                            product_name=sku.product_name,
-                            category=sku.category or "",
-                            sub_category=sku.sub_category or "",
-                            attrs={
-                                key: str(value)
-                                for key, value in sku.attributes.items()
-                            },
-                            similarity_score=similarity_score,
-                            matched_sku_image=MatchedSkuImage(
-                                sku_image_id=sku.sku_image_id,
-                                image_type=sku.image_type,
-                                image_url=self.sku_image_storage.public_url(
-                                    sku.image_url
-                                ),
-                            ),
-                            xai_result=xai_result,
-                        )
-                    )
-
-                objects.append(
-                    DetectedObject(
-                        object_index=object_index,
-                        label=crop_score.label if crop_score else "",
-                        bbox=BoundingBox(**coord),
-                        confidence=(
-                            crop_score.confidence if crop_score else 0
-                        ),
-                        attrs=(
-                            {
-                                a.key: a.value
-                                for a in crop_score.object_attrs
-                            }
-                            if crop_score
-                            else {}
-                        ),
-                        sku_candidates=sku_candidates,
-                    )
-                )
-
-            await self._update_analysis_status(scene_id, "completed")
-
-            return DetectionResult(
-                processing_status="DETECTED",
-                scene_image=scene["scene_image"],
-                objects=objects,
-            )
-        except SceneImageNotFoundError:
-            raise
-        # 이미지·Gemini·DB 경계의 예외를 동일한 failed 상태로 기록합니다.
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            await self._save_analysis_failure(scene_id, error)
-            raise
-
-    async def _update_analysis_status(
-        self,
-        scene_id: int,
-        analysis_status: typing.Literal["embedded", "completed", "failed"],
-        analysis_error: str | None = None,
-    ) -> None:
-        """장면 이미지의 분석 상태와 오류 원인을 저장합니다."""
-        await self.session.execute(
-            _UPDATE_ANALYSIS_STATUS,
-            {
-                "scene_image_id": scene_id,
-                "analysis_status": analysis_status,
-                "analysis_error": analysis_error,
-            },
+        embeddings = await asyncio.gather(
+            *(self._embed_crop(crop) for crop in crops),
+            return_exceptions=True,
         )
-        await self.session.commit()
 
-    async def _save_analysis_failure(
-        self,
-        scene_id: int,
-        error: Exception,
-    ) -> None:
-        """현재 트랜잭션을 정리하고 분석 실패 상태를 기록합니다."""
-        await self.session.rollback()
-        try:
-            await self._update_analysis_status(
-                scene_id,
-                "failed",
-                str(error) or error.__class__.__name__,
+        detected_objects = []
+        for crop, embedding in zip(crops, embeddings):
+            similar_skus = await self._find_skus_for_crop(crop, embedding)
+            detected_objects.append(
+                DetectedObject(
+                    object_index=crop.crop_index,
+                    bbox=crop.bbox,
+                    sku_candidates=[
+                        self._to_sku_candidate(sku) for sku in similar_skus
+                    ],
+                )
             )
-        # 원래 처리 오류를 보존하므로 상태 저장 오류는 로그로 남깁니다.
-        except Exception:  # pylint: disable=broad-exception-caught
-            await self.session.rollback()
+
+        return detected_objects
+
+    async def _find_skus_for_crop(
+        self,
+        crop: CroppedObject,
+        embedding: list[float] | BaseException,
+    ) -> list["SimilarSku"]:
+        """임베딩 1건으로 유사 SKU를 조회합니다.
+
+        Args:
+            crop: 조회 대상 크롭입니다.
+            embedding: ``asyncio.gather``가 돌려준 임베딩 또는 예외입니다.
+
+        Returns:
+            유사 SKU 목록이며, 임베딩·조회에 실패하면 빈 목록입니다.
+        """
+        # 크롭 1건의 실패가 나머지 크롭 추천까지 막지 않도록 폴백합니다.
+        if isinstance(embedding, BaseException):
+            _LOGGER.warning(
+                "크롭 임베딩 실패로 SKU 후보를 비웁니다: crop_index=%s",
+                crop.crop_index,
+                exc_info=embedding,
+            )
+            return []
+
+        try:
+            return await self.find_similar_skus(embedding)
+        except SimilarSkuQueryError:
             _LOGGER.exception(
-                "scene_image 분석 실패 상태 저장에 실패했습니다: %s",
-                scene_id,
+                "유사 SKU 조회 실패로 후보를 비웁니다: crop_index=%s",
+                crop.crop_index,
             )
+            return []
 
-    async def get_crop_image_coords(
-        self,
-        scene_id: int,
-        object_indexes: list[int],
-    ) -> SceneCropData:
-        """장면 이미지 경로와 요청된 인덱스의 좌표를 함께 조회합니다.
+    async def _embed_crop(self, crop: CroppedObject) -> list[float]:
+        """크롭 1건을 임베딩합니다. 동시 호출 수를 세마포어로 제한합니다.
 
         Args:
-            scene_id: 조회할 장면 이미지 ID입니다.
-            object_indexes: 좌표를 조회할 탐지 객체 인덱스 목록입니다.
-                범위를 벗어난 인덱스는 조용히 무시합니다.
+            crop: 임베딩할 크롭입니다.
 
         Returns:
-            원본 이미지 경로와 `(원래 인덱스, 좌표)` 쌍 목록입니다.
-            enumerate로 다시 번호를 매기지 않도록 인덱스를 좌표와 함께
-            유지합니다.
-
-        Raises:
-            SceneImageNotFoundError: scene_id에 해당하는 장면 이미지가
-                없는 경우입니다.
+            크롭 이미지의 임베딩 벡터입니다.
         """
-        result = await self.session.execute(
-            _CROP_IMAGE_COORD_QUERY,
-            {"scene_image_id": scene_id},
-        )
-        row = result.mappings().first()
-        if row is None:
-            raise SceneImageNotFoundError(scene_id)
+        async with self._embed_semaphore:
+            return await asyncio.to_thread(
+                self.gemini_service.embed_image, crop.image
+            )
 
-        coords = row["object_metadata"]
-        indexed_coords = [
-            (i, coords[i]) for i in object_indexes if 0 <= i < len(coords)
-        ]
+    @staticmethod
+    def _to_sku_candidate(sku: "SimilarSku") -> SkuCandidate:
+        """유사도 조회 결과를 응답용 SKU 후보로 변환합니다.
 
-        return {
-            "scene_image": SceneImageInfo(              # 추가
-                scene_image_id=row["scene_image_id"],
-                image_url=row["image_url"],
-                origin_name=row["origin_name"],
-                mime_type=row["mime_type"],
-                file_size=row["file_size"],
-                width_px=row["width_px"],
-                height_px=row["height_px"],
+        similarity_score는 임베딩 유사도 기반 잠정값이며, XAI 채점
+        단계에서 루브릭 총점으로 덮어씁니다.
+
+        Args:
+            sku: 유사도 조회로 얻은 SKU 1건입니다.
+
+        Returns:
+            XAI 결과가 비어 있는 SKU 후보입니다.
+        """
+        return SkuCandidate(
+            sku_code=sku.sku_code,
+            product_name=sku.product_name,
+            category=sku.category or "",
+            sub_category=sku.sub_category or "",
+            attrs={
+                key: str(value) for key, value in (sku.attributes or {}).items()
+            },
+            similarity_score=max(0, min(100, round(sku.similarity * 100))),
+            matched_sku_image=MatchedSkuImage(
+                sku_image_id=sku.sku_image_id,
+                image_type=sku.image_type,
+                image_url=sku.image_url,
             ),
-            "image_url": row["image_url"],
-            "indexed_coords": indexed_coords,
-        }
+            xai_result=XaiResult(summary=NO_XAI_SUMMARY),
+        )
 
     async def find_similar_skus(
         self,
         embedding: collections.abc.Sequence[float],
         limit: int = DEFAULT_RESULT_LIMIT,
     ) -> list[SimilarSku]:
-        """임베딩 벡터와 가장 유사한 SKU를 SKU 단위로 중복 없이 조회합니다.
+        """임베딩 벡터와 코사인 거리가 가까운 SKU를 조회합니다.
 
         Args:
-            embedding: 검색 기준이 되는 크롭 이미지 임베딩입니다.
+            embedding: 크롭 이미지의 임베딩 벡터입니다.
             limit: 반환할 최대 SKU 개수입니다.
 
         Returns:
             유사도 내림차순으로 정렬된 SKU 목록입니다.
 
         Raises:
-            SimilarSkuQueryError: 임베딩 차원이 스키마와 다른 경우입니다.
+            SimilarSkuQueryError: 임베딩 차원이 맞지 않는 경우입니다.
         """
         if len(embedding) != EMBEDDING_DIMENSIONS:
             raise SimilarSkuQueryError(
@@ -440,14 +216,51 @@ class SimilarSkuService:
                 f"합니다. 현재 {len(embedding)} 차원입니다."
             )
 
-        result = await self.session.execute(
-            _SIMILAR_SKU_QUERY,
-            {
-                "embedding": list(embedding),
-                "candidate_limit": CANDIDATE_LIMIT,
-                "result_limit": limit,
-            },
+        query_vector = sqlalchemy.cast(list(embedding), _HALFVEC)
+        distance = (
+            sqlalchemy.cast(SkuImage.embedding, _HALFVEC)
+            .cosine_distance(query_vector)
+            .label("distance")
         )
-        rows = result.mappings().all()
 
-        return [SimilarSku(**row) for row in rows]
+        candidate = (
+            sqlalchemy.select(SkuImage.sku_id, distance)
+            .where(SkuImage.embedding.is_not(None))
+            .order_by(distance)
+            .limit(CANDIDATE_LIMIT)
+            .cte("candidate")
+        )
+
+        main_image = orm.aliased(SkuImage, name="main_image")
+        min_distance = sqlalchemy.func.min(candidate.c.distance)
+
+        stmt = (
+            sqlalchemy.select(
+                SkuCatalog.sku_id,
+                main_image.sku_image_id,
+                main_image.image_url,
+                main_image.image_type,
+                SkuCatalog.sku_code,
+                SkuCatalog.product_name,
+                SkuCatalog.category,
+                SkuCatalog.sub_category,
+                SkuCatalog.attributes,
+                (1 - min_distance).label("similarity"),
+            )
+            .select_from(candidate)
+            .join(SkuCatalog, SkuCatalog.sku_id == candidate.c.sku_id)
+            .join(
+                main_image,
+                sqlalchemy.and_(
+                    main_image.sku_id == candidate.c.sku_id,
+                    main_image.image_type == "MAIN",
+                ),
+            )
+            .group_by(SkuCatalog.sku_id, main_image.sku_image_id)
+            .order_by(min_distance)
+            .limit(limit)
+        )
+
+        rows = (await self.session.execute(stmt)).mappings().all()
+
+        return [SimilarSku.model_validate(dict(row)) for row in rows]
