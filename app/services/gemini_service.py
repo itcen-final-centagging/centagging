@@ -1,6 +1,6 @@
-"""Gemini Developer API 실제 호출 서비스입니다.
+"""Google Gen AI 모델 실제 호출 서비스입니다.
 
-Service for live Gemini Developer API calls.
+Service for live Gemini model calls through Vertex AI or Developer API.
 """
 
 import io
@@ -8,12 +8,11 @@ import logging
 import time
 import typing
 
-from google import genai
 from google.genai import errors, types
 from PIL import Image
 from pydantic import ValidationError
 
-from app.core import config
+from app.core import config, genai_client
 from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiModelDetectionResult,
@@ -23,7 +22,7 @@ from app.services.furniture_detect_prompt import FURNITURE_DETECTION_PROMPT
 
 # 오류 클래스들 모음
 class GeminiConfigurationError(RuntimeError):
-    """Gemini API 키가 누락되었을 때 발생합니다."""
+    """Google Gen AI 인증 설정이 누락되었을 때 발생합니다."""
 
     code = "DETECTION_NOT_CONFIGURED"
 
@@ -83,8 +82,8 @@ class GeminiService:
 
     @property
     def is_configured(self) -> bool:
-        """API 키 설정 여부를 반환합니다. 키 값 자체는 노출하지 않습니다."""
-        return bool(self._settings.gemini_api_key)
+        """Google Gen AI 인증 설정 여부를 반환합니다."""
+        return genai_client.is_configured(self._settings)
 
     def verify_connection(self) -> GeminiVerificationResult:
         """텍스트 생성과 임베딩을 각각 한 번 호출해 실제 연동을 검증합니다.
@@ -98,12 +97,11 @@ class GeminiService:
         """
         if not self.is_configured:
             raise GeminiConfigurationError(
-                "GEMINI_API_KEY is not configured. "
-                "Create .env from .env.example."
+                "Google Gen AI authentication is not configured."
             )
 
         try:
-            client = genai.Client(api_key=self._settings.gemini_api_key)
+            client = genai_client.create_client(self._settings)
             text_response = client.models.generate_content(
                 model=self._settings.gemini_vlm_model,
                 contents="Connection verification. Reply only OK.",
@@ -144,13 +142,15 @@ class GeminiService:
             GeminiRawDetection 객체 리스트입니다.
         """
         if not self.is_configured:
-            raise GeminiConfigurationError("GEMINI_API_KEY is not configured.")
+            raise GeminiConfigurationError(
+                "Google Gen AI authentication is not configured."
+            )
 
         started_at = time.perf_counter()
         object_count = 0
 
         try:
-            client = genai.Client(api_key=self._settings.gemini_api_key)
+            client = genai_client.create_client(self._settings)
 
             contents: list[types.ContentUnionDict] = [
                 image,
@@ -228,11 +228,11 @@ class GeminiService:
         """
         if not self.is_configured:
             raise GeminiConfigurationError(
-                "GEMINI_API_KEY가 설정되지 않았습니다."
+                "Google Gen AI 인증 설정이 누락되었습니다."
             )
 
         try:
-            client = genai.Client(api_key=self._settings.gemini_api_key)
+            client = genai_client.create_client(self._settings)
 
             image_format = (image.format or "PNG").upper()
             buffer = io.BytesIO()
@@ -242,7 +242,7 @@ class GeminiService:
             response = client.models.embed_content(
                 model=self._settings.gemini_embedding_model,
                 contents=[  # type: ignore[arg-type]
-                    genai.types.Part.from_bytes(
+                    types.Part.from_bytes(
                         data=image_bytes,
                         mime_type=f"image/{image_format.lower()}",
                     ),

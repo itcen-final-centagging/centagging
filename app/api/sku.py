@@ -133,7 +133,7 @@ async def extract_metadata(
     except sku_service.SkuConfigurationError as error:
         raise fastapi.HTTPException(
             status_code=fastapi.status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Gemini API key is not configured.",
+            detail="Google Gen AI authentication is not configured.",
         ) from error
     except sku_service.SkuExtractionError as error:
         raise fastapi.HTTPException(

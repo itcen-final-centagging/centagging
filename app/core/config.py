@@ -27,6 +27,9 @@ class Settings:
     image_storage_root: str
     sku_image_root: str
     mvp_login_password: str = dataclasses.field(repr=False)
+    vertex_api_key: str = dataclasses.field(default="", repr=False)
+    gcp_project_id: str = ""
+    vertex_ai_location: str = "global"
 
 
 def get_settings() -> Settings:
@@ -37,6 +40,9 @@ def get_settings() -> Settings:
     """
     return Settings(
         gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+        vertex_api_key=os.getenv("VERTEX_API_KEY", ""),
+        gcp_project_id=os.getenv("GCP_PROJECT_ID", ""),
+        vertex_ai_location=os.getenv("VERTEX_AI_LOCATION") or "global",
         gemini_vlm_model=os.getenv("GEMINI_VLM_MODEL", "gemini-3.5-flash"),
         gemini_embedding_model=os.getenv(
             "GEMINI_EMBEDDING_MODEL", "gemini-embedding-2"
