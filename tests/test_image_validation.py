@@ -1,5 +1,6 @@
 """이미지 업로드 유효성 검증 서비스 테스트입니다."""
 
+import datetime
 import io
 import json
 import pathlib
@@ -13,7 +14,7 @@ import starlette.datastructures
 import starlette.testclient
 
 from app.api import scene_images
-from app.core import config, database
+from app.core import config, database, exception_handlers, request_context
 from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiRawDetection,
@@ -126,10 +127,25 @@ class _FakeInsertResult:
 
     def __init__(self, scene_image_id: int = 42) -> None:
         self.scene_image_id = scene_image_id
+        self.created_at = datetime.datetime(
+            2026,
+            8,
+            27,
+            12,
+            35,
+            tzinfo=datetime.timezone(datetime.timedelta(hours=9)),
+        )
 
-    def scalar_one(self) -> int:
-        """저장된 이미지 ID를 반환합니다."""
-        return self.scene_image_id
+    def mappings(self) -> "_FakeInsertResult":
+        """SQLAlchemy mappings 결과처럼 동작합니다."""
+        return self
+
+    def one(self) -> dict[str, object]:
+        """생성된 이미지 ID와 생성 시각을 반환합니다."""
+        return {
+            "scene_image_id": self.scene_image_id,
+            "created_at": self.created_at,
+        }
 
 
 class _FakeUserLookupResult:
@@ -195,6 +211,8 @@ class UploadSceneImageApiTest(unittest.TestCase):
         self.storage_directory = tempfile.TemporaryDirectory()
         self.session = _FakeSession()
         self.app = fastapi.FastAPI()
+        self.app.add_middleware(request_context.RequestIdMiddleware)
+        exception_handlers.register_exception_handlers(self.app)
         self.app.include_router(scene_images.router)
 
         async def override_database_session():
@@ -210,6 +228,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
             mvp_login_id="mvp-user",
             mvp_login_password="",
             image_storage_root=self.storage_directory.name,
+            sku_image_root="",
             database=config.DatabaseSettings(
                 name="",
                 username="",
@@ -226,7 +245,12 @@ class UploadSceneImageApiTest(unittest.TestCase):
             detections=[
                 GeminiRawDetection(
                     category="의자",
-                    box_2d=[100, 200, 700, 800],
+                    bbox_coord={
+                        "xmin": 200,
+                        "ymin": 100,
+                        "xmax": 800,
+                        "ymax": 700,
+                    },
                     evidence="chair shape",
                     confidence=0.9,
                 )
@@ -265,9 +289,39 @@ class UploadSceneImageApiTest(unittest.TestCase):
         response = self._post_valid_image()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "validated")
-        self.assertEqual(response.json()["image"]["mime_type"], "image/png")
-        self.assertEqual(response.json()["scene_image_id"], 42)
+        response_body = response.json()
+        self.assertEqual(response_body["status"], "success")
+        self.assertEqual(
+            response_body["data"]["scene_image"]["mime_type"],
+            "image/png",
+        )
+        self.assertEqual(
+            response_body["data"]["scene_image"]["scene_image_id"], 42
+        )
+        self.assertEqual(
+            response_body["data"]["scene_image"]["created_at"],
+            "2026-08-27T12:35:00+09:00",
+        )
+        self.assertEqual(response_body["data"]["object_count"], 1)
+        detected_object = response_body["data"]["objects"][0]
+        self.assertEqual(detected_object["object_index"], 0)
+        self.assertEqual(detected_object["category"], "의자")
+        self.assertIsNone(detected_object["sub_category"])
+        self.assertEqual(
+            detected_object["bbox_coord"],
+            {
+                "xmin": 200,
+                "ymin": 100,
+                "xmax": 800,
+                "ymax": 700,
+            },
+        )
+        self.assertEqual(detected_object["confidence"], 0.9)
+        self.assertEqual(detected_object["evidence"], "chair shape")
+        self.assertEqual(
+            response_body["meta"]["request_id"],
+            response.headers["X-Request-ID"],
+        )
         assert self.session.execute_parameters is not None
         self.assertEqual(
             self.session.user_lookup_parameters,
@@ -295,15 +349,18 @@ class UploadSceneImageApiTest(unittest.TestCase):
         assert self.session.analysis_update_parameters is not None
         self.assertEqual(
             json.loads(
-                str(self.session.analysis_update_parameters["bbox_coord"])
+                str(self.session.analysis_update_parameters["object_metadata"])
             ),
             [
                 {
-                    "category":"의자",
-                    "xmin": 200,
-                    "ymin": 100,
-                    "xmax": 800,
-                    "ymax": 700,
+                    "object_index": 0,
+                    "bbox_coord": {
+                        "xmin": 200,
+                        "ymin": 100,
+                        "xmax": 800,
+                        "ymax": 700,
+                    },
+                    "category": "의자",
                 }
             ],
         )
@@ -370,7 +427,8 @@ class UploadSceneImageApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(
-            response.json()["detail"], scene_images.UPLOAD_ERROR_MESSAGE
+            response.json()["error"]["message"],
+            scene_images.UPLOAD_ERROR_MESSAGE,
         )
         self.assertIsNone(self.session.execute_parameters)
 

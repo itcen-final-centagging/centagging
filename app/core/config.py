@@ -25,6 +25,7 @@ class Settings:
     mvp_login_id: str
     database: DatabaseSettings
     image_storage_root: str
+    sku_image_root: str
     mvp_login_password: str = dataclasses.field(repr=False)
 
 
@@ -43,6 +44,7 @@ def get_settings() -> Settings:
         mvp_login_id=os.getenv("MVP_LOGIN_ID", ""),
         mvp_login_password=os.getenv("MVP_LOGIN_PASSWORD", ""),
         image_storage_root=os.getenv("IMAGE_STORAGE_ROOT", "uploads"),
+        sku_image_root=os.getenv("SKU_IMAGE_ROOT", "data/images"),
         database=DatabaseSettings(
             name=os.getenv("POSTGRES_DB", "centagging"),
             username=os.getenv("POSTGRES_USER", "centagging"),

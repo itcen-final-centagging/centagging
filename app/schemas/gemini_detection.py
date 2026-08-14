@@ -8,27 +8,29 @@ from pydantic import BaseModel, Field, model_validator
 Coordinate = Annotated[float, Field(ge=0, le=1000)]
 
 
-# Gemini  탐지 객체 label, 박스 크기(좌표 순서: [ymin, xmin, ymax, xmax], 좌표 범위)
+# Gemini 탐지 객체 좌표
+class GeminiBoundingBox(BaseModel):
+    xmin: Coordinate
+    ymin: Coordinate
+    xmax: Coordinate
+    ymax: Coordinate
+
+    @model_validator(mode="after")
+    def validate_direction(self) -> "GeminiBoundingBox":
+        if self.xmin >= self.xmax:
+            raise ValueError("xmin 값은 xmax 값보다 작아야 합니다.")
+        if self.ymin >= self.ymax:
+            raise ValueError("ymin 값은 ymax 값보다 작아야 합니다.")
+        return self
+
+# Gemini  탐지 객체 category, 박스 크기(좌표 순서: [ymin, xmin, ymax, xmax], 좌표 범위)
 class GeminiRawDetection(BaseModel):
     """Gemini가 반환하는 개별 탐지 객체입니다."""
 
     category: str = Field(min_length=1)
-    box_2d: list[Coordinate] = Field(min_length=4, max_length=4)
+    bbox_coord: GeminiBoundingBox
     evidence: str = Field(min_length=1)
     confidence: float | None = Field(default=None, ge=0, le=1)
-
-    @model_validator(mode="after")
-    def validate_box_2d(self) -> "GeminiRawDetection":
-        """bounding box 좌표의 방향과 크기를 검증합니다."""
-        ymin, xmin, ymax, xmax = self.box_2d
-
-        if ymin >= ymax:
-            raise ValueError("ymin 값은 ymax 값보다 작아야 합니다.")
-
-        if xmin >= xmax:
-            raise ValueError("xmin 값은 xmax 값보다 작아야 합니다.")
-
-        return self
 
 
 # Gemini 탐지 결과 리스트

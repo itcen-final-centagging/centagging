@@ -15,11 +15,19 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/history/results': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       '/tagging': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
       '/uploads': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/sku-images': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },

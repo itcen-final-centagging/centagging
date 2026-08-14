@@ -19,14 +19,13 @@ FURNITURE_DETECTION_PROMPT = """
     7. A smaller region should be suppressed only when it is a component of the larger furniture, not an independent furniture object.
 
     ## Bounding-box rules
-    1. box_2d must use [ymin, xmin, ymax, xmax].
+    1. bbox_coord must be an object containing xmin, ymin, xmax, and ymax.
     2. Coordinates must be integers normalized to the range 0 to 1000.
     3. The detection box should tightly enclose the confidently visible or visually continuous extent of the furniture.
-    4. Do not intentionally add crop padding to box_2d.
+    4. Do not intentionally add crop padding to bbox_coord.
     5. Do not include cast shadows, reflections, or unrelated nearby objects.
-    6. If furniture touches or extends beyond an image boundary, clamp the box to that boundary and set is_truncated to true.
-    7. If the exact boundary is uncertain because of occlusion, prefer a conservative box that does not absorb a separate neighboring object.
-    8. The following must always hold:
+    6. If the exact boundary is uncertain because of occlusion, prefer a conservative box that does not absorb a separate neighboring object.
+    7. The following must always hold:
         0 <= ymin < ymax <= 1000
         0 <= xmin < xmax <= 1000
 
@@ -40,10 +39,8 @@ FURNITURE_DETECTION_PROMPT = """
     ## Occlusion and truncation rules
     1. Detect a partially occluded object when enough visible structure exists to identify it as an independent furniture instance.
     2. Detect furniture truncated by the image boundary when it can still be identified as furniture.
-    3. For an image-boundary-truncated object, clamp the bounding box to the image boundary and set is_truncated to true.
-    4. Do not invent coordinates for portions located outside the image.
-    5. When part of the object is hidden behind another object, box the reliably estimated object extent only when its continuation is visually obvious. Otherwise, box the visible extent and set is_occluded to true.
-    6. Do not treat shadows or reflections as part of the furniture boundary.
+    3. Do not invent coordinates for portions located outside the image.
+    4. Do not treat shadows or reflections as part of the furniture boundary.
 
     ## Category rules
     - Use a coarse furniture category from the provided allowed category list.
@@ -55,7 +52,12 @@ FURNITURE_DETECTION_PROMPT = """
         "detections": [
             {
                 "category": "의자",
-                "box_2d": [251, 99, 977, 631],
+                "bbox_coord": {
+                    "xmin": 99,
+                    "ymin": 251,
+                    "xmax": 631,
+                    "ymax": 977
+                },
                 "evidence": "A separately visible chair with a backrest and four legs.",
                 "confidence": 0.82
             }

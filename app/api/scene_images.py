@@ -6,12 +6,12 @@ import pathlib
 import uuid
 
 import fastapi
-import pydantic
 import sqlalchemy
 from fastapi.concurrency import run_in_threadpool
 
 from app.core import config, database
-from app.schemas.furniture_detection import DetectedObjectResponse
+from app.schemas import common as common_schema
+from app.schemas.furniture_detection import DetectedObjectResponse, FurnitureDetectionResponse, SceneImageResponse
 from app.schemas.gemini_detection import GeminiDetectionResult
 from app.services import furniture_detection_service, image_validation
 
@@ -55,12 +55,12 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
         :width_px,
         :height_px
     )
-    RETURNING scene_image_id
+    RETURNING scene_image_id, created_at
     """)
 _UPDATE_DETECTION_SUCCESS = sqlalchemy.text("""
     UPDATE scene_image
     SET
-        bbox_coord = CAST(:bbox_coord AS jsonb),
+        object_metadata = CAST(:object_metadata AS jsonb),
         analysis_status = :analysis_status,
         analysis_error = :analysis_error
     WHERE scene_image_id = :scene_image_id
@@ -73,17 +73,6 @@ _UPDATE_ANALYSIS_FAILURE = sqlalchemy.text("""
         analysis_error = :analysis_error
     WHERE scene_image_id = :scene_image_id
 """)
-
-
-class ImageValidationResponse(pydantic.BaseModel):
-    """저장된 업로드 이미지의 ID와 메타데이터입니다."""
-
-    status: str
-    scene_image_id: int
-    image: image_validation.ImageMetadata
-    detections: list[DetectedObjectResponse] = pydantic.Field(
-        default_factory=list
-    )
 
 
 def _save_image(path: pathlib.Path, content: bytes) -> None:
@@ -118,10 +107,21 @@ def _build_detected_objects(
     """내부 탐지 결과를 공개 응답 객체로 변환합니다."""
     return [
         DetectedObjectResponse(
+            object_index=object_index,
             category=detection.category,
-            box_2d=[round(coordinate) for coordinate in detection.box_2d],
+            sub_category=None,
+            bbox_coord={
+                "xmin": round(detection.bbox_coord.xmin),
+                "ymin": round(detection.bbox_coord.ymin),
+                "xmax": round(detection.bbox_coord.xmax),
+                "ymax": round(detection.bbox_coord.ymax),
+            },
+            confidence=detection.confidence,
+            evidence=detection.evidence,
         )
-        for detection in detection_result.detections
+        for object_index, detection in enumerate(
+            detection_result.detections
+        )
     ]
 
 
@@ -132,18 +132,14 @@ async def _save_detection_success(
     detected_objects: list[DetectedObjectResponse],
 ) -> None:
     """탐지 결과와 성공 상태를 저장합니다."""
-    bbox_coord = []
-    for detected_object in detected_objects:
-        ymin, xmin, ymax, xmax = detected_object.box_2d
-        bbox_coord.append(
-            {
-                "category": detected_object.category,
-                "xmin": xmin,
-                "ymin": ymin,
-                "xmax": xmax,
-                "ymax": ymax,
-            }
-        )
+    object_metadata = [
+        {
+            "object_index": detected_object.object_index,
+            "category": detected_object.category,
+            "bbox_coord": detected_object.bbox_coord.model_dump(),
+        }
+        for detected_object in detected_objects
+    ]
 
     await database_session.execute(
         _UPDATE_DETECTION_SUCCESS,
@@ -151,8 +147,8 @@ async def _save_detection_success(
             "scene_image_id": scene_image_id,
             "analysis_status": "detected",
             "analysis_error": None,
-            "bbox_coord": json.dumps(
-                bbox_coord,
+            "object_metadata": json.dumps(
+                object_metadata,
                 ensure_ascii=False,
             ),
         },
@@ -177,13 +173,16 @@ async def _save_analysis_failure(
     await database_session.commit()
 
 
-@router.post("/tagging", response_model=ImageValidationResponse)
+@router.post(
+    "/tagging",
+    response_model=common_schema.SuccessResponse[FurnitureDetectionResponse],
+)
 async def upload_scene_image(
     file: fastapi.UploadFile = fastapi.File(...),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
-) -> ImageValidationResponse:
+) -> common_schema.SuccessResponse[FurnitureDetectionResponse]:
     """이미지를 검증하고 원본 파일과 메타데이터를 함께 저장합니다.
 
     Args:
@@ -243,7 +242,9 @@ async def upload_scene_image(
                 "height_px": validated.metadata.height_px,
             },
         )
-        scene_image_id = int(result.scalar_one())
+        created_scene = result.mappings().one()
+        scene_image_id = int(created_scene["scene_image_id"])
+        created_at = created_scene["created_at"]
         await database_session.commit()
     except fastapi.HTTPException:
         raise
@@ -289,9 +290,21 @@ async def upload_scene_image(
             status_code=502, detail="가구 탐지에 실패했습니다."
         ) from error
 
-    return ImageValidationResponse(
-        status="validated",
-        scene_image_id=scene_image_id,
-        image=validated.metadata,
-        detections=detected_objects,
+    return common_schema.success_response(
+        FurnitureDetectionResponse(
+            scene_image=SceneImageResponse(
+                scene_image_id=scene_image_id,
+                image_url=image_url,
+                origin_name=validated.metadata.origin_name,
+                mime_type=validated.metadata.mime_type,
+                file_size=validated.metadata.file_size,
+                analysis_status="detected",
+                analysis_error=None,
+                width_px=validated.metadata.width_px,
+                height_px=validated.metadata.height_px,
+                created_at=created_at,
+            ),
+            object_count=len(detected_objects),
+            objects=detected_objects,
+        )
     )
