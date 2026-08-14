@@ -1,12 +1,12 @@
 import type React from 'react';
 
-import { TaggingWorkflowProvider } from '@/features/tagging/hooks/useTaggingWorkflow';
+import { AuthProvider } from '@/features/auth/components/AuthProvider';
 import { AppRouter } from '@/router';
 
 export const App: React.FC = () => {
   return (
-    <TaggingWorkflowProvider>
+    <AuthProvider>
       <AppRouter />
-    </TaggingWorkflowProvider>
+    </AuthProvider>
   );
 };

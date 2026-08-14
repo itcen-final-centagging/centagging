@@ -10,6 +10,7 @@
     "lint:fix": "eslint --cache . --fix",
     "prettier:check": "prettier --cache . --check",
     "prettier:write": "prettier --cache . --write",
+    "test:auth-api": "node --test tests/auth-api.test.mjs",
     "test:tagging-api": "node --test tests/tagging-api.test.mjs",
     "preview": "vite preview"
   },

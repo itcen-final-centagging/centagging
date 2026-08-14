@@ -15,7 +15,7 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
            tr.created_at,
            si.image_url,
            si.origin_name,
-           si.bbox_coord -> tr.object_index AS bbox
+           si.object_metadata -> tr.object_index -> 'bbox_coord' AS bbox
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -33,7 +33,7 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            tr.similarity_score,
            si.image_url AS scene_image_url,
            si.origin_name,
-           si.bbox_coord -> tr.object_index AS bbox,
+           si.object_metadata -> tr.object_index -> 'bbox_coord' AS bbox,
            sc.sku_code,
            sc.product_name,
            sc.brand,

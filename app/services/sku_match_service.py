@@ -25,8 +25,9 @@ class DuplicateObjectIndexError(RuntimeError):
 class MatchingTargetNotFoundError(RuntimeError):
     """sku_code 또는 활성 사용자를 찾지 못한 경우입니다."""
 
+
 _SELECT_SCENE = sqlalchemy.text("""
-    SELECT jsonb_array_length(bbox_coord) AS object_count
+    SELECT jsonb_array_length(object_metadata) AS object_count
       FROM scene_image
      WHERE scene_image_id = :scene_image_id
     """)
@@ -138,7 +139,7 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             scene_id: 조회할 장면 이미지 ID입니다.
 
         Returns:
-            bbox_coord 배열의 길이입니다.
+            object_metadata 배열의 길이입니다.
 
         Raises:
             SceneImageNotFoundError: 장면 이미지가 없는 경우입니다.

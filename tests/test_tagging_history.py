@@ -9,7 +9,7 @@ import fastapi
 import starlette.testclient
 
 from app.api import history
-from app.core import database
+from app.core import database, exception_handlers, request_context
 
 
 class _FakeResult:
@@ -119,6 +119,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
         }
         self.session = _FakeSession(rows, detail_row)
         self.app = fastapi.FastAPI()
+        self.app.add_middleware(request_context.RequestIdMiddleware)
+        exception_handlers.register_exception_handlers(self.app)
         self.app.include_router(history.router)
 
         async def override_database_session() -> (
@@ -136,12 +138,11 @@ class TaggingHistoryApiTest(unittest.TestCase):
         response = self.client.get("/history/results")
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "success")
         self.assertEqual(
-            response.json(),
+            response.json()["data"],
             {
-                "status": "success",
-                "data": {
-                    "items": [
+                "items": [
                         {
                             "result_id": 8801,
                             "sku_code": "CHR-2041",
@@ -162,9 +163,12 @@ class TaggingHistoryApiTest(unittest.TestCase):
                                 },
                             },
                         }
-                    ]
-                },
+                ]
             },
+        )
+        self.assertEqual(
+            response.json()["meta"]["request_id"],
+            response.headers["X-Request-ID"],
         )
 
     def test_returns_empty_items_when_history_does_not_exist(self) -> None:
@@ -176,7 +180,11 @@ class TaggingHistoryApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
-            {"status": "success", "data": {"items": []}},
+            {
+                "status": "success",
+                "data": {"items": []},
+                "meta": {"request_id": response.headers["X-Request-ID"]},
+            },
         )
 
     def test_queries_bbox_by_object_index_in_newest_first_order(self) -> None:
@@ -184,7 +192,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
         self.client.get("/history/results")
 
         self.assertIn(
-            "si.bbox_coord -> tr.object_index",
+            "si.object_metadata -> tr.object_index",
             self.session.executed_statement,
         )
         self.assertIn(
@@ -217,6 +225,10 @@ class TaggingHistoryApiTest(unittest.TestCase):
             data["xai_result"],
             {"summary": "형태와 색상이 유사합니다."},
         )
+        self.assertEqual(
+            response.json()["meta"]["request_id"],
+            response.headers["X-Request-ID"],
+        )
 
     def test_returns_404_when_tagging_history_does_not_exist(self) -> None:
         """결과 ID에 해당하는 태깅 이력이 없으면 404를 반환합니다."""
@@ -226,8 +238,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(
-            response.json()["detail"],
-            "태깅 이력을 찾을 수 없습니다.",
+            response.json()["error"]["code"],
+            "RESOURCE_NOT_FOUND",
         )
 
 

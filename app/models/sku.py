@@ -8,6 +8,7 @@ SQLAlchemy models for the SKU catalog and its images. 테이블은
 import datetime
 import typing
 
+import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import sqlalchemy
 from sqlalchemy import orm
 from sqlalchemy.dialects import postgresql
@@ -77,6 +78,12 @@ class SkuImage(Base):  # pylint: disable=too-few-public-methods
     )
     image_type: orm.Mapped[str] = orm.mapped_column(
         sqlalchemy.String(20), nullable=False, default="MAIN"
+    )
+    embedding: orm.Mapped[typing.Optional[list[float]]] = orm.mapped_column(
+        pgvector_sa.Vector(3072), deferred=True
+    )
+    indexed_at: orm.Mapped[typing.Optional[datetime.datetime]] = (
+        orm.mapped_column(sqlalchemy.TIMESTAMP(timezone=True))
     )
     created_at: orm.Mapped[datetime.datetime] = orm.mapped_column(
         sqlalchemy.TIMESTAMP(timezone=True),

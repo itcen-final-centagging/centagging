@@ -2,18 +2,16 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.dependencies import get_similar_sku_service, get_sku_match_service
+from app.dependencies import get_tagging_service, get_sku_match_service
+from app.schemas import common as common_schema
 from app.schemas.tagging import (
-    DetectionResponse,
+    DetectionResult,
     SkuMatchingRequest,
-    SkuMatchingResponse,
     SkuMatchingResult,
 )
+from app.repositories.scene_image_repository import SceneImageNotFoundError
 from app.services import sku_match_service as sku_match
-from app.services.similar_sku_service import (
-    SceneImageNotFoundError,
-    SimilarSkuService,
-)
+from app.services.tagging_service import TaggingService
 
 router = APIRouter(prefix="/tagging", tags=["tagging"])
 
@@ -21,15 +19,18 @@ router = APIRouter(prefix="/tagging", tags=["tagging"])
 @router.get("/scenes/{scene_id}")
 async def get_recommendation_sku(
     scene_id: int,
-    object_indexes: list[int] = Query(default=[]),
-    similar_sku_service: SimilarSkuService = Depends(get_similar_sku_service),
-) -> DetectionResponse:
+    object_indexes: list[int] | None = Query(
+        default=None,
+        description="탐지 객체 인덱스 목록입니다. "
+    ),
+    taggin_service: TaggingService = Depends(get_tagging_service),
+) -> common_schema.SuccessResponse[DetectionResult]:
     """장면 이미지에서 탐지된 객체들의 유사 SKU를 추천합니다.
 
     Args:
         scene_id: 조회할 장면 이미지 ID입니다.
-        object_indexes: 탐지된 객체 인덱스입니다.
-        similar_sku_service: 유사 SKU 조회 서비스입니다.
+        object_indexes: 조회할 탐지 객체의 인덱스 목록입니다.
+        taggin_service: 유사 SKU 조회 및 XAI 근거 산출 서비스입니다.
 
     Returns:
         탐지된 객체 별 유사 SKU 후보 정보 목록을 반환합니다.
@@ -39,13 +40,11 @@ async def get_recommendation_sku(
             404를 반환합니다.
     """
     try:
-        result = await similar_sku_service.orchestrate_similar_skus(
-            scene_id, object_indexes
-        )
+        result = await taggin_service.get_sku_candidates(scene_id)
     except SceneImageNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    return DetectionResponse(status="success", data=result)
+    return common_schema.success_response(result)
 
 
 @router.put("/scenes/{scene_id}")
@@ -53,7 +52,7 @@ async def confirm_scene_matching(
     scene_id: int,
     match_request: SkuMatchingRequest,
     match_service: sku_match.SkuMatchService = Depends(get_sku_match_service),
-) -> SkuMatchingResponse:
+) -> common_schema.SuccessResponse[SkuMatchingResult]:
     """탐지 객체별로 선택한 SKU를 최종 확정해 저장합니다.
 
     Args:
@@ -81,10 +80,9 @@ async def confirm_scene_matching(
     ) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
-    return SkuMatchingResponse(
-        status="success",
-        data=SkuMatchingResult(
+    return common_schema.success_response(
+        SkuMatchingResult(
             processing_status="CONFIRMED",
             result_ids=result_ids,
-        ),
+        )
     )

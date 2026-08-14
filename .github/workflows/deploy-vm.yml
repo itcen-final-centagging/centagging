@@ -1,0 +1,152 @@
+name: Deploy to GCP VM
+
+on:
+  push:
+    branches:
+      - deploy
+  workflow_dispatch:
+
+concurrency:
+  group: centagging-production-vm
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: build-and-deploy
+    if: github.ref == 'refs/heads/deploy'
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 45
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      GCP_ARTIFACT_REPOSITORY: ${{ vars.GCP_ARTIFACT_REPOSITORY }}
+      GCP_VM_NAME: ${{ vars.GCP_VM_NAME }}
+      GCP_VM_ZONE: ${{ vars.GCP_VM_ZONE }}
+
+    steps:
+      - name: Check out deploy revision
+        uses: actions/checkout@v6
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_variables=(
+            GCP_PROJECT_ID
+            GCP_REGION
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+            GCP_DEPLOY_SERVICE_ACCOUNT
+            GCP_ARTIFACT_REPOSITORY
+            GCP_VM_NAME
+            GCP_VM_ZONE
+          )
+
+          for variable_name in "${required_variables[@]}"; do
+            if [[ -z "${!variable_name:-}" ]]; then
+              echo "Missing GitHub Environment variable: ${variable_name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          version: ">= 550.0.0"
+
+      - name: Configure Artifact Registry authentication
+        shell: bash
+        run: |
+          gcloud auth configure-docker \
+            "${GCP_REGION}-docker.pkg.dev" \
+            --quiet
+
+      - name: Build and push immutable images
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          registry="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}"
+          api_image="${registry}/api:${GITHUB_SHA}"
+          frontend_image="${registry}/frontend:${GITHUB_SHA}"
+
+          docker build --pull \
+            --file Dockerfile.api \
+            --tag "${api_image}" \
+            .
+
+          docker build --pull \
+            --file Dockerfile.frontend \
+            --tag "${frontend_image}" \
+            .
+
+          docker push "${api_image}"
+          docker push "${frontend_image}"
+
+          echo "api_image=${api_image}" >> "${GITHUB_OUTPUT}"
+          echo "frontend_image=${frontend_image}" >> "${GITHUB_OUTPUT}"
+
+      - name: Package VM deployment files
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_name="centagging-${GITHUB_SHA}.tar.gz"
+          release_path="${RUNNER_TEMP}/${release_name}"
+
+          tar -czf "${release_path}" \
+            docker-compose.prod.yml \
+            scripts/deploy \
+            data/catalog
+
+          echo "release_name=${release_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_path=${release_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy images through IAP
+        shell: bash
+        env:
+          API_IMAGE: ${{ steps.images.outputs.api_image }}
+          FRONTEND_IMAGE: ${{ steps.images.outputs.frontend_image }}
+          RELEASE_NAME: ${{ steps.package.outputs.release_name }}
+          RELEASE_PATH: ${{ steps.package.outputs.release_path }}
+        run: |
+          set -euo pipefail
+
+          gcloud compute scp "${RELEASE_PATH}" \
+            "${GCP_VM_NAME}:/tmp/${RELEASE_NAME}" \
+            --project="${GCP_PROJECT_ID}" \
+            --zone="${GCP_VM_ZONE}" \
+            --tunnel-through-iap \
+            --quiet
+
+          # shellcheck disable=SC2016 # status is expanded by the remote shell.
+          remote_command="$(printf \
+            'sudo mkdir -p /opt/centagging && sudo tar -xzf %q -C /opt/centagging --no-same-owner && sudo bash /opt/centagging/scripts/deploy/deploy_vm.sh %q %q; status=$?; rm -f %q; exit ${status}' \
+            "/tmp/${RELEASE_NAME}" \
+            "${API_IMAGE}" \
+            "${FRONTEND_IMAGE}" \
+            "/tmp/${RELEASE_NAME}")"
+
+          gcloud compute ssh "${GCP_VM_NAME}" \
+            --project="${GCP_PROJECT_ID}" \
+            --zone="${GCP_VM_ZONE}" \
+            --tunnel-through-iap \
+            --quiet \
+            --command="${remote_command}"
