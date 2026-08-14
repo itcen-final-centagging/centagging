@@ -187,12 +187,12 @@ class TaggingHistoryApiTest(unittest.TestCase):
             },
         )
 
-    def test_queries_bbox_by_object_index_in_newest_first_order(self) -> None:
+    def test_queries_bbox_by_object_idx_in_newest_first_order(self) -> None:
         """객체 좌표를 선택하고 저장 시각 최신순으로 조회합니다."""
         self.client.get("/history/results")
 
         self.assertIn(
-            "si.object_metadata -> tr.object_index",
+            "si.object_metadata -> tr.object_idx",
             self.session.executed_statement,
         )
         self.assertIn(

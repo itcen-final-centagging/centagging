@@ -122,7 +122,7 @@ test('save and history requests use their backend contracts', async (t) => {
   });
 
   await saveTaggingReview({
-    objectIndex: 1,
+    objectIdx: 1,
     sceneImageId: '7',
     selectedSku: {
       matchRank: 2,
@@ -152,7 +152,7 @@ test('save and history requests use their backend contracts', async (t) => {
     matching: [
       {
         match_rank: 2,
-        object_index: 1,
+        object_idx: 1,
         similarity_score: 92,
         sku_code: 'CHR-2041',
         vlm_mood: {
@@ -186,7 +186,7 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
         data: {
           objects: [
             {
-              object_index: 1,
+              object_idx: 1,
               sku_candidates: [
                 {
                   attrs: { color: 'white', material: 'mesh' },

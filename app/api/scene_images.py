@@ -107,7 +107,7 @@ def _build_detected_objects(
     """내부 탐지 결과를 공개 응답 객체로 변환합니다."""
     return [
         DetectedObjectResponse(
-            object_index=object_index,
+            object_idx=object_idx,
             category=detection.category,
             sub_category=None,
             bbox_coord={
@@ -119,7 +119,7 @@ def _build_detected_objects(
             confidence=detection.confidence,
             evidence=detection.evidence,
         )
-        for object_index, detection in enumerate(
+        for object_idx, detection in enumerate(
             detection_result.detections
         )
     ]
@@ -134,7 +134,7 @@ async def _save_detection_success(
     """탐지 결과와 성공 상태를 저장합니다."""
     object_metadata = [
         {
-            "object_index": detected_object.object_index,
+            "object_idx": detected_object.object_idx,
             "category": detected_object.category,
             "bbox_coord": detected_object.bbox_coord.model_dump(),
         }

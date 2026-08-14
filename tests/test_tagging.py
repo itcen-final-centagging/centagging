@@ -111,7 +111,7 @@ class CropSceneObjectsTest(unittest.TestCase):
                 image_path,
                 [
                     {
-                        "object_index": 0,
+                        "object_idx": 0,
                         "bbox_coord": {
                             "xmin": 100.0,
                             "ymin": 200.0,

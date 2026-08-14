@@ -116,7 +116,7 @@ class XaiScoringService:
         # 응답 순서가 요청 순서와 다를 수 있으므로 crop_index로 색인합니다.
         scores = {crop.crop_index: crop for crop in score_result.crops}
         for detected in detected_objects:
-            crop_score = scores.get(detected.object_index)
+            crop_score = scores.get(detected.object_idx)
             if crop_score is not None:
                 self._apply_crop_score(detected, crop_score)
 
@@ -138,7 +138,7 @@ class XaiScoringService:
         """
         scoring_crops = []
         for detected in detected_objects:
-            if detected.object_index not in crop_bytes:
+            if detected.object_idx not in crop_bytes:
                 continue
 
             image_bytes_list = await asyncio.gather(
@@ -167,8 +167,8 @@ class XaiScoringService:
 
             scoring_crops.append(
                 ScoringCrop(
-                    crop_index=detected.object_index,
-                    crop_image_bytes=crop_bytes[detected.object_index],
+                    crop_index=detected.object_idx,
+                    crop_image_bytes=crop_bytes[detected.object_idx],
                     candidates=candidates,
                 )
             )

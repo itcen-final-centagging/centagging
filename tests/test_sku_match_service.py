@@ -76,7 +76,7 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
         )
         service = sku_match_service.SkuMatchService(session, settings)
         matching = tagging.SkuMatching(
-            object_index=0,
+            object_idx=0,
             sku_code="CHR-2041",
             match_rank=2,
             similarity_score=92,
@@ -96,13 +96,13 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(session.executions), 2)
         stored = session.executions[1]
         self.assertEqual(stored["scene_image_id"], 7)
-        self.assertEqual(stored["object_index"], 0)
+        self.assertEqual(stored["object_idx"], 0)
         self.assertEqual(stored["match_source"], "RECOMMEND")
         self.assertEqual(stored["match_rank"], 2)
         self.assertEqual(stored["similarity_score"], 0.92)
         insert_sql = str(session.statements[1])
         self.assertNotIn("tag_values", insert_sql)
-        self.assertIn("object_index", insert_sql)
+        self.assertIn("object_idx", insert_sql)
         self.assertIn("match_source", insert_sql)
         self.assertIn("match_rank", insert_sql)
         self.assertIn("CAST(:xai_result AS jsonb)", insert_sql)

@@ -144,7 +144,7 @@ COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
 
 -- ------------------------------------------------------------
 -- 6. tagging_result : 최종 객체-SKU 매핑 + 검수 이력
---    scene_image.object_metadata 배열의 object_index로 탐지 객체를 식별한다.
+--    scene_image.object_metadata 배열의 object_idx로 탐지 객체를 식별한다.
 --    이미지 1장에서 객체 N개를 태깅하면 N행이 생성됨
 --
 --    xai_result 구조 (루브릭 채점, PoC vlm_client.py 기준)
@@ -159,7 +159,7 @@ COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
 CREATE TABLE tagging_result (
     result_id        BIGSERIAL   PRIMARY KEY,
     scene_image_id   BIGINT      NOT NULL REFERENCES scene_image(scene_image_id),
-    object_index     SMALLINT    NOT NULL,
+    object_idx       SMALLINT    NOT NULL,
     sku_id           BIGINT      NOT NULL REFERENCES sku_catalog(sku_id),
     sku_image_id     BIGINT      REFERENCES sku_image(sku_image_id),
     match_source     VARCHAR(20) NOT NULL
@@ -174,7 +174,7 @@ CREATE TABLE tagging_result (
     created_by       BIGINT      NOT NULL REFERENCES app_user(user_id),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_result_scene_object UNIQUE (scene_image_id, object_index),
+    CONSTRAINT uq_result_scene_object UNIQUE (scene_image_id, object_idx),
     -- 검색 경유는 순위·유사도·근거가 없고, 추천 경유는 순위·유사도가 반드시 있어야 함
     CONSTRAINT ck_result_source CHECK (
         (match_source = 'SEARCH'
@@ -197,7 +197,7 @@ CREATE INDEX idx_result_scene        ON tagging_result(scene_image_id);
 CREATE INDEX idx_result_sku          ON tagging_result(sku_id);
 
 COMMENT ON TABLE  tagging_result                  IS '최종 객체-SKU 매핑 + 검수 이력';
-COMMENT ON COLUMN tagging_result.object_index     IS 'scene_image.object_metadata 배열의 객체 인덱스';
+COMMENT ON COLUMN tagging_result.object_idx       IS 'scene_image.object_metadata 배열의 객체 인덱스';
 COMMENT ON COLUMN tagging_result.sku_image_id     IS '매칭 근거가 된 SKU 이미지';
 COMMENT ON COLUMN tagging_result.match_source     IS 'RECOMMEND(추천 경유) | SEARCH(카탈로그 검색 경유)';
 COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 순위';

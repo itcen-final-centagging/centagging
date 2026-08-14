@@ -27,7 +27,7 @@ class BoundingBoxResponse(BaseModel):
 class DetectedObjectResponse(BaseModel):
     """외부 API에 노출하는 탐지 객체입니다."""
 
-    object_index: int = Field(ge=0)
+    object_idx: int = Field(ge=0)
     category: str = Field(min_length=1)
     sub_category: str | None = None
     bbox_coord: BoundingBoxResponse

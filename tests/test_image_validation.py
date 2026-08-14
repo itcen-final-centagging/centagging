@@ -304,7 +304,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
         )
         self.assertEqual(response_body["data"]["object_count"], 1)
         detected_object = response_body["data"]["objects"][0]
-        self.assertEqual(detected_object["object_index"], 0)
+        self.assertEqual(detected_object["object_idx"], 0)
         self.assertEqual(detected_object["category"], "의자")
         self.assertIsNone(detected_object["sub_category"])
         self.assertEqual(
@@ -353,7 +353,7 @@ class UploadSceneImageApiTest(unittest.TestCase):
             ),
             [
                 {
-                    "object_index": 0,
+                    "object_idx": 0,
                     "bbox_coord": {
                         "xmin": 200,
                         "ymin": 100,

@@ -72,7 +72,7 @@ class BoundingBox(BaseModel):
 class DetectedObject(BaseModel):
     """탐지된 가구 객체의 속성과 SKU 후보 목록입니다."""
 
-    object_index: int
+    object_idx: int
     label: str = ""
     bbox_coord: BoundingBox
     confidence: int = Field(default=0, ge=0, le=100)
@@ -96,7 +96,7 @@ class SkuMatching(BaseModel):
     """
 
     # scene_image.bbox_coord 배열의 인덱스입니다.
-    object_index: int = Field(ge=0)
+    object_idx: int = Field(ge=0)
     sku_code: str = Field(min_length=1)
     match_rank: int = Field(ge=1)
     similarity_score: int = Field(ge=0, le=100)

@@ -163,7 +163,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     try {
       const candidates = await fetchRecommendations(
         analysisId,
-        selectedObject.objectIndex,
+        selectedObject.objectIdx,
       );
       if (candidates.length === 0) {
         throw new Error('추천된 SKU가 없습니다.');
@@ -214,7 +214,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     setStage('saving');
     try {
       await saveTaggingReview({
-        objectIndex: selectedObject.objectIndex,
+        objectIdx: selectedObject.objectIdx,
         sceneImageId: analysisId,
         selectedSku,
       });

@@ -14,12 +14,12 @@ class SceneImageNotFoundError(RuntimeError):
     """존재하지 않는 scene_image_id로 확정을 시도한 경우입니다."""
 
 
-class ObjectIndexOutOfRangeError(RuntimeError):
-    """장면에 존재하지 않는 object_index를 확정하려는 경우입니다."""
+class ObjectIdxOutOfRangeError(RuntimeError):
+    """장면에 존재하지 않는 object_idx를 확정하려는 경우입니다."""
 
 
-class DuplicateObjectIndexError(RuntimeError):
-    """한 요청에 같은 object_index가 두 번 들어온 경우입니다."""
+class DuplicateObjectIdxError(RuntimeError):
+    """한 요청에 같은 object_idx가 두 번 들어온 경우입니다."""
 
 
 class MatchingTargetNotFoundError(RuntimeError):
@@ -37,7 +37,7 @@ _SELECT_SCENE = sqlalchemy.text("""
 _INSERT_TAGGING_RESULT = sqlalchemy.text("""
     INSERT INTO tagging_result (
         scene_image_id,
-        object_index,
+        object_idx,
         sku_id,
         sku_image_id,
         match_source,
@@ -48,7 +48,7 @@ _INSERT_TAGGING_RESULT = sqlalchemy.text("""
         created_by
     )
     SELECT :scene_image_id,
-           :object_index,
+           :object_idx,
            sc.sku_id,
            (
                SELECT si.sku_image_id
@@ -111,14 +111,14 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
 
         Raises:
             SceneImageNotFoundError: 장면 이미지가 없는 경우입니다.
-            DuplicateObjectIndexError: object_index가 중복된 경우입니다.
-            ObjectIndexOutOfRangeError: 장면에 없는 인덱스인 경우입니다.
+            DuplicateObjectIdxError: object_idx가 중복된 경우입니다.
+            ObjectIdxOutOfRangeError: 장면에 없는 인덱스인 경우입니다.
             MatchingTargetNotFoundError: sku_code나 활성 사용자를 찾지
                 못한 경우입니다.
         """
         try:
             object_count = await self._get_object_count(scene_id)
-            self._validate_object_indexes(matching, object_count)
+            self._validate_object_idxs(matching, object_count)
 
             result_ids = []
             for item in matching:
@@ -155,28 +155,28 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
         return int(row["object_count"] or 0)
 
     @staticmethod
-    def _validate_object_indexes(
+    def _validate_object_idxs(
         matching: list[SkuMatching],
         object_count: int,
     ) -> None:
-        """object_index의 중복과 범위를 검증합니다.
+        """object_idx의 중복과 범위를 검증합니다.
 
         Args:
             matching: 확정할 객체-SKU 매핑 목록입니다.
             object_count: 장면에 탐지된 객체 개수입니다.
 
         Raises:
-            DuplicateObjectIndexError: object_index가 중복된 경우입니다.
-            ObjectIndexOutOfRangeError: 장면에 없는 인덱스인 경우입니다.
+            DuplicateObjectIdxError: object_idx가 중복된 경우입니다.
+            ObjectIdxOutOfRangeError: 장면에 없는 인덱스인 경우입니다.
         """
-        indexes = [item.object_index for item in matching]
-        duplicates = {i for i in indexes if indexes.count(i) > 1}
+        idxs = [item.object_idx for item in matching]
+        duplicates = {i for i in idxs if idxs.count(i) > 1}
         if duplicates:
-            raise DuplicateObjectIndexError(sorted(duplicates))
+            raise DuplicateObjectIdxError(sorted(duplicates))
 
-        out_of_range = [i for i in indexes if i >= object_count]
+        out_of_range = [i for i in idxs if i >= object_count]
         if out_of_range:
-            raise ObjectIndexOutOfRangeError(sorted(out_of_range))
+            raise ObjectIdxOutOfRangeError(sorted(out_of_range))
 
     async def _insert_matching(
         self,
@@ -200,7 +200,7 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             _INSERT_TAGGING_RESULT,
             {
                 "scene_image_id": scene_id,
-                "object_index": item.object_index,
+                "object_idx": item.object_idx,
                 "sku_code": item.sku_code,
                 "login_id": self.settings.mvp_login_id,
                 "match_source": "RECOMMEND",

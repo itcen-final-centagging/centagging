@@ -17,7 +17,7 @@ type ApiBoundingBox = {
 };
 
 type DevDetection = {
-  object_index: number;
+  object_idx: number;
   category: string;
   sub_category: string | null;
   bbox_coord: ApiBoundingBox;
@@ -57,7 +57,7 @@ type DevCandidate = {
 
 type DevRecommendationData = {
   objects: Array<{
-    object_index: number;
+    object_idx: number;
     sku_candidates: DevCandidate[];
   }>;
 };
@@ -256,7 +256,7 @@ export const analyzeImage = async (
       category: nullableText(detection.category),
       confidence: detection.confidence,
       description: detection.evidence,
-      id: `${sceneImageId}-${detection.object_index}`,
+      id: `${sceneImageId}-${detection.object_idx}`,
       metadata: {
         attributes: {},
         category: nullableText(detection.category),
@@ -265,22 +265,22 @@ export const analyzeImage = async (
         subCategory: detection.sub_category,
       },
       name: detection.category,
-      objectIndex: detection.object_index,
+      objectIdx: detection.object_idx,
     })),
   };
 };
 
 export const fetchRecommendations = async (
   sceneImageId: string,
-  objectIndex: number,
+  objectIdx: number,
 ): Promise<SkuCandidate[]> => {
   const query = new URLSearchParams();
-  query.append('object_indexes', String(objectIndex));
+  query.append('object_idxs', String(objectIdx));
   const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
   );
   const object = response.data.objects.find(
-    (item) => item.object_index === objectIndex,
+    (item) => item.object_idx === objectIdx,
   );
   return object?.sku_candidates.map(toDevCandidate) ?? [];
 };
@@ -302,11 +302,11 @@ export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
 };
 
 export const saveTaggingReview = async ({
-  objectIndex,
+  objectIdx,
   sceneImageId,
   selectedSku,
 }: {
-  objectIndex: number;
+  objectIdx: number;
   sceneImageId: string;
   selectedSku: SkuCandidate;
 }): Promise<void> => {
@@ -326,7 +326,7 @@ export const saveTaggingReview = async ({
         matching: [
           {
             match_rank: selectedSku.matchRank,
-            object_index: objectIndex,
+            object_idx: objectIdx,
             similarity_score: selectedSku.score,
             sku_code: selectedSku.sku,
             vlm_mood: selectedSku.vlmMood,

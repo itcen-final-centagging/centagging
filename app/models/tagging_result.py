@@ -15,7 +15,7 @@ class TaggingResult(Base):
     __tablename__ = "tagging_result"
     __table_args__ = (
         sqlalchemy.UniqueConstraint(
-            "scene_image_id", "object_index", name="uq_result_scene_object"
+            "scene_image_id", "object_idx", name="uq_result_scene_object"
         ),
     )
 
@@ -27,7 +27,7 @@ class TaggingResult(Base):
         sqlalchemy.ForeignKey("scene_image.scene_image_id"),
         nullable=False,
     )
-    object_index: orm.Mapped[int] = orm.mapped_column(
+    object_idx: orm.Mapped[int] = orm.mapped_column(
         sqlalchemy.SmallInteger, nullable=False
     )
     sku_id: orm.Mapped[int] = orm.mapped_column(

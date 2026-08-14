@@ -107,7 +107,7 @@ class SimilarSkuService:
             similar_skus = await self._find_skus_for_crop(crop, embedding)
             detected_objects.append(
                 DetectedObject(
-                    object_index=crop.crop_index,
+                    object_idx=crop.crop_index,
                     bbox_coord=crop.bbox,
                     sku_candidates=[
                         self._to_sku_candidate(sku) for sku in similar_skus
