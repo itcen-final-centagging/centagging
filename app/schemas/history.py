@@ -95,3 +95,5 @@ class TaggingHistoryDetail(pydantic.BaseModel):
     detected_object: HistoryDetectedObject
     matched_sku: HistoryMatchedSku
     xai_result: HistoryXaiResult | None
+    xai_status: tagging_schema.XaiStatus | None
+    xai_fallback_reason: tagging_schema.XaiFallbackReason | None

@@ -133,6 +133,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "summary": "형태와 색상이 유사합니다.",
                 "criteria": [],
             },
+            "xai_status": "FALLBACK",
+            "xai_fallback_reason": "RATE_LIMITED",
         }
         self.session = _FakeSession(rows, detail_row)
         self.app = fastapi.FastAPI()
@@ -160,26 +162,26 @@ class TaggingHistoryApiTest(unittest.TestCase):
             response.json()["data"],
             {
                 "items": [
-                        {
-                            "result_id": 8801,
-                            "sku_code": "CHR-2041",
-                            "product_name": ("에르고 메쉬 오피스체어 화이트"),
-                            "object_name": "의자",
-                            "similarity_score": 92,
-                            "created_by": "김태깅",
-                            "created_at": "2026-08-10T17:56:00+09:00",
-                            "style_tags": ["미니멀", "홈오피스"],
-                            "scene_image": {
-                                "image_url": ("/uploads/scene-images/9f2c.jpg"),
-                                "origin_name": "scene_office_01.jpg",
-                                "bbox": {
-                                    "xmin": 262,
-                                    "ymin": 300,
-                                    "xmax": 681,
-                                    "ymax": 890,
-                                },
+                    {
+                        "result_id": 8801,
+                        "sku_code": "CHR-2041",
+                        "product_name": ("에르고 메쉬 오피스체어 화이트"),
+                        "object_name": "의자",
+                        "similarity_score": 92,
+                        "created_by": "김태깅",
+                        "created_at": "2026-08-10T17:56:00+09:00",
+                        "style_tags": ["미니멀", "홈오피스"],
+                        "scene_image": {
+                            "image_url": ("/uploads/scene-images/9f2c.jpg"),
+                            "origin_name": "scene_office_01.jpg",
+                            "bbox": {
+                                "xmin": 262,
+                                "ymin": 300,
+                                "xmax": 681,
+                                "ymax": 890,
                             },
-                        }
+                        },
+                    }
                 ]
             },
         )
@@ -215,8 +217,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_index "
-            "-> 'bbox_coord' AS bbox",
+            "si.object_metadata -> tr.object_index " "-> 'bbox_coord' AS bbox",
             query,
         )
         self.assertIn(
@@ -241,8 +242,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_index "
-            "-> 'bbox_coord' AS bbox",
+            "si.object_metadata -> tr.object_index " "-> 'bbox_coord' AS bbox",
             query,
         )
         self.assertIn("tr.vlm_mood", query)
@@ -288,6 +288,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "criteria": [],
             },
         )
+        self.assertEqual(data["xai_status"], "FALLBACK")
+        self.assertEqual(data["xai_fallback_reason"], "RATE_LIMITED")
         self.assertEqual(
             response.json()["meta"]["request_id"],
             response.headers["X-Request-ID"],

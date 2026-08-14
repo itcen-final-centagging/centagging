@@ -65,6 +65,11 @@ export interface XaiResult {
   summary: string;
 }
 
+export type XaiStatus = 'COMPLETED' | 'FALLBACK';
+
+export type XaiFallbackReason =
+  'RATE_LIMITED' | 'PROCESSING_ERROR' | 'UNAVAILABLE';
+
 export interface VlmMood {
   summary: string;
   tags: string[];
@@ -86,8 +91,10 @@ export interface SkuCandidate {
   sku: string;
   vectorScore: number | null;
   vlmMood: VlmMood | null;
+  xaiFallbackReason: XaiFallbackReason | null;
   xaiReason: string | null;
   xaiResult: XaiResult | null;
+  xaiStatus: XaiStatus | null;
 }
 
 export interface TaggingValues {

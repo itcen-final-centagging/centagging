@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Save } from 'lucide-react';
 import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ImagePreview } from '@/features/tagging/components/ImagePreview';
+import { XaiFallbackNotice } from '@/features/tagging/components/XaiFallbackNotice';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import type { TaggingValues } from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
@@ -117,6 +118,12 @@ export const ReviewPanel = () => {
       </article>
       <article className="studio-surface p-5">
         <h2 className="text-base font-extrabold text-neutral-800">선택 SKU</h2>
+        <div className="mt-4">
+          <XaiFallbackNotice
+            reason={selectedSku.xaiFallbackReason}
+            status={selectedSku.xaiStatus}
+          />
+        </div>
         <FurnitureArtwork
           className="mt-4"
           imageUrl={selectedSku.imageUrl}

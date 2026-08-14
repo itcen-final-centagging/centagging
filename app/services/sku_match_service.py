@@ -47,6 +47,8 @@ _MATCHING_CHANGED_SQL = """
         tagging_result.match_rank,
         tagging_result.similarity_score,
         tagging_result.xai_result,
+        tagging_result.xai_status,
+        tagging_result.xai_fallback_reason,
         tagging_result.vlm_mood,
         tagging_result.created_by
     ) IS DISTINCT FROM ROW(
@@ -56,6 +58,8 @@ _MATCHING_CHANGED_SQL = """
         EXCLUDED.match_rank,
         EXCLUDED.similarity_score,
         EXCLUDED.xai_result,
+        EXCLUDED.xai_status,
+        EXCLUDED.xai_fallback_reason,
         EXCLUDED.vlm_mood,
         EXCLUDED.created_by
     )
@@ -73,6 +77,8 @@ _UPSERT_TAGGING_RESULT = sqlalchemy.text(f"""
         match_rank,
         similarity_score,
         xai_result,
+        xai_status,
+        xai_fallback_reason,
         vlm_mood,
         created_by
     )
@@ -90,6 +96,8 @@ _UPSERT_TAGGING_RESULT = sqlalchemy.text(f"""
            :match_rank,
            :similarity_score,
            CAST(:xai_result AS jsonb),
+           :xai_status,
+           :xai_fallback_reason,
            CAST(:vlm_mood AS jsonb),
            au.user_id
       FROM sku_catalog sc
@@ -105,6 +113,8 @@ _UPSERT_TAGGING_RESULT = sqlalchemy.text(f"""
         match_rank = EXCLUDED.match_rank,
         similarity_score = EXCLUDED.similarity_score,
         xai_result = EXCLUDED.xai_result,
+        xai_status = EXCLUDED.xai_status,
+        xai_fallback_reason = EXCLUDED.xai_fallback_reason,
         vlm_mood = EXCLUDED.vlm_mood,
         created_by = EXCLUDED.created_by,
         similarity_grade = CASE
@@ -260,6 +270,8 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
                     item.xai_result.model_dump(exclude={"vlm_mood"}),
                     ensure_ascii=False,
                 ),
+                "xai_status": item.xai_status,
+                "xai_fallback_reason": item.xai_fallback_reason,
                 "vlm_mood": json.dumps(
                     item.vlm_mood.model_dump(), ensure_ascii=False
                 ),

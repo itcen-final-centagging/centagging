@@ -55,6 +55,8 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            sc.sub_category,
            sc.attributes,
            tr.xai_result,
+           tr.xai_status,
+           tr.xai_fallback_reason,
            tr.vlm_mood
       FROM tagging_result tr
       JOIN scene_image si
@@ -169,5 +171,7 @@ async def get_tagging_history_detail(
                 "attrs": row["attributes"],
             },
             "xai_result": row["xai_result"],
+            "xai_status": row["xai_status"],
+            "xai_fallback_reason": row["xai_fallback_reason"],
         }
     )
