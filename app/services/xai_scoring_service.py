@@ -20,7 +20,7 @@ from app.services.image_processing_service import (
     CroppedObject,
     read_sku_image_bytes,
 )
-from app.services.xai_prompt import XAI_PROMPT
+from app.services.prompt.xai_prompt.xai_prompt import XAI_PROMPT
 
 _LOGGER = logging.getLogger(__name__)
 

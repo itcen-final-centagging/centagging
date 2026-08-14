@@ -9,14 +9,37 @@ import type {
   XaiResult,
 } from '../types';
 
+type ApiBoundingBox = {
+  xmin: number;
+  ymin: number;
+  xmax: number;
+  ymax: number;
+};
+
 type DevDetection = {
-  box_2d: number[];
-  label: string;
+  object_index: number;
+  category: string;
+  sub_category: string | null;
+  bbox_coord: ApiBoundingBox;
+  confidence: number | null;
+  evidence: string;
 };
 
 type DevUploadResponse = {
-  detections: DevDetection[];
-  scene_image_id: number;
+  scene_image: {
+    scene_image_id: number;
+    image_url: string;
+    origin_name: string;
+    mime_type: string;
+    file_size: number;
+    analysis_status: string;
+    analysis_error: string | null;
+    width_px: number;
+    height_px: number;
+    created_at: string;
+  };
+  object_count: number;
+  objects: DevDetection[];
 };
 
 type DevCandidate = {
@@ -99,11 +122,13 @@ const API_BASE_URL =
     '',
   ) ?? '';
 
-const toBbox = (coordinates: number[]): [number, number, number, number] => [
-  coordinates[0] ?? 0,
-  coordinates[1] ?? 0,
-  coordinates[2] ?? 0,
-  coordinates[3] ?? 0,
+const toBbox = (
+  bbox: ApiBoundingBox,
+): [number, number, number, number] => [
+  bbox.ymin,
+  bbox.xmin,
+  bbox.ymax,
+  bbox.xmax,
 ];
 
 const nullableText = (value: unknown): string | null =>
@@ -220,26 +245,27 @@ export const analyzeImage = async (
       method: 'POST',
     },
   );
+  const sceneImageId = response.data.scene_image.scene_image_id;
 
   return {
-    analysisId: String(response.data.scene_image_id),
+    analysisId: String(sceneImageId),
     mode: null,
-    objects: response.data.detections.map((detection, objectIndex) => ({
-      bbox: toBbox(detection.box_2d),
+    objects: response.data.objects.map((detection) => ({
+      bbox: toBbox(detection.bbox_coord),
       candidates: [],
-      category: nullableText(detection.label),
-      confidence: null,
-      description: null,
-      id: `${response.data.scene_image_id}-${objectIndex}`,
+      category: nullableText(detection.category),
+      confidence: detection.confidence,
+      description: detection.evidence,
+      id: `${sceneImageId}-${detection.object_index}`,
       metadata: {
         attributes: {},
-        category: nullableText(detection.label),
-        description: null,
+        category: nullableText(detection.category),
+        description: detection.evidence,
         keyFeatures: [],
-        subCategory: null,
+        subCategory: detection.sub_category,
       },
-      name: detection.label,
-      objectIndex,
+      name: detection.category,
+      objectIndex: detection.object_index,
     })),
   };
 };
