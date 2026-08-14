@@ -122,8 +122,8 @@ class XaiScoringService:
 
         return detected_objects
 
-    @staticmethod
     async def _build_scoring_crops(
+        self,
         crop_bytes: dict[int, bytes],
         detected_objects: list[DetectedObject],
     ) -> list[ScoringCrop]:
@@ -146,6 +146,7 @@ class XaiScoringService:
                     asyncio.to_thread(
                         read_sku_image_bytes,
                         candidate.matched_sku_image.image_url,
+                        self.settings.sku_image_root,
                     )
                     for candidate in detected.sku_candidates
                 )

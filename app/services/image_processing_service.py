@@ -154,15 +154,10 @@ def read_sku_image_bytes(
 
     Args:
         image_url: sku_image 테이블의 image_url 값입니다.
+        sku_image_root: SKU 이미지가 저장된 루트 경로입니다.
 
     Returns:
         JPEG 바이트이며, 파일을 못 읽으면 None입니다.
         후보 1건이 실패해도 나머지 채점은 계속하도록 예외 대신 None입니다.
     """
-    try:
-        with Image.open(pathlib.Path(image_url)) as sku_image:
-            buf = io.BytesIO()
-            sku_image.convert("RGB").save(buf, format="JPEG", quality=90)
-            return buf.getvalue()
-    except OSError:
-        return None
+    return SkuImageStorage(root=sku_image_root).read_jpeg(image_url)
