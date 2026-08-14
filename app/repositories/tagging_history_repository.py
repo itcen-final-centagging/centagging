@@ -14,6 +14,7 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
                -> 'attribute'
                ->> 'label' AS object_name,
            tr.similarity_score,
+           tr.vlm_mood,
            au.user_name AS created_by,
            tr.created_at,
            si.image_url,
@@ -37,6 +38,13 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            si.image_url AS scene_image_url,
            si.origin_name,
            si.object_metadata -> tr.object_index -> 'bbox_coord' AS bbox,
+           si.object_metadata
+               -> tr.object_index
+               -> 'attribute'
+               ->> 'label' AS object_label,
+           si.object_metadata
+               -> tr.object_index
+               -> 'attribute' AS object_attributes,
            sc.sku_code,
            sc.product_name,
            sc.brand,
@@ -45,7 +53,8 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            sc.category,
            sc.sub_category,
            sc.attributes,
-           tr.xai_result
+           tr.xai_result,
+           tr.vlm_mood
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -75,6 +84,7 @@ async def list_tagging_history(
 
     for row in result.mappings().all():
         score = row["similarity_score"]
+        vlm_mood = row["vlm_mood"] or {}
         items.append(
             history_schema.TaggingHistoryListItem.model_validate(
                 {
@@ -87,7 +97,7 @@ async def list_tagging_history(
                     ),
                     "created_by": row["created_by"],
                     "created_at": row["created_at"],
-                    "style_tags": [],
+                    "style_tags": vlm_mood.get("tags", []),
                     "scene_image": {
                         "image_url": row["image_url"],
                         "origin_name": row["origin_name"],
@@ -135,11 +145,11 @@ async def get_tagging_history_detail(
                 "origin_name": row["origin_name"],
             },
             "detected_object": {
-                "category": None,
+                "category": row["object_label"],
                 "sub_category": None,
-                "attrs": {},
+                "attrs": row["object_attributes"] or {},
                 "bbox": row["bbox"],
-                "vlm_mood": None,
+                "vlm_mood": row["vlm_mood"],
             },
             "matched_sku": {
                 "sku_code": row["sku_code"],

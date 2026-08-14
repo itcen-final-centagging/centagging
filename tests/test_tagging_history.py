@@ -85,6 +85,10 @@ class TaggingHistoryApiTest(unittest.TestCase):
                     "xmax": 681,
                     "ymax": 890,
                 },
+                "vlm_mood": {
+                    "summary": "차분한 홈오피스 분위기입니다.",
+                    "tags": ["미니멀", "홈오피스"],
+                },
             }
         ]
         detail_row = {
@@ -107,6 +111,16 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "xmax": 500,
                 "ymax": 800,
             },
+            "object_label": "의자",
+            "object_attributes": {
+                "label": "의자",
+                "color": "화이트",
+                "material": "메쉬",
+            },
+            "vlm_mood": {
+                "summary": "차분한 홈오피스 분위기입니다.",
+                "tags": ["미니멀", "홈오피스"],
+            },
             "sku_code": "CHR-9901",
             "product_name": "메쉬 사무용 의자",
             "brand": "센터퍼니처",
@@ -115,7 +129,10 @@ class TaggingHistoryApiTest(unittest.TestCase):
             "category": "의자",
             "sub_category": "학생·사무용의자",
             "attributes": {"color": "화이트", "material": "메쉬"},
-            "xai_result": {"summary": "형태와 색상이 유사합니다."},
+            "xai_result": {
+                "summary": "형태와 색상이 유사합니다.",
+                "criteria": [],
+            },
         }
         self.session = _FakeSession(rows, detail_row)
         self.app = fastapi.FastAPI()
@@ -151,7 +168,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                             "similarity_score": 92,
                             "created_by": "김태깅",
                             "created_at": "2026-08-10T17:56:00+09:00",
-                            "style_tags": [],
+                            "style_tags": ["미니멀", "홈오피스"],
                             "scene_image": {
                                 "image_url": ("/uploads/scene-images/9f2c.jpg"),
                                 "origin_name": "scene_office_01.jpg",
@@ -206,6 +223,29 @@ class TaggingHistoryApiTest(unittest.TestCase):
             "ORDER BY tr.created_at DESC, tr.result_id DESC",
             query,
         )
+        self.assertIn("tr.vlm_mood", query)
+
+    def test_queries_detail_object_fields_by_object_index(self) -> None:
+        """상세 조회도 동일 객체의 라벨, 좌표, 속성을 선택합니다."""
+        self.client.get("/history/results/9901")
+        query = " ".join(self.session.executed_statement.split())
+
+        self.assertIn(
+            "si.object_metadata -> tr.object_index "
+            "-> 'attribute' ->> 'label' AS object_label",
+            query,
+        )
+        self.assertIn(
+            "si.object_metadata -> tr.object_index "
+            "-> 'attribute' AS object_attributes",
+            query,
+        )
+        self.assertIn(
+            "si.object_metadata -> tr.object_index "
+            "-> 'bbox_coord' AS bbox",
+            query,
+        )
+        self.assertIn("tr.vlm_mood", query)
 
     def test_returns_saved_tagging_history_detail(self) -> None:
         """저장된 연출 이미지와 확정 SKU 상세 정보를 반환합니다."""
@@ -220,9 +260,22 @@ class TaggingHistoryApiTest(unittest.TestCase):
             data["detected_object"]["bbox"],
             {"xmin": 100, "ymin": 200, "xmax": 500, "ymax": 800},
         )
-        self.assertIsNone(data["detected_object"]["category"])
-        self.assertEqual(data["detected_object"]["attrs"], {})
-        self.assertIsNone(data["detected_object"]["vlm_mood"])
+        self.assertEqual(data["detected_object"]["category"], "의자")
+        self.assertEqual(
+            data["detected_object"]["attrs"],
+            {
+                "label": "의자",
+                "color": "화이트",
+                "material": "메쉬",
+            },
+        )
+        self.assertEqual(
+            data["detected_object"]["vlm_mood"],
+            {
+                "summary": "차분한 홈오피스 분위기입니다.",
+                "tags": ["미니멀", "홈오피스"],
+            },
+        )
         self.assertEqual(data["matched_sku"]["sku_code"], "CHR-9901")
         self.assertEqual(
             data["matched_sku"]["image_url"],
@@ -230,11 +283,34 @@ class TaggingHistoryApiTest(unittest.TestCase):
         )
         self.assertEqual(
             data["xai_result"],
-            {"summary": "형태와 색상이 유사합니다."},
+            {
+                "summary": "형태와 색상이 유사합니다.",
+                "criteria": [],
+            },
         )
         self.assertEqual(
             response.json()["meta"]["request_id"],
             response.headers["X-Request-ID"],
+        )
+
+    def test_documents_history_detail_nested_response_models(self) -> None:
+        """상세 응답의 중첩 객체를 명시적인 OpenAPI 모델로 문서화합니다."""
+        response = self.client.get("/openapi.json")
+
+        self.assertEqual(response.status_code, 200)
+        schemas = response.json()["components"]["schemas"]
+        properties = schemas["TaggingHistoryDetail"]["properties"]
+        self.assertEqual(
+            properties["scene_image"]["$ref"],
+            "#/components/schemas/HistoryDetailSceneImage",
+        )
+        self.assertEqual(
+            properties["detected_object"]["$ref"],
+            "#/components/schemas/HistoryDetectedObject",
+        )
+        self.assertEqual(
+            properties["matched_sku"]["$ref"],
+            "#/components/schemas/HistoryMatchedSku",
         )
 
     def test_returns_404_when_tagging_history_does_not_exist(self) -> None:
