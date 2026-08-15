@@ -6,9 +6,19 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 from app.core import config, database
 from app.services.gemini_service import GeminiService
 from app.services.similar_sku_service import SimilarSkuService
+from app.services.sku_image_storage import SkuImageStorage
 from app.services.sku_match_service import SkuMatchService
 from app.services.tagging_service import TaggingService
 from app.services.xai_scoring_service import XaiScoringService
+
+
+def get_sku_image_storage() -> SkuImageStorage:
+    """설정된 SKU 이미지 저장소를 반환합니다.
+
+    Returns:
+        SKU 이미지 저장 경로와 공개 URL 변환기입니다.
+    """
+    return SkuImageStorage(config.get_settings().sku_image_root)
 
 
 def get_tagging_service(

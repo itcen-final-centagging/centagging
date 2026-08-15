@@ -6,14 +6,15 @@ import string
 import typing
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 from pydantic import BaseModel, Field
 
-from app.core import config
+from app.core import config, genai_client
 from app.schemas.tagging import DetectedObject, XaiResult
 from app.services.gemini_service import (
     GeminiApiError,
     GeminiConfigurationError,
+    GeminiRateLimitError,
     GeminiResponseInvalidError,
 )
 from app.services.image_processing_service import (
@@ -41,7 +42,7 @@ class ScoringCrop(BaseModel):
 
 
 class SkuEvaluation(BaseModel):
-    """SKU 후보 한 건의 루브릭 채점 결과입니다."""
+    """Gemini가 반환한 SKU 후보 1건의 루브릭 평가입니다."""
 
     sku_id: str
     status: typing.Literal["Matched", "Rejected"]
@@ -50,14 +51,14 @@ class SkuEvaluation(BaseModel):
 
 
 class ObjectAttribute(BaseModel):
-    """탐지 객체에서 확인한 속성의 키와 값입니다."""
+    """Gemini가 추출한 객체 속성 키와 값입니다."""
 
     key: str
     value: str
 
 
 class CropScore(BaseModel):
-    """크롭 객체 한 건의 속성과 SKU 평가 결과입니다."""
+    """크롭 1건의 객체 속성과 SKU 후보 평가 결과입니다."""
 
     crop_index: int
     label: str = ""
@@ -67,7 +68,7 @@ class CropScore(BaseModel):
 
 
 class RubricScoreResult(BaseModel):
-    """모든 크롭 객체의 루브릭 채점 결과입니다."""
+    """한 번의 Gemini 채점 요청으로 받은 전체 크롭 결과입니다."""
 
     crops: list[CropScore] = Field(default_factory=list)
 
@@ -76,17 +77,21 @@ class XaiScoringService:
     """모든 크롭·후보를 한 번의 VLM 요청으로 채점하는 서비스입니다."""
 
     def __init__(self, settings: config.Settings) -> None:
-        """Gemini 설정을 저장하고 지연 초기화 상태를 준비합니다."""
+        """Gemini 설정으로 XAI 채점기를 초기화합니다.
+
+        Args:
+            settings: Gemini 모델과 이미지 저장소 설정입니다.
+        """
         self.settings = settings
         self._client: genai.Client | None = None
 
     def _get_client(self) -> genai.Client:
-        if not self.settings.gemini_api_key:
+        if not genai_client.is_configured(self.settings):
             raise GeminiConfigurationError(
-                "GEMINI_API_KEY가 설정되지 않았습니다."
+                "Google Gen AI 인증 설정이 누락되었습니다."
             )
         if self._client is None:
-            self._client = genai.Client(api_key=self.settings.gemini_api_key)
+            self._client = genai_client.create_client(self.settings)
         return self._client
 
     async def enrich_detected_objects(
@@ -117,6 +122,11 @@ class XaiScoringService:
             score_result = await asyncio.to_thread(
                 self.score_all, scoring_crops
             )
+        except GeminiRateLimitError:
+            _LOGGER.warning(
+                "Gemini 요청 한도 초과, 임베딩 유사도로 대체합니다."
+            )
+            return detected_objects
         # 채점 실패로 추천 전체가 실패하지 않도록 폴백합니다.
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("루브릭 채점 실패, 임베딩 유사도로 대체합니다.")
@@ -156,6 +166,7 @@ class XaiScoringService:
                         read_sku_image_bytes,
                         candidate.matched_sku_image.image_url,
                         self.settings.sku_image_root,
+                        self.settings.image_storage_root,
                     )
                     for candidate in detected.sku_candidates
                 )
@@ -228,7 +239,8 @@ class XaiScoringService:
 
         Raises:
             ValueError: 채점 대상이 하나도 없는 경우입니다.
-            GeminiConfigurationError: API 키가 없는 경우입니다.
+            GeminiConfigurationError: Google Gen AI 인증 설정이 없는
+                경우입니다.
             GeminiResponseInvalidError: 응답이 비어 있는 경우입니다.
             GeminiApiError: SDK 호출이 실패한 경우입니다.
         """
@@ -280,6 +292,14 @@ class XaiScoringService:
             return RubricScoreResult.model_validate_json(response.text)
         except GeminiResponseInvalidError:
             raise
+        except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 루브릭 채점 요청 한도를 초과했습니다."
+                ) from error
+            raise GeminiApiError(
+                "Gemini 루브릭 채점 요청에 실패했습니다."
+            ) from error
         except Exception as error:
             raise GeminiApiError(
                 "Gemini 루브릭 채점 요청에 실패했습니다."

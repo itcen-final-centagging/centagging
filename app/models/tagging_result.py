@@ -12,7 +12,6 @@ from sqlalchemy.ext import mutable
 from app.models.sku import Base
 
 
-# SQLAlchemy 매핑 전용 클래스입니다.
 class TaggingResult(Base):  # pylint: disable=too-few-public-methods
     """최종 객체-SKU 매핑 + 검수 이력입니다 (``schema.sql``의 ``tagging_result``)."""
 

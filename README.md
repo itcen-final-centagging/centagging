@@ -197,7 +197,7 @@ docker compose up -d --force-recreate
 centagging-backend/
 ├─ .github/
 │  ├─ workflows/
-│  │  └─ python-style.yml       # Python 스타일 검사 GitHub Actions(dev,main 브랜치에 PR하면, CI 동작)
+│  │  └─ deploy-vm.yml          # deploy 브랜치 운영 VM 배포 GitHub Actions
 │  └─ pull_request_template.md  # PR 작성 템플릿
 │
 ├─ app/                         # FastAPI 백엔드

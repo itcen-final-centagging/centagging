@@ -66,19 +66,21 @@ async def confirm_scene_matching(
         저장된 tagging_result의 result_id 목록입니다.
 
     Raises:
-        HTTPException: 장면 이미지가 없으면 404, 요청 값이 장면·카탈로그와
-            맞지 않으면 422를 반환합니다.
+        HTTPException: 장면 이미지나 SKU가 없으면 404, 객체 인덱스가
+            중복되거나 범위를 벗어나면 422를 반환합니다.
     """
     try:
         result_ids = await match_service.confirm_matching(
             scene_id, match_request.matching
         )
-    except sku_match.SceneImageNotFoundError as error:
+    except (
+        sku_match.SceneImageNotFoundError,
+        sku_match.MatchingTargetNotFoundError,
+    ) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except (
         sku_match.DuplicateObjectIdxError,
         sku_match.ObjectIdxOutOfRangeError,
-        sku_match.MatchingTargetNotFoundError,
     ) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 

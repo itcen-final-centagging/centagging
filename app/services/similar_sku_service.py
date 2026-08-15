@@ -21,6 +21,7 @@ from app.schemas.tagging import (
 )
 from app.services.gemini_service import GeminiService
 from app.services.image_processing_service import CroppedObject
+from app.services.sku_image_storage import SkuImageStorage
 
 EMBEDDING_DIMENSIONS = 3072
 CANDIDATE_LIMIT = 30
@@ -75,6 +76,7 @@ class SimilarSkuService:
         self.session = session
         self.gemini_service = gemini_service
         self.settings = settings
+        self.sku_image_storage = SkuImageStorage(settings.sku_image_root)
         self._embed_semaphore = asyncio.Semaphore(EMBED_CONCURRENCY)
 
     async def build_detected_objects(
@@ -163,8 +165,7 @@ class SimilarSkuService:
                 self.gemini_service.embed_image, crop.image
             )
 
-    @staticmethod
-    def _to_sku_candidate(sku: "SimilarSku") -> SkuCandidate:
+    def _to_sku_candidate(self, sku: "SimilarSku") -> SkuCandidate:
         """유사도 조회 결과를 응답용 SKU 후보로 변환합니다.
 
         similarity_score는 임베딩 유사도 기반 잠정값이며, XAI 채점
@@ -188,7 +189,7 @@ class SimilarSkuService:
             matched_sku_image=MatchedSkuImage(
                 sku_image_id=sku.sku_image_id,
                 image_type=sku.image_type,
-                image_url=sku.image_url,
+                image_url=self.sku_image_storage.public_url(sku.image_url),
             ),
             xai_result=XaiResult(summary=NO_XAI_SUMMARY),
         )
@@ -232,12 +233,9 @@ class SimilarSkuService:
         )
 
         main_image = orm.aliased(SkuImage, name="main_image")
-        # SQLAlchemy의 동적 반환 타입은 Pylint가 추론하지 못합니다.
-        min_distance = (
-            sqlalchemy.func.min(  # pylint: disable=assignment-from-no-return
-                candidate.c.distance
-            )
-        )
+        # SQLAlchemy 동적 함수의 반환형을 Pylint가 None으로 오인합니다.
+        # pylint: disable-next=assignment-from-no-return
+        min_distance = sqlalchemy.func.min(candidate.c.distance)
 
         stmt = (
             sqlalchemy.select(

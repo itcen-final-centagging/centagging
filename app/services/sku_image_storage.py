@@ -9,6 +9,7 @@ from PIL import Image
 
 _LEGACY_PREFIX = "data/images/"
 _PUBLIC_PREFIX = "/sku-images/"
+_UPLOAD_PUBLIC_PREFIX = "/uploads/"
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -30,9 +31,12 @@ class SkuImageStorage:
             stored_path: DB의 ``sku_image.image_url`` 값입니다.
 
         Returns:
-            ``/sku-images``로 시작하는 공개 URL입니다.
+            ``/sku-images`` 경로 또는 기존 ``/uploads`` 공개 URL입니다.
         """
-        key = self._normalize_key(stored_path)
+        normalized_path = urllib.parse.unquote(stored_path).replace("\\", "/")
+        if normalized_path.startswith(_UPLOAD_PUBLIC_PREFIX):
+            return urllib.parse.quote(normalized_path, safe="/")
+        key = self._normalize_key(normalized_path)
         return _PUBLIC_PREFIX + urllib.parse.quote(key, safe="/")
 
     def storage_key(self, image_path: str | pathlib.Path) -> str:
@@ -79,9 +83,13 @@ class SkuImageStorage:
 
     @staticmethod
     def _normalize_key(stored_path: str) -> str:
-        key = stored_path.replace("\\", "/").lstrip("/")
+        key = urllib.parse.unquote(stored_path).replace("\\", "/").lstrip("/")
         if key.startswith(_LEGACY_PREFIX):
             key = key.removeprefix(_LEGACY_PREFIX)
+        if key.startswith(_PUBLIC_PREFIX.lstrip("/")):
+            key = key.removeprefix(_PUBLIC_PREFIX.lstrip("/"))
+        if key.startswith(_UPLOAD_PUBLIC_PREFIX.lstrip("/")):
+            key = key.removeprefix(_UPLOAD_PUBLIC_PREFIX.lstrip("/"))
         if not key or ".." in pathlib.PurePosixPath(key).parts:
             raise ValueError("올바르지 않은 SKU 이미지 경로입니다.")
         return key
