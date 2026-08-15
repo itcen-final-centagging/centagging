@@ -1,24 +1,60 @@
-"""Gemini Developer API 실제 호출 서비스입니다.
+"""Google Gen AI 모델 실제 호출 서비스입니다.
 
-Service for live Gemini Developer API calls.
+Service for live Gemini model calls through Vertex AI or Developer API.
 """
 
+import io
+import logging
+import time
 import typing
 
-from google import genai
+from google.genai import errors, types
+from PIL import Image
+from pydantic import ValidationError
 
-from app.core import config
+from app.core import config, genai_client
+from app.schemas.gemini_detection import (
+    GeminiDetectionResult,
+    GeminiModelDetectionResult,
+)
+from app.services.furniture_detect_prompt import FURNITURE_DETECTION_PROMPT
 
 
+# 오류 클래스들 모음
 class GeminiConfigurationError(RuntimeError):
-    """Gemini API 키가 누락된 경우 발생합니다.
+    """Google Gen AI 인증 설정이 누락되었을 때 발생합니다."""
 
-    Raised when the Gemini API key is missing.
-    """
+    code = "DETECTION_NOT_CONFIGURED"
 
 
 class GeminiApiError(RuntimeError):
     """Gemini API 호출이 실패한 경우 발생합니다. / Raised when a Gemini API call fails."""
+
+    code = "API_CALL_FAIL"
+
+
+class GeminiRateLimitError(GeminiApiError):
+    """Gemini 요청 한도를 초과했을 때 발생합니다."""
+
+    code = "RATE_LIMITED"
+
+
+class GeminiAuthenticationError(GeminiApiError):
+    """Gemini 인증에 실패할 때 발생합니다."""
+
+    code = "DETECTION_AUTH_FAILED"
+
+
+class GeminiInferenceError(GeminiApiError):
+    """Gemini 추론 요청에 실패할 때 발생합니다."""
+
+    code = "DETECTION_INFERENCE_FAILED"
+
+
+class GeminiResponseInvalidError(GeminiApiError):
+    """Gemini 응답 검증에 실패할 때 발생합니다."""
+
+    code = "DETECTION_RESPONSE_INVALID"
 
 
 class GeminiVerificationResult(typing.TypedDict):
@@ -27,6 +63,10 @@ class GeminiVerificationResult(typing.TypedDict):
     vlm_model: str
     embedding_model: str
     embedding_dimensions: int
+
+
+class GeminiEmbeddingError(RuntimeError):
+    """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
 
 
 class GeminiService:
@@ -42,8 +82,8 @@ class GeminiService:
 
     @property
     def is_configured(self) -> bool:
-        """API 키 설정 여부를 반환합니다. 키 값 자체는 노출하지 않습니다."""
-        return bool(self._settings.gemini_api_key)
+        """Google Gen AI 인증 설정 여부를 반환합니다."""
+        return genai_client.is_configured(self._settings)
 
     def verify_connection(self) -> GeminiVerificationResult:
         """텍스트 생성과 임베딩을 각각 한 번 호출해 실제 연동을 검증합니다.
@@ -57,12 +97,11 @@ class GeminiService:
         """
         if not self.is_configured:
             raise GeminiConfigurationError(
-                "GEMINI_API_KEY is not configured. "
-                "Create .env from .env.example."
+                "Google Gen AI authentication is not configured."
             )
 
         try:
-            client = genai.Client(api_key=self._settings.gemini_api_key)
+            client = genai_client.create_client(self._settings)
             text_response = client.models.generate_content(
                 model=self._settings.gemini_vlm_model,
                 contents="Connection verification. Reply only OK.",
@@ -92,3 +131,134 @@ class GeminiService:
             "embedding_model": self._settings.gemini_embedding_model,
             "embedding_dimensions": len(embedding_values),
         }
+
+    def detect_furniture(self, image: Image.Image) -> GeminiDetectionResult:
+        """이미지에서 가구를 감지합니다. / Detect furniture in an image.
+
+        Args:
+            image: PIL 이미지 객체입니다.
+
+        Returns:
+            GeminiRawDetection 객체 리스트입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "Google Gen AI authentication is not configured."
+            )
+
+        started_at = time.perf_counter()
+        object_count = 0
+
+        try:
+            client = genai_client.create_client(self._settings)
+
+            contents: list[types.ContentUnionDict] = [
+                image,
+                FURNITURE_DETECTION_PROMPT,
+            ]
+
+            response = client.models.generate_content(
+                model=self._settings.gemini_vlm_model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=GeminiModelDetectionResult,
+                ),
+            )
+            if not response.text:
+                raise GeminiResponseInvalidError(
+                    "Gemini VLM returned an empty response."
+                )
+
+            result = GeminiModelDetectionResult.model_validate_json(
+                response.text
+            )
+            processing_time_ms = round(
+                (time.perf_counter() - started_at) * 1000
+            )
+            object_count = len(result.detections)
+
+        except GeminiResponseInvalidError:
+            raise
+
+        except ValidationError as error:
+            raise GeminiResponseInvalidError(
+                "Gemini detection response is invalid."
+            ) from error
+
+        except errors.ClientError as error:
+            if getattr(error, "code", None) in (401, 403):
+                raise GeminiAuthenticationError(
+                    "Gemini authentication failed."
+                ) from error
+
+            raise GeminiInferenceError(
+                "Gemini detection request failed."
+            ) from error
+
+        except Exception as error:
+            raise GeminiInferenceError(
+                "Gemini detection request failed."
+            ) from error
+
+        logging.getLogger(__name__).info(
+            "Gemini furniture detection finished: "
+            "model=%s, processing_time_ms=%d, object_count=%d",
+            self._settings.gemini_vlm_model,
+            processing_time_ms,
+            object_count,
+        )
+        return GeminiDetectionResult(
+            detections=result.detections,
+            processing_time_ms=processing_time_ms,
+        )
+
+    def embed_image(self, image: Image.Image) -> list[float]:
+        """이미지를 임베딩하여 벡터 값을 반환합니다.
+
+        Args:
+            image: PIL 이미지 객체입니다.
+
+        Returns:
+            임베딩 벡터(float 리스트)입니다.
+
+        Raises:
+            GeminiConfigurationError: Gemini API 키가 설정되지 않은 경우입니다.
+            GeminiEmbeddingError: 이미지 임베딩에 실패한 경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "Google Gen AI 인증 설정이 누락되었습니다."
+            )
+
+        try:
+            client = genai_client.create_client(self._settings)
+
+            image_format = (image.format or "PNG").upper()
+            buffer = io.BytesIO()
+            image.save(buffer, format=image_format)
+            image_bytes = buffer.getvalue()
+
+            response = client.models.embed_content(
+                model=self._settings.gemini_embedding_model,
+                contents=[  # type: ignore[arg-type]
+                    types.Part.from_bytes(
+                        data=image_bytes,
+                        mime_type=f"image/{image_format.lower()}",
+                    ),
+                ],
+            )
+
+            embeddings = response.embeddings
+            if not embeddings or not embeddings[0].values:
+                raise GeminiEmbeddingError(
+                    "Gemini 임베딩 응답이 비어 있습니다."
+                )
+
+            return embeddings[0].values
+        except GeminiEmbeddingError:
+            raise
+        except Exception as error:
+            raise GeminiEmbeddingError(
+                "Gemini 이미지 임베딩에 실패했습니다."
+            ) from error

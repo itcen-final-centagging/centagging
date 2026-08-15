@@ -2,7 +2,9 @@
 .env
 .env.*
 !.env.example
+!.env.prod.example
 .streamlit/secrets.toml
+gha-creds-*.json
 
 # Python 캐시와 테스트 산출물 / Python caches and test artifacts
 __pycache__/
@@ -24,6 +26,15 @@ env/
 uploads/
 outputs/
 *.sqlite3
+
+# React local dependencies and build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.eslintcache
+
+data/images
+resource
+data/images
 
 # IDE 및 운영체제 파일 / IDE and operating system files
 .vscode/

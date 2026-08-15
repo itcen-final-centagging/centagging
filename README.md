@@ -1,9 +1,10 @@
 # Centagging
 
 AI 기반 인테리어 연출 이미지 가구 자동 태깅 솔루션
+## 0. 기술 스택
 
 - 백엔드: FastAPI
-- 프론트엔드: Streamlit
+- 프론트엔드: React 19 + TypeScript + Vite, Nginx
 - 데이터베이스: PostgreSQL + pgvector
 - AI: Gemini VLM 및 이미지 임베딩
 - 팀 공통 실행 환경: Docker Compose
@@ -44,15 +45,19 @@ cd centagging-backend
 Copy-Item .env.example .env
 ```
 
-`.env`에서 Gemini API 키를 입력합니다.
+`.env`에서 MVP 로그인 계정과 Gemini API 키를 입력합니다.
 
 ```env
+MVP_LOGIN_ID=your-mvp-login-id
+MVP_LOGIN_PASSWORD=your-mvp-login-password
 GEMINI_API_KEY=your-gemini-api-key-here
 GEMINI_VLM_MODEL=gemini-3.5-flash
 GEMINI_EMBEDDING_MODEL=gemini-embedding-2
 ```
 
-`.env`는 개인별 설정 파일이며 Git에서 제외됩니다. 실제 API 키를 `.env.example`, 소스 코드, 커밋, 메신저에 넣으면 안 됩니다.
+`MVP_LOGIN_ID`와 `MVP_LOGIN_PASSWORD`는 PoC에서만 사용하는 고정 로그인 계정입니다. `.env.example`의 예시값을 실제 환경에서 그대로 사용하지 마세요.
+
+`.env`는 개인별 설정 파일이며 Git에서 제외됩니다. 실제 로그인 비밀번호와 API 키를 `.env.example`, 소스 코드, 커밋, 메신저에 넣으면 안 됩니다.
 
 > **주의:** Windows 시스템 환경 변수 또는 터미널 환경 변수에 `GEMINI_API_KEY`가 있으면 Docker Compose가 `.env`보다 그 값을 우선할 수 있습니다. 프로젝트에서는 시스템 변수 대신 `.env`만 사용하세요.
 
@@ -74,7 +79,7 @@ docker compose ps
 | --- | --- | --- |
 | FastAPI | http://localhost:8000 | 백엔드 API 포트 |
 | FastAPI Docs | http://localhost:8000/docs | API 스웨거 테스트 화면 |
-| Streamlit | http://localhost:8501 | 프론트앤드 포트 |
+| React | http://localhost:8501 | 프론트엔드 포트 |
 | PostgreSQL + pgvector | localhost:5432 | 로컬 데이터베이스 |
 
 소스 코드만 변경했다면 볼륨 마운트와 `--reload`가 적용되어 API 컨테이너가 자동으로 갱신됩니다. 일반적인 재실행은 아래 명령으로 충분합니다.
@@ -83,33 +88,25 @@ docker compose ps
 docker compose up -d
 ```
 
-## 5. Gemini API 호출 확인
+## 5. MVP 로그인 API 확인
 
-먼저 Gemini 설정 상태를 확인합니다.(http://localhost:8000/docs 에서 테스트 권장)
-
-```powershell
-Invoke-RestMethod http://localhost:8000/api/v1/gemini/status
-```
-
-`configured` 값이 `true`이면 실제 호출 검증을 실행합니다.
+FastAPI Docs(http://localhost:8000/docs) 또는 PowerShell에서 `.env`에 설정한 계정값으로 `POST /api/centagging/auth/login`을 한 번 호출합니다.
 
 ```powershell
+$loginBody = @{
+  login_id = "your-mvp-login-id"
+  password = "your-mvp-login-password"
+} | ConvertTo-Json
+
 Invoke-RestMethod -Method Post `
-  -Uri http://localhost:8000/api/v1/gemini/verify
+  -Uri http://localhost:8000/api/centagging/auth/login `
+  -ContentType "application/json" `
+  -Body $loginBody
 ```
 
-정상 응답 예시는 아래와 같습니다.
+성공하면 사용자 정보가 반환되며 쿠키나 토큰은 발급되지 않습니다. 프론트엔드는 성공 응답을 받은 뒤 다음 페이지로 이동합니다. 백엔드는 이후 요청의 로그인 상태를 확인하지 않으므로 보호 API 인증 방식은 별도로 결정해야 합니다.
 
-```json
-{
-  "status": "ok",
-  "vlm_model": "gemini-3.5-flash",
-  "embedding_model": "gemini-embedding-2",
-  "embedding_dimensions": 3072
-}
-```
-
-`/api/v1/gemini/verify`는 Gemini VLM과 임베딩 API를 실제로 각각 호출합니다. 사용량이 발생할 수 있으므로 연동 확인이 필요할 때만 실행합니다.
+> **주의:** MVP 로그인 계정은 프로토타입 검증용입니다. 운영 환경에서는 고정 계정 대신 SSO·IAM 등의 인증 체계로 교체해야 합니다.
 
 ## 6. 로컬 Python 환경 (선택)
 
@@ -118,13 +115,12 @@ Docker 외에 로컬에서 코드 품질 검사 또는 디버깅을 하려면 Co
 ```powershell
 conda env create -f environment.yml
 conda activate centagging
-pre-commit install
 ```
 
-전체 코드 품질 검사는 아래처럼 실행합니다.
+pre-commit 검사는 커밋 시 자동으로 실행되지 않습니다. 전체 코드 품질 검사가 필요할 때 아래처럼 수동으로 실행합니다.
 
 ```powershell
-pre-commit run --all-files
+pre-commit run --hook-stage manual --all-files
 ```
 
 Python 코드는 [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)를 따르며, 세부 협업 기준은 [docs/CODING_CONVENTION.md](docs/CODING_CONVENTION.md)를 확인합니다.
@@ -171,7 +167,7 @@ Remove-Item Env:GEMINI_API_KEY -ErrorAction SilentlyContinue
 docker compose up -d --force-recreate --no-deps api
 ```
 
-위 명령 후 `/api/v1/gemini/verify`를 다시 실행합니다. Windows 시스템 환경 변수에 `GEMINI_API_KEY`가 남아 있다면 `환경 변수 편집`에서 삭제하고 새 터미널을 열어야 합니다.
+위 명령 후 Gemini를 사용하는 분석 기능을 다시 실행합니다. Windows 시스템 환경 변수에 `GEMINI_API_KEY`가 남아 있다면 `환경 변수 편집`에서 삭제하고 새 터미널을 열어야 합니다.
 
 ### Gemini 호출이 `API_KEY_INVALID`로 실패할 때
 
@@ -187,7 +183,7 @@ docker compose up -d --force-recreate --no-deps api
 
 ```env
 API_PORT=8001
-STREAMLIT_PORT=8502
+FRONTEND_PORT=8502
 POSTGRES_PORT=5433
 ```
 
@@ -195,17 +191,51 @@ POSTGRES_PORT=5433
 docker compose up -d --force-recreate
 ```
 
-## 9. 주요 파일
+## 10. 주요 파일
 
 ```text
-app/                    FastAPI 애플리케이션
-frontend/               Streamlit 애플리케이션
-docker/                 DB 초기화 스크립트
-docker-compose.yml       팀 공통 Docker 실행 구성
-Dockerfile.api           FastAPI 이미지 구성
-Dockerfile.frontend      Streamlit 이미지 구성
-.env.example             개인 환경 변수 예시
-environment.yml          Conda 환경 구성
-requirements.txt         고정된 Python 의존성 목록
-kosa-poc-main/           수정하지 않는 참고 샘플
+centagging-backend/
+├─ .github/
+│  ├─ workflows/
+│  │  └─ deploy-vm.yml          # deploy 브랜치 운영 VM 배포 GitHub Actions
+│  └─ pull_request_template.md  # PR 작성 템플릿
+│
+├─ app/                         # FastAPI 백엔드
+│  ├─ api/
+│  │  └─ gemini.py              # Gemini 연결·검증 API
+│  ├─ core/
+│  │  └─ config.py              # 환경 변수·설정 관리
+│  ├─ services/
+│  │  └─ gemini_service.py      # Gemini API 호출 로직
+│  └─ main.py                   # FastAPI 애플리케이션 시작점
+│
+├─ frontend/                    # React 프론트엔드
+│  ├─ src/                      # React 애플리케이션 코드
+│  └─ nginx.conf                # API 프록시 및 정적 파일 설정
+│
+├─ docker/
+│  └─ db/
+│     └─ init/
+│        └─ 01-enable-vector.sql # PostgreSQL pgvector 확장 활성화
+│
+├─ docs/
+│  └─ CODING_CONVENTION.md      # Google Python Style 기반 협업 규칙
+│
+├─ kosa-poc-main/               # 받은 샘플 코드 - 참고용, 수정 금지
+│  ├─ embedding/
+│  ├─ image-generation/
+│  └─ vlm-tagging/
+│
+├─ .env                         # 개인 로컬 비밀값 - Git 제외
+├─ .env.example                 # 팀 공유용 환경 변수 템플릿
+├─ .gitignore                   # 비밀값·캐시·가상환경 제외 규칙
+├─ .pre-commit-config.yaml      # 수동 Python 코드 품질 검사 설정
+├─ .dockerignore                # Docker 빌드 제외 규칙
+├─ docker-compose.yml           # API·Frontend·DB 통합 실행
+├─ Dockerfile.api               # FastAPI 컨테이너 이미지 정의
+├─ Dockerfile.frontend          # React 빌드 및 Nginx 컨테이너 이미지 정의
+├─ requirements.txt             # Python 패키지 정확 버전 고정
+├─ environment.yml              # Conda 환경 정의
+├─ pyproject.toml               # Black 등 Python 도구 설정
+└─ README.md                    # 팀 공통 설치·실행 가이드
 ```

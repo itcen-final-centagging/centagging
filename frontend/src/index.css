@@ -1,0 +1,359 @@
+@import 'tailwindcss';
+
+:root {
+  font-family: Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  color: #0f172b;
+  background: #f1f5f9;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --radius: 12px;
+  --color-primary: #1447e6;
+  --color-primary-20: #eff6ff;
+  --color-primary-50: #dbeafe;
+  --color-primary-100: #bedbff;
+  --color-primary-200: #8ec5ff;
+  --color-primary-300: #51a2ff;
+  --color-primary-700: #193cb8;
+  --color-neutral-20: #f8fafc;
+  --color-neutral-50: #f1f5f9;
+  --color-neutral-100: #e2e8f0;
+  --color-neutral-200: #cad5e2;
+  --color-neutral-300: #90a1b9;
+  --color-neutral-400: #62748e;
+  --color-neutral-500: #45556c;
+  --color-neutral-600: #314158;
+  --color-neutral-700: #1d293d;
+  --color-neutral-800: #0f172b;
+  --color-success-50: #d0fae5;
+  --color-success-600: #007a55;
+  --color-danger-20: #fef2f2;
+  --color-danger-200: #ffa2a2;
+  --color-danger-600: #c10007;
+  --color-warning-50: #fef3c6;
+  --color-warning-600: #bb4d00;
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --blue-800: #1e40af;
+  --blue-900: #1e3a8a;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-quaternary: #94a3b8;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-muted: #e2e8f0;
+  --bg-hover: #f1f5f9;
+  --border-color: #e2e8f0;
+  --content-gradient:
+    radial-gradient(
+      ellipse 100% 80% at 50% -16%,
+      rgba(96, 165, 250, 0.15) 0%,
+      rgba(255, 255, 255, 0) 55%
+    ),
+    radial-gradient(
+      ellipse 58% 60% at 100% 100%,
+      rgba(139, 92, 246, 0.08) 0%,
+      rgba(255, 255, 255, 0) 70%
+    ),
+    #f1f5f9;
+  --shadow-card: 0 1px 3px rgb(15 23 42 / 8%), 0 1px 2px rgb(15 23 42 / 5%);
+  --shadow-panel: 0 12px 28px rgb(15 23 42 / 7%);
+  --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --color-primary: var(--blue-700);
+  --color-primary-20: var(--blue-50);
+  --color-primary-50: var(--blue-100);
+  --color-primary-100: var(--blue-200);
+  --color-primary-200: var(--blue-300);
+  --color-primary-300: var(--blue-400);
+  --color-primary-700: var(--blue-900);
+}
+
+@theme inline {
+  --color-blue-50: var(--blue-50);
+  --color-blue-100: var(--blue-100);
+  --color-blue-200: var(--blue-200);
+  --color-blue-300: var(--blue-300);
+  --color-blue-400: var(--blue-400);
+  --color-blue-500: var(--blue-500);
+  --color-blue-600: var(--blue-600);
+  --color-blue-700: var(--blue-700);
+  --color-blue-800: var(--blue-800);
+  --color-blue-900: var(--blue-900);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-quaternary: var(--text-quaternary);
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-bg-muted: var(--bg-muted);
+  --color-bg-hover: var(--bg-hover);
+  --color-border: var(--border-color);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --color-primary: var(--color-primary);
+  --color-primary-20: var(--color-primary-20);
+  --color-primary-50: var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-700: var(--color-primary-700);
+  --color-neutral-20: var(--color-neutral-20);
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-500: var(--color-neutral-500);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-700: var(--color-neutral-700);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-success-50: var(--color-success-50);
+  --color-success-600: var(--color-success-600);
+  --color-danger-20: var(--color-danger-20);
+  --color-danger-200: var(--color-danger-200);
+  --color-danger-600: var(--color-danger-600);
+  --color-warning-50: var(--color-warning-50);
+  --color-warning-600: var(--color-warning-600);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg-tertiary);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #155dfc;
+  outline-offset: 2px;
+}
+
+.studio-surface {
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: var(--shadow-card);
+}
+
+.studio-content-gradient {
+  background: var(--content-gradient);
+}
+
+.studio-page-title {
+  font-family: inherit;
+}
+
+.studio-panel-hover {
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+
+.studio-panel-hover:hover {
+  border-color: var(--blue-300);
+  box-shadow: 0 16px 32px rgb(29 78 216 / 8%);
+  transform: translateY(-1px);
+}
+
+.furniture-sofa {
+  position: relative;
+  width: 120px;
+  height: 36px;
+  margin-top: 34px;
+  border-radius: 14px 14px 7px 7px;
+  background: #8c99ab;
+}
+
+.furniture-sofa::before {
+  position: absolute;
+  top: -30px;
+  left: 6px;
+  width: 108px;
+  height: 35px;
+  border-radius: 14px 14px 0 0;
+  background: #a9b3c1;
+  content: '';
+}
+
+.furniture-sofa::after {
+  position: absolute;
+  bottom: -16px;
+  left: 13px;
+  width: 80px;
+  border-right: 4px solid transparent;
+  border-bottom: 17px solid #59677c;
+  border-left: 4px solid transparent;
+  content: '';
+}
+
+.furniture-table {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #bc8a67;
+}
+
+.furniture-table::after {
+  position: absolute;
+  bottom: -33px;
+  left: 25px;
+  width: 7px;
+  height: 34px;
+  background: #7c5b45;
+  content: '';
+}
+
+.furniture-lamp {
+  position: relative;
+  width: 4px;
+  height: 66px;
+  margin-top: 26px;
+  background: #425168;
+}
+
+.furniture-lamp::before {
+  position: absolute;
+  top: -10px;
+  left: -13px;
+  width: 30px;
+  height: 32px;
+  border-radius: 50% 50% 40% 40%;
+  background: #eee4d1;
+  content: '';
+}
+
+.furniture-lamp::after {
+  position: absolute;
+  bottom: -7px;
+  left: -9px;
+  width: 22px;
+  height: 12px;
+  border-radius: 50%;
+  background: #425168;
+  content: '';
+}
+
+.furniture-chair {
+  position: relative;
+  width: 42px;
+  height: 50px;
+  margin-top: 13px;
+  border: 6px solid #5b6878;
+  border-radius: 14px 14px 7px 7px;
+  border-bottom-width: 10px;
+}
+
+.furniture-chair::before {
+  position: absolute;
+  bottom: -26px;
+  left: 15px;
+  width: 4px;
+  height: 21px;
+  background: #45556c;
+  box-shadow:
+    -16px 17px 0 -1px #45556c,
+    16px 17px 0 -1px #45556c;
+  content: '';
+}
+
+.furniture-cabinet {
+  position: relative;
+  width: 64px;
+  height: 76px;
+  border-radius: 6px;
+  background: #d4dbe5;
+  box-shadow: inset 0 0 0 3px #a6b2c2;
+}
+
+.furniture-cabinet::before {
+  position: absolute;
+  top: 23px;
+  right: 8px;
+  left: 8px;
+  height: 3px;
+  background: #94a3b8;
+  box-shadow: 0 23px 0 #94a3b8;
+  content: '';
+}
+
+.detection-box {
+  position: absolute;
+  border: 2px solid #155dfc;
+  border-radius: 5px;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 78%);
+}
+
+.detection-box span {
+  position: absolute;
+  top: -28px;
+  left: -2px;
+  padding: 4px 6px;
+  border-radius: 4px 4px 4px 0;
+  background: #1447e6;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.detection-box-sofa {
+  top: 47%;
+  left: 18%;
+  width: 48%;
+  height: 38%;
+}
+
+.detection-box-table {
+  top: 58%;
+  left: 68%;
+  width: 16%;
+  height: 22%;
+}
+
+.detection-box-lamp {
+  top: 17%;
+  left: 78%;
+  width: 11%;
+  height: 42%;
+}
+
+.detection-box-selected {
+  border-width: 3px;
+  box-shadow: 0 0 0 4px rgb(219 234 254 / 92%);
+}
+
+@media (max-width: 900px) {
+  .detection-box span {
+    font-size: 9px;
+  }
+}
