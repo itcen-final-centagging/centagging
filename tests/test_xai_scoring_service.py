@@ -50,16 +50,16 @@ class _SuccessfulScoringService(xai_scoring_service.XaiScoringService):
 
     def score_all(
         self,
-        _crops: list[xai_scoring_service.ScoringCrop],
+        crops: list[xai_scoring_service.ScoringCrop],
     ) -> xai_scoring_service.RubricScoreResult:
         """후보 1건의 완료된 루브릭 결과를 반환합니다."""
         return xai_scoring_service.RubricScoreResult(
             crops=[
                 xai_scoring_service.CropScore(
-                    crop_index=0,
+                    crop_index=crops[0].crop_index,
                     evaluations=[
                         xai_scoring_service.SkuEvaluation(
-                            sku_id="CHR-2041",
+                            sku_id=crops[0].candidates[0].sku_code,
                             status="Matched",
                             total_score=93,
                             xai_result=tagging.XaiResult(
@@ -74,6 +74,7 @@ class _SuccessfulScoringService(xai_scoring_service.XaiScoringService):
 
 def _build_xai_request(
     temp_dir: str,
+    object_idx: int = 0,
 ) -> tuple[config.Settings, CroppedObject, tagging.DetectedObject]:
     """XAI 채점 공개 인터페이스에 전달할 입력을 만듭니다."""
     image_path = pathlib.Path(temp_dir) / "chair.png"
@@ -102,7 +103,7 @@ def _build_xai_request(
         xai_result=tagging.XaiResult(summary="XAI 판정 결과가 없습니다."),
     )
     detected = tagging.DetectedObject(
-        object_idx=0,
+        object_idx=object_idx,
         bbox_coord=tagging.BoundingBox(
             xmin=0,
             ymin=0,
@@ -112,7 +113,7 @@ def _build_xai_request(
         sku_candidates=[candidate],
     )
     crop = CroppedObject(
-        crop_index=0,
+        crop_index=object_idx,
         bbox=detected.bbox_coord,
         image=Image.new("RGB", (10, 10), color="white"),
         image_bytes=b"crop",
@@ -194,14 +195,18 @@ class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(objects[0].sku_candidates[0].similarity_score, 91)
 
     async def test_success_applies_xai_score(self) -> None:
-        """Gemini 채점 성공 후보에는 XAI 점수를 반영합니다."""
+        """0이 아닌 객체 인덱스에도 XAI 점수를 반영합니다."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            settings, crop, detected = _build_xai_request(temp_dir)
+            settings, crop, detected = _build_xai_request(
+                temp_dir,
+                object_idx=5,
+            )
             service = _SuccessfulScoringService(settings)
 
             objects = await service.enrich_detected_objects([crop], [detected])
 
         candidate = objects[0].sku_candidates[0]
+        self.assertEqual(objects[0].object_idx, 5)
         self.assertEqual(candidate.similarity_score, 93)
         self.assertEqual(candidate.xai_result.summary, "구조와 색상이 유사합니다.")
 
