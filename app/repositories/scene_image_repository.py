@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.scene_image import SceneImage
+from app.schemas.tagging import ObjectMetadata
 
 class SceneImageNotFoundError(RuntimeError):
     """존재하지 않는 scene_image_id로 조회한 경우입니다."""
@@ -26,3 +27,21 @@ async def get_scene_image(
         raise SceneImageNotFoundError(scene_image_id)
 
     return scene_image
+
+async def add_detected_object_metadata(
+    session: AsyncSession,
+    scene_id: int,
+    object_metadata: ObjectMetadata
+) -> SceneImage:
+    """연출 이미지 내 검출 객체 메타데이터를 저장합니다.
+    
+    Args:
+        session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
+        scene_image: 연출 이미지 Model 객체입니다.
+
+    Returns:
+        SceneImageNotFoundError: 해당 ID의 장면 이미지가 없는 경우입니다.
+    """
+    scene_image = await get_scene_image(session, scene_id)
+    scene_image.object_metadata = object_metadata
+    

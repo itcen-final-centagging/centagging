@@ -33,7 +33,6 @@ class XaiResult(BaseModel):
 
     summary: str
     criteria: list[XaiCriterion] = Field(default_factory=list)
-    vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
 class SkuCandidate(BaseModel):
@@ -47,6 +46,7 @@ class SkuCandidate(BaseModel):
     similarity_score: int
     matched_sku_image: MatchedSkuImage
     xai_result: XaiResult
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
 class SceneImageInfo(BaseModel):
@@ -87,7 +87,22 @@ class DetectionResult(BaseModel):
     processing_status: str
     scene_image: SceneImageInfo
     objects: list[DetectedObject]
-
+    
+class ObjectAttributes(BaseModel):
+    """탐지 객체 속성입니다."""
+    
+    color: str
+    material: str
+    style: str
+    
+class ObjectMetadata(BaseModel):
+    """확정 시점의 탐지 객체 속성입니다."""
+    
+    object_index: int
+    category: str
+    sub_category: str
+    bbox_coord: BoundingBox
+    attrs: ObjectAttributes
 
 class SkuMatching(BaseModel):
     """확정할 객체-SKU 매핑 1건입니다.
@@ -96,20 +111,19 @@ class SkuMatching(BaseModel):
     후보를 그대로 돌려받습니다.
     """
 
-    # scene_image.object_metadata 배열의 인덱스입니다.
     object_index: int = Field(ge=0)
-    sku_code: str = Field(min_length=1)
+    sku_id: int = Field(ge=1)
     match_rank: int = Field(ge=1)
     similarity_score: int = Field(ge=0, le=100)
+    object_metadata: ObjectMetadata
     xai_result: XaiResult
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
 class SkuMatchingRequest(BaseModel):
-    """탐지 객체별 SKU 확정 요청입니다."""
+    """탐지 객체 저장 요청입니다."""
 
-    # 빈 배열은 확정할 대상이 없다는 뜻이라 요청 자체를 거부합니다.
-    matching: list[SkuMatching] = Field(min_length=1)
+    tagging_results: list[SkuMatching] = Field(min_length=1)
 
 
 class SkuMatchingResult(BaseModel):
