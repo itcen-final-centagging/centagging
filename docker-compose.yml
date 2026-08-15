@@ -28,9 +28,16 @@ services:
       APP_ENV: ${APP_ENV:-local}
       API_HOST: 0.0.0.0
       API_PORT: 8000
+      MVP_LOGIN_ID: ${MVP_LOGIN_ID:-}
+      MVP_LOGIN_PASSWORD: ${MVP_LOGIN_PASSWORD:-}
+      VERTEX_API_KEY: ${VERTEX_API_KEY:-}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+      VERTEX_AI_LOCATION: ${VERTEX_AI_LOCATION:-global}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
+      IMAGE_STORAGE_ROOT: ${IMAGE_STORAGE_ROOT:-uploads}
+      SKU_IMAGE_ROOT: ${SKU_IMAGE_ROOT:-data/images}
       POSTGRES_DB: ${POSTGRES_DB:-centagging}
       POSTGRES_USER: ${POSTGRES_USER:-centagging}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
@@ -40,6 +47,8 @@ services:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./app:/app/app
+      - ./uploads:/app/uploads
+      - ./data:/app/data:ro
     depends_on:
       db:
         condition: service_healthy
@@ -50,22 +59,18 @@ services:
       timeout: 5s
       retries: 10
 
-  # Streamlit 관리자 화면 / Streamlit admin interface
+  # React 관리자 화면 / React admin interface
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    environment:
-      API_BASE_URL: http://api:8000
     ports:
-      - "${STREAMLIT_PORT:-8501}:8501"
-    volumes:
-      - ./frontend:/app/frontend
+      - "${FRONTEND_PORT:-8501}:8501"
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8501/_stcore/health')"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8501/"]
       interval: 5s
       timeout: 5s
       retries: 10
