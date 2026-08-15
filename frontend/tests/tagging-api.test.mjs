@@ -15,6 +15,60 @@ const loadTaggingApi = async (t) => {
   return server.ssrLoadModule('/src/features/tagging/api/tagging.ts');
 };
 
+const loadSaveWorkflow = async (t) => {
+  const server = await createServer({
+    appType: 'custom',
+    logLevel: 'silent',
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    server: { middlewareMode: true },
+  });
+  t.after(() => server.close());
+  return server.ssrLoadModule(
+    '/src/features/tagging/services/save-tagging-workflow.ts',
+  );
+};
+
+test('history refresh failure does not undo a successful save', async (t) => {
+  const { saveTaggingAndRefreshHistory } = await loadSaveWorkflow(t);
+  const events = [];
+
+  const result = await saveTaggingAndRefreshHistory({
+    onSaved: () => events.push('saved'),
+    refreshHistory: async () => {
+      events.push('history');
+      throw new Error('이력 서버 오류');
+    },
+    save: async () => events.push('put'),
+  });
+
+  assert.deepEqual(events, ['put', 'saved', 'history']);
+  assert.deepEqual(result, {
+    historyError: '이력 서버 오류',
+  });
+});
+
+test('save failure does not mark saved or refresh history', async (t) => {
+  const { saveTaggingAndRefreshHistory } = await loadSaveWorkflow(t);
+  const events = [];
+
+  await assert.rejects(
+    saveTaggingAndRefreshHistory({
+      onSaved: () => events.push('saved'),
+      refreshHistory: async () => {
+        events.push('history');
+        return [];
+      },
+      save: async () => {
+        events.push('put');
+        throw new Error('저장 서버 오류');
+      },
+    }),
+    /저장 서버 오류/,
+  );
+
+  assert.deepEqual(events, ['put']);
+});
+
 test('history results are mapped from the backend response', async (t) => {
   const { fetchTaggingHistory } = await loadTaggingApi(t);
   const originalFetch = globalThis.fetch;

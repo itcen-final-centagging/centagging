@@ -149,15 +149,23 @@ def parse_image_to_bytes(image: Image.Image) -> bytes:
 def read_sku_image_bytes(
     image_url: str,
     sku_image_root: str,
+    image_storage_root: str | None = None,
 ) -> bytes | None:
     """sku_image.image_url이 가리키는 파일을 JPEG 바이트로 읽습니다.
 
     Args:
         image_url: sku_image 테이블의 image_url 값입니다.
         sku_image_root: SKU 이미지가 저장된 루트 경로입니다.
+        image_storage_root: 업로드 이미지가 저장된 루트 경로입니다.
 
     Returns:
         JPEG 바이트이며, 파일을 못 읽으면 None입니다.
         후보 1건이 실패해도 나머지 채점은 계속하도록 예외 대신 None입니다.
     """
-    return SkuImageStorage(root=sku_image_root).read_jpeg(image_url)
+    normalized_url = image_url.replace("\\", "/")
+    root = (
+        image_storage_root
+        if normalized_url.startswith("/uploads/") and image_storage_root
+        else sku_image_root
+    )
+    return SkuImageStorage(root=root).read_jpeg(image_url)
