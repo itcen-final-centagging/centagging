@@ -14,7 +14,7 @@ import {
 } from '@/features/tagging/components/WorkflowStatus';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 
-const pageCopy = {
+const PAGE_COPY = {
   upload: {
     eyebrow: '새 태깅 작업',
     title: '연출 이미지에서, 정확한 상품까지',
@@ -63,17 +63,17 @@ const pageCopy = {
   },
 } as const;
 
-const getCopyKey = (stage: string): keyof typeof pageCopy => {
+const getCopyKey = (stage: string): keyof typeof PAGE_COPY => {
   if (stage === 'analyzing') return 'upload';
   if (stage === 'redetecting') return 'not-found';
   if (stage === 'saving') return 'review';
-  return stage as keyof typeof pageCopy;
+  return stage as keyof typeof PAGE_COPY;
 };
 
 export const TaggingPage: React.FC = () => {
   const { analysisMode, analysisScenario, setAnalysisScenario, stage } =
     useTaggingWorkflow();
-  const copy = pageCopy[getCopyKey(stage)];
+  const copy = PAGE_COPY[getCopyKey(stage)];
 
   return (
     <div className="px-6 py-6 pb-10">
@@ -95,7 +95,7 @@ export const TaggingPage: React.FC = () => {
             <span className="mt-2 inline-flex w-fit rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
               {analysisMode === 'live'
                 ? 'Gemini 실시간 분석 결과'
-                : 'Gemini 키 미설정 · PoC Mock 분석 결과'}
+                : '객체 · SKU 선택 데모'}
             </span>
           ) : null}
         </div>
