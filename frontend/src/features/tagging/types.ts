@@ -71,9 +71,9 @@ export interface VlmMood {
 }
 
 export interface SkuCandidate {
+  attrs: Record<string, unknown>;
   category: string | null;
   color: string | null;
-  grade: string | null;
   imageUrl: string | null;
   kind: 'sofa' | 'table' | 'lamp' | 'chair' | 'cabinet' | null;
   material: string | null;

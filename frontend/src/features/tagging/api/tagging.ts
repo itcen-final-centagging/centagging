@@ -49,7 +49,6 @@ type ApiRubric = {
 type ApiCandidate = {
   category: string;
   color: string;
-  grade: string;
   image_url: string;
   kind: NonNullable<SkuCandidate['kind']>;
   material: string;
@@ -133,9 +132,9 @@ const toDevCandidate = (
   candidate: DevCandidate,
   candidateIndex: number,
 ): SkuCandidate => ({
+  attrs: candidate.attrs ?? {},
   category: candidate.category,
   color: nullableText(candidate.attrs.color),
-  grade: null,
   imageUrl: resolveAssetUrl(candidate.matched_sku_image.image_url),
   kind: toKind(candidate.category, candidate.sub_category),
   material: nullableText(candidate.attrs.material),
@@ -156,9 +155,13 @@ const toDevCandidate = (
 });
 
 const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
+  attrs: {
+    color: candidate.color,
+    material: candidate.material,
+    size: candidate.size,
+  },
   category: candidate.category,
   color: candidate.color,
-  grade: candidate.grade,
   imageUrl: resolveAssetUrl(candidate.image_url),
   kind: candidate.kind,
   material: candidate.material,
