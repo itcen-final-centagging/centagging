@@ -11,13 +11,18 @@ import fastapi
 import pydantic
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
+from app import dependencies
 from app.core import config, database
+from app.schemas import common as common_schema
 from app.services import sku_service
 
 router = fastapi.APIRouter(prefix="/sku", tags=["sku"])
 
 _ALLOWED_MIME_TYPES = {"image/jpeg", "image/png"}
 _MAX_IMAGE_SIZE = 10 * 1024 * 1024
+_MAX_BATCH_IMAGE_COUNT = 20
+
+SkuImageType = typing.Literal["MAIN", "ANGLE", "DETAIL", "STYLING"]
 
 
 class MetadataExtractResponse(pydantic.BaseModel):
@@ -58,6 +63,22 @@ class SkuCreateResponse(pydantic.BaseModel):
     sku_code: str
     product_name: str
     main_image_url: str
+
+
+class SkuImageUploadItem(pydantic.BaseModel):
+    """기존 SKU에 새로 연결한 이미지 1건입니다."""
+
+    sku_image_id: int
+    image_url: str
+    image_type: SkuImageType
+
+
+class SkuImageBatchCreateResponse(pydantic.BaseModel):
+    """기존 SKU 이미지 일괄 추가 응답입니다."""
+
+    sku_id: int
+    sku_code: str
+    images: list[SkuImageUploadItem]
 
 
 class SkuCatalogItem(pydantic.BaseModel):
@@ -102,6 +123,95 @@ def _validate_image(content: bytes, content_type: typing.Optional[str]) -> None:
             status_code=fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="파일 용량은 최대 10MB까지 가능합니다.",
         )
+
+
+# NOTE: 기존 SKU 라우터 확장부에 공통 관리자 권한·응답 규약을 적용합니다.
+@router.post(
+    "/{sku_code}/images",
+    response_model=common_schema.SuccessResponse[SkuImageBatchCreateResponse],
+    status_code=fastapi.status.HTTP_201_CREATED,
+)
+async def add_images_to_existing_sku(
+    sku_code: str,
+    images: list[fastapi.UploadFile] = fastapi.File(...),
+    image_type: SkuImageType = fastapi.Form("STYLING"),
+    _: dependencies.AdminUser = fastapi.Depends(
+        dependencies.require_super_admin
+    ),
+    session: sqlalchemy_async.AsyncSession = fastapi.Depends(
+        database.get_database_session
+    ),
+) -> common_schema.SuccessResponse[SkuImageBatchCreateResponse]:
+    """기존 SKU에 제품 이미지를 한 번에 추가합니다.
+
+    관리자 일괄 등록 화면은 여러 파일을 업로드하되 하나의 큐 항목은
+    동일한 이미지 유형으로 저장합니다. 예를 들어 여러 연출 이미지를
+    ``STYLING``으로, 여러 상세 컷을 ``DETAIL``로 묶어 추가합니다.
+
+    Args:
+        sku_code: 이미지를 연결할 기존 SKU 코드입니다.
+        images: JPG 또는 PNG 파일 1~20개입니다.
+        image_type: 모든 파일에 적용할 이미지 유형입니다.
+        session: 요청 범위 DB 세션입니다.
+
+    Returns:
+        새로 만든 ``sku_image`` 목록입니다.
+
+    Raises:
+        fastapi.HTTPException: SKU가 없거나, 파일 수·형식·용량이
+            허용 범위를 벗어난 경우입니다.
+    """
+    if not images:
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="이미지를 한 장 이상 업로드해야 합니다.",
+        )
+    if len(images) > _MAX_BATCH_IMAGE_COUNT:
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"이미지는 한 번에 최대 {_MAX_BATCH_IMAGE_COUNT}장까지 가능합니다.",
+        )
+
+    sku = await sku_service.find_sku_by_code(session, sku_code)
+    if sku is None:
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_404_NOT_FOUND,
+            detail="기존 SKU를 찾을 수 없습니다.",
+        )
+
+    image_urls = []
+    for image in images:
+        content = await image.read()
+        _validate_image(content, image.content_type)
+        image_urls.append(
+            sku_service.save_uploaded_image(
+                config.get_settings(),
+                sku.sku_code,
+                image.filename or "image.jpg",
+                content,
+            )
+        )
+
+    created_images = await sku_service.add_sku_images(
+        session,
+        sku_id=sku.sku_id,
+        image_urls=image_urls,
+        image_type=image_type,
+    )
+    return common_schema.success_response(
+        SkuImageBatchCreateResponse(
+            sku_id=sku.sku_id,
+            sku_code=sku.sku_code,
+            images=[
+                SkuImageUploadItem(
+                    sku_image_id=image.sku_image_id,
+                    image_url=image.image_url,
+                    image_type=typing.cast(SkuImageType, image.image_type),
+                )
+                for image in created_images
+            ],
+        )
+    )
 
 
 @router.post("/extract", response_model=MetadataExtractResponse)
