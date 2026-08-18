@@ -7,9 +7,11 @@ import { cn } from '@/lib/utils';
 interface ImagePreviewProps {
   image?: UploadedImage;
   isEditing?: boolean;
+  hoveredObjectId?: string;
   onObjectBboxChange?: (
     updates: Array<Pick<FurnitureObject, 'bbox' | 'id'>>,
   ) => void;
+  onObjectHover?: (objectId?: string) => void;
   onObjectToggle?: (object: FurnitureObject) => void;
   objects?: FurnitureObject[];
   selectedObjectIds?: string[];
@@ -94,8 +96,10 @@ export const ObjectCropPreview = ({
 
 export const ImagePreview = ({
   image,
+  hoveredObjectId,
   isEditing = false,
   onObjectBboxChange,
+  onObjectHover,
   onObjectToggle,
   objects = [],
   selectedObjectIds = [],
@@ -222,22 +226,32 @@ export const ImagePreview = ({
         />
         {showBoxes
           ? objects
-              .filter(
-                (object) =>
+              .filter((object) => {
+                if (!isEditing && hoveredObjectId) {
+                  return object.id === hoveredObjectId;
+                }
+
+                return (
                   !showOnlySelectedBoxes ||
-                  selectedObjectIds.includes(object.id),
-              )
+                  selectedObjectIds.includes(object.id)
+                );
+              })
               .map((object) => {
                 const [ymin, xmin, ymax, xmax] = object.bbox;
                 return (
                   <div
                     className={cn(
                       'detection-box',
-                      selectedObjectIds.includes(object.id) &&
+                      isEditing &&
+                        selectedObjectIds.includes(object.id) &&
                         'detection-box-selected',
+                      hoveredObjectId === object.id &&
+                        'detection-box-hovered',
                       isEditing && 'detection-box-editing',
                     )}
                     key={object.id}
+                    onMouseEnter={() => onObjectHover?.(object.id)}
+                    onMouseLeave={() => onObjectHover?.(undefined)}
                     onClick={() => {
                       if (suppressBoxClickRef.current) {
                         suppressBoxClickRef.current = false;
