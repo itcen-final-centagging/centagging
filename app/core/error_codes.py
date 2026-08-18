@@ -16,6 +16,8 @@ class ErrorCode(str, enum.Enum):
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
     UPSTREAM_ERROR = "UPSTREAM_ERROR"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+    INVALID_QUERY = "INVALID_QUERY"
+    SKU_NOT_FOUND = "SKU_NOT_FOUND"
 
     @property
     def default_message(self) -> str:
@@ -34,4 +36,6 @@ _DEFAULT_ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.INTERNAL_SERVER_ERROR: "서버 오류가 발생했습니다.",
     ErrorCode.UPSTREAM_ERROR: "연동 서비스 처리 중 오류가 발생했습니다.",
     ErrorCode.SERVICE_UNAVAILABLE: "서비스를 일시적으로 사용할 수 없습니다.",
+    ErrorCode.INVALID_QUERY: "검색어(q)를 입력해 주세요.",
+    ErrorCode.SKU_NOT_FOUND: "SKU를 찾을 수 없습니다.",
 }
