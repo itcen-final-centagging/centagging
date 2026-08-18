@@ -191,6 +191,31 @@ class GeminiService:
                 response.text
             )
 
+            def _contains_hangul(text: str) -> bool:
+                return any("\uac00" <= char <= "\ud7a3" for char in text)
+
+            def _fallback_evidence(category: str) -> str:
+                return f"이미지에서 {category} 형태가 확인됩니다."
+
+            normalized_detections = []
+
+            for detection in result.detections:
+                evidence = detection.evidence
+
+                if not _contains_hangul(evidence):
+                    logging.getLogger(__name__).warning(
+                        "Gemini evidence가 한글이 아니어서 fallback을 사용합니다."
+                    )
+                    evidence = _fallback_evidence(detection.category)
+
+                normalized_detections.append(
+                    detection.model_copy(update={"evidence": evidence})
+                )
+
+            result = result.model_copy(
+                update={"detections": normalized_detections}
+            )
+
             invalid_categories = [
                 detection.category
                 for detection in result.detections
