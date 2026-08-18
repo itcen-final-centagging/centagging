@@ -19,6 +19,18 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/sku': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/approvals': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/product-image-submissions': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       '/tagging': {
         target: 'http://localhost:8000',
         changeOrigin: true,

@@ -325,6 +325,46 @@ async def create_sku(  # pylint: disable=too-many-arguments
     return sku
 
 
+async def add_sku_images(
+    session: sqlalchemy_async.AsyncSession,
+    *,
+    sku_id: int,
+    image_urls: list[str],
+    image_type: str,
+) -> list[sku_models.SkuImage]:
+    """기존 SKU에 같은 유형의 이미지를 여러 장 추가합니다.
+
+    일괄 업로드 화면은 파일을 여러 장 올려도 유형 선택은 한 번에
+    적용하므로, 이 함수도 하나의 ``image_type``으로 이미지 목록을
+    저장합니다. 파일별로 다른 유형이 필요하면 호출을 나누면 됩니다.
+
+    Args:
+        session: 요청 범위의 비동기 DB 세션입니다.
+        sku_id: 이미지를 추가할 기존 SKU 식별자입니다.
+        image_urls: 스토리지에 저장된 공개 이미지 경로 목록입니다.
+        image_type: MAIN | ANGLE | DETAIL | STYLING 중 하나입니다.
+
+    Returns:
+        새로 생성된 SKU 이미지 행 목록입니다.
+    """
+    images = [
+        sku_models.SkuImage(
+            sku_id=sku_id,
+            image_url=image_url,
+            image_type=image_type,
+        )
+        for image_url in image_urls
+    ]
+    session.add_all(images)
+    try:
+        await session.flush()
+        await session.commit()
+    except sqlalchemy.exc.SQLAlchemyError:
+        await session.rollback()
+        raise
+    return images
+
+
 async def list_skus(
     session: sqlalchemy_async.AsyncSession, limit: int = 50
 ) -> collections.abc.Sequence[typing.Any]:

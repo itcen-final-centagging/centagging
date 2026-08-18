@@ -83,7 +83,7 @@ export const NoDetectionPanel = () => {
 };
 
 export const SavedPanel = () => {
-  const { historyError, resetWorkflow, selectedSku, uploadedImage } =
+  const { confirmedSelections, historyError, resetWorkflow, uploadedImage } =
     useTaggingWorkflow();
 
   return (
@@ -95,7 +95,7 @@ export const SavedPanel = () => {
         태깅 결과가 저장되었습니다
       </h2>
       <p className="mt-2 text-sm leading-6 text-neutral-500">
-        {uploadedImage?.name} · {selectedSku?.name}
+        {uploadedImage?.name} · {confirmedSelections.length}개 객체
         <br />
         저장한 결과는 검수 이력에서 다시 확인할 수 있습니다.
       </p>

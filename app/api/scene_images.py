@@ -120,6 +120,12 @@ def _build_detected_objects(
         DetectedObjectResponse(
             label=detection.label,
             box_2d=[round(coordinate) for coordinate in detection.box_2d],
+            evidence=detection.evidence,
+            confidence=(
+                round(detection.confidence * 100)
+                if detection.confidence is not None
+                else None
+            ),
         )
         for detection in detection_result.detections
     ]
