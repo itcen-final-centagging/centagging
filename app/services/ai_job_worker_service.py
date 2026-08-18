@@ -13,10 +13,16 @@ from app.repositories import ai_job_repository, scene_image_repository
 from app.schemas.furniture_detection import DetectedObjectResponse
 from app.schemas.gemini_detection import GeminiDetectionResult
 from app.services import furniture_detection_service
+from app.services.gemini_service import GeminiService
+from app.services.similar_sku_service import SimilarSkuService
+from app.services.tagging_service import TaggingService
+from app.services.xai_scoring_service import XaiScoringService
 
 _LOGGER = logging.getLogger(__name__)
 _DETECTION_FAILURE_CODE = "DETECT_SCENE_FAILED"
 _DETECTION_FAILURE_MESSAGE = "가구 탐지에 실패했습니다."
+_RECOMMENDATION_FAILURE_CODE = "RECOMMEND_SKU_FAILED"
+_RECOMMENDATION_FAILURE_MESSAGE = "SKU 추천에 실패했습니다."
 _UNSUPPORTED_JOB_CODE = "UNSUPPORTED_JOB_TYPE"
 _UNSUPPORTED_JOB_MESSAGE = "지원하지 않는 AI 작업 유형입니다."
 
@@ -107,7 +113,37 @@ async def _detect_scene(
     }
 
 
-async def _record_failure(
+def _build_tagging_service(
+    session: AsyncSession,
+    settings: Settings,
+) -> TaggingService:
+    """Worker가 SKU 추천에 사용할 태깅 서비스를 조립합니다."""
+    return TaggingService(
+        session=session,
+        settings=settings,
+        similar_sku_service=SimilarSkuService(
+            session=session,
+            gemini_service=GeminiService(settings=settings),
+            settings=settings,
+        ),
+        xai_scoring_service=XaiScoringService(settings=settings),
+    )
+
+
+async def _recommend_sku(
+    session: AsyncSession,
+    job: AiJob,
+    settings: Settings,
+) -> dict[str, object]:
+    """장면의 탐지 객체에 대한 SKU 추천 결과를 작업 결과로 만듭니다."""
+    result = await _build_tagging_service(
+        session,
+        settings,
+    ).get_sku_candidates(job.scene_image_id)
+    return result.model_dump(mode="json")
+
+
+async def _record_detection_failure(
     session: AsyncSession,
     job: AiJob,
     error_code: str,
@@ -138,6 +174,22 @@ async def _record_failure(
     )
 
 
+async def _record_job_failure(
+    session: AsyncSession,
+    job: AiJob,
+    error_code: str,
+    error_message: str,
+) -> AiJob:
+    """장면 상태를 바꾸지 않고 추천 작업의 실패 상태만 기록합니다."""
+    await session.rollback()
+    return await ai_job_repository.mark_job_failed(
+        session,
+        job.job_id,
+        error_code,
+        error_message,
+    )
+
+
 async def process_next_job(
     session: AsyncSession,
     settings: Settings,
@@ -150,9 +202,12 @@ async def process_next_job(
 
     job_id = job.job_id
     try:
-        if job.job_type != AiJobType.DETECT_SCENE.value:
+        if job.job_type == AiJobType.DETECT_SCENE.value:
+            result_payload = await _detect_scene(session, job, settings)
+        elif job.job_type == AiJobType.RECOMMEND_SKU.value:
+            result_payload = await _recommend_sku(session, job, settings)
+        else:
             raise UnsupportedAiJobTypeError(job.job_type)
-        result_payload = await _detect_scene(session, job, settings)
         return await ai_job_repository.mark_job_succeeded(
             session,
             job_id,
@@ -160,17 +215,26 @@ async def process_next_job(
         )
     except UnsupportedAiJobTypeError:
         _LOGGER.exception("지원하지 않는 AI 작업입니다: %s", job_id)
-        return await _record_failure(
+        return await _record_job_failure(
             session,
             job,
             _UNSUPPORTED_JOB_CODE,
             _UNSUPPORTED_JOB_MESSAGE,
         )
     except Exception:  # pylint: disable=broad-exception-caught
-        _LOGGER.exception("가구 탐지 작업에 실패했습니다: %s", job_id)
-        return await _record_failure(
+        if job.job_type == AiJobType.DETECT_SCENE.value:
+            _LOGGER.exception("가구 탐지 작업에 실패했습니다: %s", job_id)
+            return await _record_detection_failure(
+                session,
+                job,
+                _DETECTION_FAILURE_CODE,
+                _DETECTION_FAILURE_MESSAGE,
+            )
+
+        _LOGGER.exception("SKU 추천 작업에 실패했습니다: %s", job_id)
+        return await _record_job_failure(
             session,
             job,
-            _DETECTION_FAILURE_CODE,
-            _DETECTION_FAILURE_MESSAGE,
+            _RECOMMENDATION_FAILURE_CODE,
+            _RECOMMENDATION_FAILURE_MESSAGE,
         )

@@ -17,6 +17,7 @@ from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiRawDetection,
 )
+from app.schemas.tagging import DetectionResult, SceneImageInfo
 from app.services import ai_job_worker_service, furniture_detection_service
 
 
@@ -41,12 +42,16 @@ def _session(fake_session: _FakeSession) -> AsyncSession:
     return typing.cast(AsyncSession, fake_session)
 
 
-def _job(attempt_count: int = 1, max_attempts: int = 3) -> AiJob:
-    """선점 완료된 DETECT_SCENE 작업을 생성합니다."""
+def _job(
+    attempt_count: int = 1,
+    max_attempts: int = 3,
+    job_type: AiJobType = AiJobType.DETECT_SCENE,
+) -> AiJob:
+    """선점 완료된 AI 작업을 생성합니다."""
     return AiJob(
         job_id=uuid.UUID("6c1fc192-d2c7-4a13-ae8d-b778736f4cd0"),
         scene_image_id=42,
-        job_type=AiJobType.DETECT_SCENE.value,
+        job_type=job_type.value,
         status=AiJobStatus.RUNNING.value,
         input_payload={"image_url": "/uploads/scene-images/scene.png"},
         attempt_count=attempt_count,
@@ -111,6 +116,23 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
         self.settings = _settings(self.storage_directory.name)
         self.job = _job()
         self.scene = _scene()
+        self.recommendation_result = DetectionResult(
+            processing_status="DETECTED",
+            scene_image=SceneImageInfo(
+                scene_image_id=42,
+                image_url="/uploads/scene-images/scene.png",
+                origin_name="scene.png",
+                mime_type="image/png",
+                file_size=5,
+                width_px=512,
+                height_px=512,
+            ),
+            objects=[],
+        )
+        self.tagging_service = unittest.mock.Mock()
+        self.tagging_service.get_sku_candidates = unittest.mock.AsyncMock(
+            return_value=self.recommendation_result
+        )
 
         self.claim_patch = unittest.mock.patch.object(
             ai_job_repository,
@@ -147,15 +169,22 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
                 processing_time_ms=10,
             ),
         )
+        self.tagging_service_patch = unittest.mock.patch.object(
+            ai_job_worker_service,
+            "_build_tagging_service",
+            return_value=self.tagging_service,
+        )
         self.claim_mock = self.claim_patch.start()
         self.scene_mock = self.scene_patch.start()
         self.success_mock = self.success_patch.start()
         self.failure_mock = self.failure_patch.start()
         self.detection_mock = self.detection_patch.start()
+        self.tagging_service_mock = self.tagging_service_patch.start()
 
     def tearDown(self) -> None:
         """패치와 임시 이미지 저장소를 정리합니다."""
         self.detection_patch.stop()
+        self.tagging_service_patch.stop()
         self.failure_patch.stop()
         self.success_patch.stop()
         self.scene_patch.stop()
@@ -253,6 +282,55 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
             "가구 탐지에 실패했습니다.",
         )
         self.failure_mock.assert_awaited_once()
+
+    async def test_recommends_sku_and_marks_job_succeeded(self) -> None:
+        """SKU 추천은 결과를 작업에만 저장하고 장면 상태는 유지합니다."""
+        self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
+        self.claim_mock.return_value = self.job
+        self.success_mock.return_value = self.job
+
+        result = await ai_job_worker_service.process_next_job(
+            self.session, self.settings, "worker-1"
+        )
+
+        self.assertIs(result, self.job)
+        self.tagging_service_mock.assert_called_once_with(
+            self.session,
+            self.settings,
+        )
+        self.tagging_service.get_sku_candidates.assert_awaited_once_with(42)
+        self.scene_mock.assert_not_awaited()
+        self.success_mock.assert_awaited_once_with(
+            self.session,
+            self.job.job_id,
+            self.recommendation_result.model_dump(mode="json"),
+        )
+        self.failure_mock.assert_not_awaited()
+
+    async def test_requeues_failed_sku_recommendation(self) -> None:
+        """추천 실패는 장면 탐지 상태를 바꾸지 않고 작업만 재시도합니다."""
+        self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
+        self.claim_mock.return_value = self.job
+        self.failure_mock.return_value = self.job
+        self.scene.analysis_status = "detected"
+        self.tagging_service.get_sku_candidates.side_effect = RuntimeError(
+            "temporary error"
+        )
+
+        await ai_job_worker_service.process_next_job(
+            self.session, self.settings, "worker-1"
+        )
+
+        self.assertEqual(self.fake_session.rollback_count, 1)
+        self.assertEqual(self.scene.analysis_status, "detected")
+        self.scene_mock.assert_not_awaited()
+        self.failure_mock.assert_awaited_once_with(
+            self.session,
+            self.job.job_id,
+            "RECOMMEND_SKU_FAILED",
+            "SKU 추천에 실패했습니다.",
+        )
+        self.success_mock.assert_not_awaited()
 
 
 if __name__ == "__main__":
