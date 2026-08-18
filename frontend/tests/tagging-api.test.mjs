@@ -234,6 +234,13 @@ test('save and history requests use their backend contracts', async (t) => {
             summary: 'The table shape is a close match.',
           },
         },
+        values: {
+          category: '테이블',
+          color: '브라운',
+          material: '원목',
+          mood: '따뜻한 다이닝룸입니다.',
+          styleTags: ['null', '내추럴'],
+        },
       },
     ],
     sceneImageId: '7',
@@ -275,7 +282,7 @@ test('save and history requests use their backend contracts', async (t) => {
         match_rank: 1,
         object_index: 2,
         object_metadata: {
-          attrs: { color: 'oak', material: 'wood', style: 'natural' },
+          attrs: { color: '브라운', material: '원목', style: '내추럴' },
           bbox_coord: { xmax: 500, xmin: 60, ymax: 400, ymin: 50 },
           category: '테이블',
           object_index: 2,
@@ -284,8 +291,8 @@ test('save and history requests use their backend contracts', async (t) => {
         similarity_score: 88,
         sku_id: 71,
         vlm_mood: {
-          summary: 'A compact dining area.',
-          tags: ['modern'],
+          summary: '따뜻한 다이닝룸입니다.',
+          tags: ['내추럴'],
         },
         xai_result: {
           criteria: [

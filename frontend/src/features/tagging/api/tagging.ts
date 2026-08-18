@@ -5,6 +5,7 @@ import type {
   RubricEvaluation,
   SkuCandidate,
   TaggingHistory,
+  TaggingValues,
   VlmMood,
   XaiResult,
 } from '../types';
@@ -113,6 +114,20 @@ const toBbox = (coordinates: number[]): [number, number, number, number] => [
 
 const nullableText = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
+
+/** 검수 폼의 'null' 플레이스홀더 값입니다. 저장 시 빈 값으로 취급합니다. */
+const NULL_TAG_VALUE = 'null';
+
+/** 검수 편집값을 우선 쓰되, 미입력이면 추천 SKU 값으로 대체합니다. */
+const reviewedText = (
+  value: string | undefined,
+  fallback: string | null | undefined,
+): string =>
+  value && value !== NULL_TAG_VALUE ? value : (fallback ?? '');
+
+/** 검수 폼의 플레이스홀더 태그를 걸러냅니다. */
+const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
+  tags?.filter((tag) => tag !== NULL_TAG_VALUE);
 
 const resolveAssetUrl = (value: unknown): string | null => {
   const path = nullableText(value);
@@ -329,6 +344,8 @@ type TaggingReviewMatch = {
   object: FurnitureObject;
   objectIndex: number;
   selectedSku: SkuCandidate;
+  /** 검수 화면에서 사용자가 확정한 태깅 값입니다. 없으면 추천 SKU 값을 씁니다. */
+  values?: TaggingValues;
 };
 
 type SaveTaggingReviewInput = {
@@ -360,25 +377,37 @@ export const saveTaggingReview = async (
     {
       body: JSON.stringify({
         tagging_results: matching.map(
-          ({ object, objectIndex, selectedSku }) => {
+          ({ object, objectIndex, selectedSku, values }) => {
             const [ymin, xmin, ymax, xmax] = object.bbox;
+            const styleTags = reviewedTags(values?.styleTags);
             return {
               match_rank: selectedSku.matchRank,
               object_index: objectIndex,
               object_metadata: {
                 attrs: {
-                  color: selectedSku.color ?? '',
-                  material: selectedSku.material ?? '',
-                  style: selectedSku.style ?? '',
+                  color: reviewedText(values?.color, selectedSku.color),
+                  material: reviewedText(
+                    values?.material,
+                    selectedSku.material,
+                  ),
+                  style: reviewedText(styleTags?.[0], selectedSku.style),
                 },
                 bbox_coord: { xmax, xmin, ymax, ymin },
-                category: selectedSku.category ?? '',
+                category: reviewedText(values?.category, selectedSku.category),
                 object_index: objectIndex,
                 sub_category: selectedSku.subCategory ?? '',
               },
               similarity_score: Math.round(selectedSku.score ?? 0),
               sku_id: selectedSku.skuId,
-              vlm_mood: selectedSku.vlmMood,
+              vlm_mood: {
+                summary: reviewedText(
+                  values?.mood,
+                  selectedSku.vlmMood?.summary,
+                ),
+                tags: styleTags?.length
+                  ? styleTags
+                  : (selectedSku.vlmMood?.tags ?? []),
+              },
               xai_result: selectedSku.xaiResult,
             };
           },
