@@ -55,7 +55,6 @@ type ApiRubric = {
 type ApiCandidate = {
   category: string;
   color: string;
-  grade: string;
   image_url: string;
   kind: NonNullable<SkuCandidate['kind']>;
   material: string;
@@ -115,17 +114,14 @@ const toBbox = (coordinates: number[]): [number, number, number, number] => [
 const nullableText = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
 
-/** 검수 폼의 'null' 플레이스홀더 값입니다. 저장 시 빈 값으로 취급합니다. */
 const NULL_TAG_VALUE = 'null';
 
-/** 검수 편집값을 우선 쓰되, 미입력이면 추천 SKU 값으로 대체합니다. */
 const reviewedText = (
   value: string | undefined,
   fallback: string | null | undefined,
 ): string =>
   value && value !== NULL_TAG_VALUE ? value : (fallback ?? '');
 
-/** 검수 폼의 플레이스홀더 태그를 걸러냅니다. */
 const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
   tags?.filter((tag) => tag !== NULL_TAG_VALUE);
 
@@ -155,10 +151,10 @@ const toDevCandidate = (
 ): SkuCandidate => ({
   skuId: candidate.sku_id,
   style: nullableText(candidate.attrs.style),
+  attrs: candidate.attrs ?? {},
   category: candidate.category,
   subCategory: candidate.sub_category,
   color: nullableText(candidate.attrs.color),
-  grade: null,
   imageUrl: resolveAssetUrl(candidate.matched_sku_image.image_url),
   kind: toKind(candidate.category, candidate.sub_category),
   material: nullableText(candidate.attrs.material),
@@ -179,9 +175,13 @@ const toDevCandidate = (
 });
 
 const toCandidate = (candidate: ApiCandidate): SkuCandidate => ({
+  attrs: {
+    color: candidate.color,
+    material: candidate.material,
+    size: candidate.size,
+  },
   category: candidate.category,
   color: candidate.color,
-  grade: candidate.grade,
   imageUrl: resolveAssetUrl(candidate.image_url),
   kind: candidate.kind,
   material: candidate.material,
@@ -344,7 +344,6 @@ type TaggingReviewMatch = {
   object: FurnitureObject;
   objectIndex: number;
   selectedSku: SkuCandidate;
-  /** 검수 화면에서 사용자가 확정한 태깅 값입니다. 없으면 추천 SKU 값을 씁니다. */
   values?: TaggingValues;
 };
 

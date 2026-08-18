@@ -78,11 +78,10 @@ CREATE TABLE sku_catalog (
     sku_id       BIGSERIAL    PRIMARY KEY,
     sku_code     VARCHAR(50)  NOT NULL UNIQUE,
     product_name VARCHAR(200) NOT NULL,
-    brand        VARCHAR(100),
-    price        INT,
-    space        VARCHAR(50),
     category     VARCHAR(50),
     sub_category VARCHAR(50),
+    brand        VARCHAR(50),
+    price        INTEGER,
     key_features JSONB        NOT NULL DEFAULT '[]'::jsonb,
     attributes   JSONB        NOT NULL DEFAULT '{}'::jsonb,
     text_embedding VECTOR(3072),
@@ -122,7 +121,7 @@ CREATE TABLE sku_image (
     sku_id       BIGINT      NOT NULL REFERENCES sku_catalog(sku_id) ON DELETE CASCADE,
     image_url    TEXT        NOT NULL,
     image_type   VARCHAR(20) NOT NULL DEFAULT 'MAIN'
-                 CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
+                 CHECK (image_type IN ('MAIN','ANGLE')),
     embedding    VECTOR(3072),
     indexed_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()

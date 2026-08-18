@@ -11,7 +11,13 @@ import {
 import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ObjectCropPreview } from '@/features/tagging/components/ImagePreview';
+import {
+  ATTRIBUTE_LABELS,
+  CATEGORY_ATTRIBUTE_FIELDS,
+  COMMON_ATTRIBUTE_KEYS,
+} from '@/features/tagging/constants/skuAttributes';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
+import type { SkuCandidate } from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
 
 const RUBRIC_LABELS = [
@@ -20,6 +26,37 @@ const RUBRIC_LABELS = [
   ['디테일', 20],
   ['맥락', 20],
 ] as const;
+
+const formatAttributeValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return 'null';
+  if (typeof value === 'boolean') return value ? '있음' : '없음';
+  return String(value);
+};
+
+const buildAttributeRows = (
+  candidate: SkuCandidate,
+  fallbackCategory: string | null,
+): Array<[string, string]> => {
+  const category = candidate.category ?? fallbackCategory;
+  const attrs = candidate.attrs ?? {};
+  const categoryKeys = category ? (CATEGORY_ATTRIBUTE_FIELDS[category] ?? []) : [];
+
+  return [
+    ['카테고리', category ?? '가구'],
+    ...COMMON_ATTRIBUTE_KEYS.map(
+      (key): [string, string] => [
+        ATTRIBUTE_LABELS[key] ?? key,
+        formatAttributeValue(attrs[key]),
+      ],
+    ),
+    ...categoryKeys.map(
+      (key): [string, string] => [
+        ATTRIBUTE_LABELS[key] ?? key,
+        formatAttributeValue(attrs[key]),
+      ],
+    ),
+  ];
+};
 
 export const RecommendationPanel = () => {
   const {
@@ -67,6 +104,14 @@ export const RecommendationPanel = () => {
       ]
     : [null, null, null, null];
   const isConfirmed = selectedSku?.sku === focusedCandidate.sku;
+
+  // 소규모 배열 조합이라 useMemo 없이 매 렌더마다 계산해도 무방합니다.
+  // (아래 return null 분기 뒤라 훅으로 두면 훅 규칙에 걸립니다.)
+  const attributeRows = buildAttributeRows(
+    focusedCandidate,
+    selectedObject?.category ?? null,
+  );
+        
   const completedObjectCount = confirmedSelections.filter(({ object }) =>
     recommendationObjects.some(
       (recommendationObject) => recommendationObject.id === object.id,
@@ -107,6 +152,7 @@ export const RecommendationPanel = () => {
     }
     handleObjectPageMove(1);
   };
+
 
   return (
     <section>
@@ -299,25 +345,14 @@ export const RecommendationPanel = () => {
               SKU 카탈로그 속성
             </p>
             <dl className="mt-2 divide-y divide-neutral-100 border-y border-neutral-100">
-              {[
-                [
-                  '카테고리',
-                  focusedCandidate.category ??
-                    selectedObject?.category ??
-                    '가구',
-                ],
-                ['소재', focusedCandidate.material],
-                ['색상', focusedCandidate.color],
-                ['규격', focusedCandidate.size],
-                ['추천 등급', focusedCandidate.grade ?? 'null'],
-              ].map(([label, value]) => (
+              {attributeRows.map(([label, value]) => (
                 <div
                   className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 px-2 py-3"
                   key={label}
                 >
                   <dt className="text-xs text-text-tertiary">{label}</dt>
                   <dd className="text-xs font-bold text-text-primary">
-                    {value ?? 'null'}
+                    {value}
                   </dd>
                 </div>
               ))}

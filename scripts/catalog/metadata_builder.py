@@ -1,12 +1,17 @@
 """원본 데이터 + 규칙으로 상품 메타데이터 초안을 생성한다.
 
 처리 순서:
+
 1. 원본 specifications / category_path / options
 2. 상품명·옵션·설명 기반 규칙
 3. 규칙으로 못 채운 값은 VLM 보조
-4. 사람 검수값은 최우선 적용
+4. 최종적으로도 확인할 수 없는 값은 None으로 남긴다.
+5. 사람 검수는 별도의 CSV 검수 단계에서 수행한다.
 
 각 속성은 {"value", "source", "confidence"} 형태로 관리한다.
+
+사람 검수값은 이 모듈에서 처리하지 않는다.
+최종 검수는 SKU 생성 후 CSV로 추출하여 None 값만 사람이 채우는 방식으로 수행한다.
 """
 
 from __future__ import annotations
@@ -17,11 +22,23 @@ from app.core import catalog_spec
 from scripts.catalog import text_rules as rules
 
 
-AUTO_ACCEPT = 0.9
+# VLM 결과의 confidence는 초안으로만 사용한다.
+# VLM 결과가 자동 확정값으로 취급되지 않도록 상한을 둔다.
 VLM_CONFIDENCE_CAP = 0.85
 
-MATERIAL_ATTRS = {"material", "top_material", "frame_material"}
-COUNT_ATTRS = {"drawer_count", "level_count", "shelf_count"}
+
+MATERIAL_ATTRS = {
+    "material",
+    "top_material",
+    "frame_material",
+}
+
+COUNT_ATTRS = {
+    "drawer_count",
+    "level_count",
+    "shelf_count",
+}
+
 
 SURFACE_MATERIALS = (
     "패브릭",
@@ -32,7 +49,12 @@ SURFACE_MATERIALS = (
     "스웨이드",
     "라탄",
 )
-SURFACE_FIRST_CATEGORIES = {"소파", "의자"}
+
+SURFACE_FIRST_CATEGORIES = {
+    "소파",
+    "의자",
+}
+
 
 EMPTY_SPEC_VALUES = {
     "",
@@ -49,9 +71,11 @@ EMPTY_SPEC_VALUES = {
     "상세설명 참조",
 }
 
+
 MATERIAL_CHUNK_LIMIT = 3
 
 
+# 프로젝트 소분류를 속성값으로 직접 매핑할 수 있는 경우의 규칙.
 SUBCATEGORY_ATTR_MAP: dict[str, tuple[str, dict[str, str]]] = {
     "의자": (
         "chair_type",
@@ -123,10 +147,12 @@ SUBCATEGORY_ATTR_MAP: dict[str, tuple[str, dict[str, str]]] = {
 def spec_value(product: dict, key: str) -> str | None:
     """specifications에서 실제 값만 반환한다."""
     value = (product.get("specifications") or {}).get(key)
+
     if value is None:
         return None
 
     value = str(value).strip()
+
     return None if value in EMPTY_SPEC_VALUES else value
 
 
@@ -153,7 +179,8 @@ def option_text(option: dict) -> str:
 def source_texts(product: dict) -> dict[str, str]:
     """속성 추출에 사용할 원문을 구성한다."""
     ai_text = " ".join(
-        str(value) for value in (product.get("ai_attributes") or {}).values()
+        str(value)
+        for value in (product.get("ai_attributes") or {}).values()
     )
 
     return {
@@ -186,16 +213,28 @@ def resolve_category(
     )
 
     if category is None:
-        return None, None, [f"category_path {path} 매핑 실패"]
+        return None, None, [
+            f"category_path {path} 매핑 실패"
+        ]
 
     fixed_subs = catalog_spec.PRODUCT_CATEGORY.get(category, [])
+
     sub_category = next(
-        (node for node in path[2:] if node in fixed_subs),
+        (
+            node
+            for node in path[2:]
+            if node in fixed_subs
+        ),
         None,
     )
 
     if sub_category is None:
-        sub_category = path[2] if len(path) > 2 else None
+        sub_category = (
+            path[2]
+            if len(path) > 2
+            else None
+        )
+
         warnings.append(
             f"sub_category {sub_category!r}가 "
             f"PRODUCT_CATEGORY['{category}'] 목록에 없음"
@@ -210,13 +249,22 @@ def material_hint(
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """소재 속성별 우선 소재와 검색 영역을 반환한다."""
     if attribute == "frame_material":
-        return ("철제/스틸",), ("프레임", "다리", "각재", "스탠드", "포스트")
+        return (
+            ("철제/스틸",),
+            ("프레임", "다리", "각재", "스탠드", "포스트"),
+        )
 
     if attribute == "top_material":
-        return (), ("상판", "탑")
+        return (
+            (),
+            ("상판", "탑"),
+        )
 
     if category in SURFACE_FIRST_CATEGORIES:
-        return SURFACE_MATERIALS, ("마감재", "커버", "원단")
+        return (
+            SURFACE_MATERIALS,
+            ("마감재", "커버", "원단"),
+        )
 
     return (), ()
 
@@ -229,19 +277,24 @@ def _put_if_absent(
     confidence: float,
 ) -> None:
     """값이 아직 없을 때만 추가한다."""
-    if value is not None and key not in draft:
-        draft[key] = {
-            "value": value,
-            "source": source,
-            "confidence": confidence,
-        }
+    if value is None:
+        return
+
+    if key in draft:
+        return
+
+    draft[key] = {
+        "value": value,
+        "source": source,
+        "confidence": confidence,
+    }
+
 
 def _put_product_info_attrs(
     draft: dict[str, dict[str, Any]],
     product: dict,
 ) -> None:
     """상품 원본 필드에서 직접 기본 정보를 채운다."""
-
     _put_if_absent(
         draft,
         "brand",
@@ -258,13 +311,22 @@ def _put_product_info_attrs(
         1.0,
     )
 
+
 def _ordered_sources(
     texts: dict[str, str],
 ) -> list[tuple[str, str, float]]:
     """규칙 추출용 텍스트의 우선순위를 반환한다."""
     return [
-        ("name", texts["name"], 0.7),
-        ("option", texts["option"], 0.8),
+        (
+            "name",
+            texts["name"],
+            0.7,
+        ),
+        (
+            "option",
+            texts["option"],
+            0.8,
+        ),
         (
             "ai_attributes",
             f"{texts['summary']} {texts['ai']}",
@@ -272,7 +334,8 @@ def _ordered_sources(
         ),
         (
             "specification",
-            f"{texts['spec_material']} {texts['spec_component']}",
+            f"{texts['spec_material']} "
+            f"{texts['spec_component']}",
             0.8,
         ),
     ]
@@ -284,7 +347,12 @@ def _put_explicit_attrs(
     category: str,
     sub_category: str | None,
 ) -> None:
-    """원본에 직접 명시된 값을 채운다."""
+    """원본에 직접 명시된 값을 채운다.
+
+    color는 이미지/VLM으로 보완하지 않고,
+    옵션 및 specification 원문에서만 추출한다.
+    """
+    # color는 규칙 기반으로만 처리한다.
     _put_if_absent(
         draft,
         "color",
@@ -292,6 +360,7 @@ def _put_explicit_attrs(
         "option",
         0.9,
     )
+
     _put_if_absent(
         draft,
         "color",
@@ -300,7 +369,10 @@ def _put_explicit_attrs(
         0.9,
     )
 
-    if not sub_category or category not in SUBCATEGORY_ATTR_MAP:
+    if not sub_category:
+        return
+
+    if category not in SUBCATEGORY_ATTR_MAP:
         return
 
     attr_key, mapping = SUBCATEGORY_ATTR_MAP[category]
@@ -311,11 +383,15 @@ def _put_explicit_attrs(
         rules.normalize_enum(
             attr_key,
             texts["name"],
-            catalog_spec.allowed_values(category, attr_key),
+            catalog_spec.allowed_values(
+                category,
+                attr_key,
+            ),
         ),
         "name",
         0.9,
     )
+
     _put_if_absent(
         draft,
         attr_key,
@@ -330,7 +406,10 @@ def _put_keyword_attrs(
     texts: dict[str, str],
 ) -> None:
     """상품명/요약 기반 속성을 채운다."""
-    text = f"{texts['name']} {texts['summary']}"
+    text = (
+        f"{texts['name']} "
+        f"{texts['summary']}"
+    )
 
     _put_if_absent(
         draft,
@@ -339,11 +418,13 @@ def _put_keyword_attrs(
         "name",
         0.7,
     )
+
     _put_if_absent(
         draft,
         "pattern",
         rules.normalize_pattern(
-            f"{texts['name']} {texts['spec_material']}"
+            f"{texts['name']} "
+            f"{texts['spec_material']}"
         ),
         "name",
         0.7,
@@ -357,11 +438,21 @@ def _put_schema_attr(
     key: str,
 ) -> None:
     """속성 유형에 맞는 규칙으로 값을 채운다."""
-    allowed = catalog_spec.allowed_values(category, key)
+    allowed = catalog_spec.allowed_values(
+        category,
+        key,
+    )
 
+    # 소재 계열
     if key in MATERIAL_ATTRS:
-        prefer, focus_words = material_hint(category, key)
-        chunks = rules.material_chunks(texts["spec_material"])
+        prefer, focus_words = material_hint(
+            category,
+            key,
+        )
+
+        chunks = rules.material_chunks(
+            texts["spec_material"]
+        )
 
         _put_if_absent(
             draft,
@@ -374,44 +465,64 @@ def _put_schema_attr(
                 focus_words=focus_words,
             ),
             "specification",
-            0.9 if len(chunks) <= MATERIAL_CHUNK_LIMIT else 0.75,
+            (
+                0.9
+                if len(chunks) <= MATERIAL_CHUNK_LIMIT
+                else 0.75
+            ),
         )
+
         return
 
+    # 침구 사이즈
     if key == "size":
         _put_if_absent(
             draft,
             key,
-            rules.normalize_bed_size(texts["option"]),
+            rules.normalize_bed_size(
+                texts["option"]
+            ),
             "option",
             0.9,
         )
+
         _put_if_absent(
             draft,
             key,
-            rules.normalize_bed_size(texts["name"]),
+            rules.normalize_bed_size(
+                texts["name"]
+            ),
             "name",
             0.7,
         )
+
         return
 
+    # 매트리스 두께
     if key == "thickness":
         _put_if_absent(
             draft,
             key,
-            rules.normalize_thickness(texts["option"]),
+            rules.normalize_thickness(
+                texts["option"]
+            ),
             "option",
             0.9,
         )
+
         _put_if_absent(
             draft,
             key,
-            rules.normalize_thickness(texts["name"]),
+            rules.normalize_thickness(
+                texts["name"]
+            ),
             "name",
             0.8,
         )
+
         return
 
+    # 수량 계열
     if key in COUNT_ATTRS:
         for source, text in (
             ("name", texts["name"]),
@@ -420,12 +531,17 @@ def _put_schema_attr(
             _put_if_absent(
                 draft,
                 key,
-                rules.normalize_level_count(text, allowed),
+                rules.normalize_level_count(
+                    text,
+                    allowed,
+                ),
                 source,
                 0.85,
             )
+
         return
 
+    # 좌석 수
     if key == "seating_capacity":
         _put_if_absent(
             draft,
@@ -437,35 +553,60 @@ def _put_schema_attr(
             "name",
             0.8,
         )
+
         return
 
+    # 거실장 길이
     if key == "length":
-        dimensions = rules.parse_dimensions(texts["spec_size"]) or {}
+        dimensions = (
+            rules.parse_dimensions(
+                texts["spec_size"]
+            )
+            or {}
+        )
+
         _put_if_absent(
             draft,
             key,
-            rules.normalize_length(dimensions.get("width")),
+            rules.normalize_length(
+                dimensions.get("width")
+            ),
             "derived",
             0.85,
         )
+
         return
 
+    # boolean 속성
     if key in rules.BOOLEAN_KEYWORDS:
-        for source, text, _ in _ordered_sources(texts):
+        for source, text, _confidence in _ordered_sources(
+            texts
+        ):
             _put_if_absent(
                 draft,
                 key,
-                rules.normalize_boolean(key, text),
+                rules.normalize_boolean(
+                    key,
+                    text,
+                ),
                 source,
                 0.6,
             )
+
         return
 
-    for source, text, confidence in _ordered_sources(texts):
+    # 일반 enum 속성
+    for source, text, confidence in _ordered_sources(
+        texts
+    ):
         _put_if_absent(
             draft,
             key,
-            rules.normalize_enum(key, text, allowed),
+            rules.normalize_enum(
+                key,
+                text,
+                allowed,
+            ),
             source,
             confidence,
         )
@@ -476,19 +617,48 @@ def build_draft(
     category: str,
     sub_category: str | None,
 ) -> dict[str, dict[str, Any]]:
-    """원본과 규칙으로 메타데이터 초안을 생성한다."""
+    """원본과 규칙으로 메타데이터 초안을 생성한다.
+
+    이 단계에서는 VLM이나 사람 검수값을 사용하지 않는다.
+
+    규칙으로 확인할 수 없는 속성은 draft에 들어가지 않는다.
+    이후 VLM 보조 단계에서 미확정 속성만 추가한다.
+    """
     texts = source_texts(product)
+
     draft: dict[str, dict[str, Any]] = {}
 
     # 상품 원본 정보
-    _put_product_info_attrs(draft, product)
+    _put_product_info_attrs(
+        draft,
+        product,
+    )
 
-    _put_explicit_attrs(draft, texts, category, sub_category)
-    _put_keyword_attrs(draft, texts)
+    # 원본에 직접 명시된 값
+    _put_explicit_attrs(
+        draft,
+        texts,
+        category,
+        sub_category,
+    )
 
-    for key in catalog_spec.attribute_names(category):
+    # 상품명/요약 기반 값
+    _put_keyword_attrs(
+        draft,
+        texts,
+    )
+
+    # 카탈로그 스키마 속성
+    for key in catalog_spec.attribute_names(
+        category
+    ):
         if key not in draft:
-            _put_schema_attr(draft, texts, category, key)
+            _put_schema_attr(
+                draft,
+                texts,
+                category,
+                key,
+            )
 
     return draft
 
@@ -497,14 +667,26 @@ def apply_vlm(
     draft: dict[str, dict[str, Any]],
     vlm_attrs: dict[str, Any] | None,
 ) -> dict[str, dict[str, Any]]:
-    """규칙으로 채우지 못한 속성에만 VLM 값을 추가한다."""
+    """규칙으로 채우지 못한 속성에만 VLM 값을 추가한다.
+
+    이미 규칙으로 값이 존재하는 속성은 VLM 결과로 덮어쓰지 않는다.
+
+    VLM에서 확인하지 못한 속성은 추가하지 않으며,
+    최종 SKU 생성 단계에서 None으로 취급할 수 있다.
+    """
     merged = dict(draft)
 
     for key, payload in (vlm_attrs or {}).items():
+        # 규칙으로 이미 값이 있으면 VLM이 덮어쓰지 않는다.
         if key in merged:
             continue
 
-        value = payload.get("value") if isinstance(payload, dict) else payload
+        value = (
+            payload.get("value")
+            if isinstance(payload, dict)
+            else payload
+        )
+
         if value is None:
             continue
 
@@ -517,7 +699,10 @@ def apply_vlm(
         merged[key] = {
             "value": value,
             "source": "vlm",
-            "confidence": min(float(confidence), VLM_CONFIDENCE_CAP),
+            "confidence": min(
+                float(confidence),
+                VLM_CONFIDENCE_CAP,
+            ),
             "reason": (
                 payload.get("reason")
                 if isinstance(payload, dict)
@@ -528,83 +713,51 @@ def apply_vlm(
     return merged
 
 
-def apply_verified(
-    draft: dict[str, dict[str, Any]],
-    verified: dict[str, Any] | None,
-) -> dict[str, dict[str, Any]]:
-    """사람 검수값을 최우선으로 적용한다."""
-    merged = dict(draft)
-
-    for key, value in (verified or {}).items():
-        if value is None:
-            merged.pop(key, None)
-            continue
-
-        merged[key] = {
-            "value": value,
-            "source": "human",
-            "confidence": 1.0,
-        }
-
-    return merged
-
-
-def accept(
-    merged: dict[str, dict[str, Any]],
-    category: str,
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """자동 채택값과 사람 검수 대상을 분리한다."""
-    accepted: dict[str, Any] = {}
-    review: list[dict[str, Any]] = []
-
-    for key in catalog_spec.attribute_names(category):
-        field = merged.get(key)
-
-        if field is None:
-            review.append({
-                "attribute": key,
-                "reason": "값 없음",
-            })
-            continue
-
-        if field["confidence"] >= AUTO_ACCEPT:
-            accepted[key] = field["value"]
-            continue
-
-        review.append({
-            "attribute": key,
-            "value": field["value"],
-            "source": field["source"],
-            "confidence": field["confidence"],
-            "reason": "confidence 기준 미달",
-        })
-
-    return accepted, review
-
-
-def build_key_features(product: dict) -> list[str]:
+def build_key_features(
+    product: dict,
+) -> list[str]:
     """검색/임베딩에 사용할 짧은 특징 목록을 생성한다."""
     features: list[str] = []
 
-    for value in (product.get("ai_attributes") or {}).values():
+    for value in (
+        product.get("ai_attributes") or {}
+    ).values():
         features.extend(
             line.strip()
             for line in str(value).split("\n")
             if line.strip()
         )
 
-    material = spec_value(product, "주요 소재")
+    material = spec_value(
+        product,
+        "주요 소재",
+    )
+
     if material and len(material) <= 60:
-        features.append(material.replace("\n", " "))
+        features.append(
+            material.replace("\n", " ")
+        )
 
-    component = spec_value(product, "구성품")
+    component = spec_value(
+        product,
+        "구성품",
+    )
+
     if component and len(component) <= 60:
-        features.append(f"구성품: {component}")
+        features.append(
+            f"구성품: {component}"
+        )
 
-    size = rules.parse_dimensions(spec_value(product, "크기"))
+    size = rules.parse_dimensions(
+        spec_value(product, "크기")
+    )
+
     if size:
         features.append(
-            f"크기 W{size['width']} x D{size['depth']} x H{size['height']}mm"
+            f"크기 "
+            f"W{size['width']} x "
+            f"D{size['depth']} x "
+            f"H{size['height']}mm"
         )
 
     return list(dict.fromkeys(features))
