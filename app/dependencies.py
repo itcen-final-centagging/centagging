@@ -99,6 +99,15 @@ def get_sku_image_storage() -> SkuImageStorage:
     return SkuImageStorage(config.get_settings().sku_image_root)
 
 
+def get_gemini_service() -> GeminiService:
+    """설정이 주입된 Gemini 서비스를 반환합니다.
+
+    Returns:
+        VLM·임베딩 호출에 쓰는 GeminiService입니다.
+    """
+    return GeminiService(settings=config.get_settings())
+
+
 def get_tagging_service(
     session: sqlalchemy_async.AsyncSession = Depends(
         database.get_database_session

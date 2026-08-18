@@ -3,6 +3,7 @@
 import sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
+from app.models.tagging_result import TaggingResult
 from app.schemas import history as history_schema
 from app.services import sku_image_storage
 
@@ -10,17 +11,14 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
     SELECT tr.result_id,
            sc.sku_code,
            sc.product_name,
-           si.object_metadata
-               -> tr.object_index
-               -> 'attribute'
-               ->> 'label' AS object_name,
+           si.object_metadata -> tr.object_idx ->> 'category' AS object_name,
            tr.similarity_score,
            tr.vlm_mood,
            au.user_name AS created_by,
            tr.created_at,
            si.image_url,
            si.origin_name,
-           si.object_metadata -> tr.object_index -> 'bbox_coord' AS bbox
+           si.object_metadata -> tr.object_idx -> 'bbox_coord' AS bbox
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -38,14 +36,8 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            tr.similarity_score,
            si.image_url AS scene_image_url,
            si.origin_name,
-           si.object_metadata -> tr.object_index -> 'bbox_coord' AS bbox,
-           si.object_metadata
-               -> tr.object_index
-               -> 'attribute'
-               ->> 'label' AS object_label,
-           si.object_metadata
-               -> tr.object_index
-               -> 'attribute' AS object_attributes,
+           si.object_metadata -> tr.object_idx -> 'bbox_coord' AS bbox,
+           si.object_metadata -> tr.object_idx ->> 'category' AS object_category,
            sc.sku_code,
            sc.product_name,
            sc.brand,
@@ -148,9 +140,9 @@ async def get_tagging_history_detail(
                 "origin_name": row["origin_name"],
             },
             "detected_object": {
-                "category": row["object_label"],
+                "category": row["object_category"],
                 "sub_category": None,
-                "attrs": row["object_attributes"] or {},
+                "attrs": {},
                 "bbox": row["bbox"],
                 "vlm_mood": row["vlm_mood"],
             },
@@ -171,3 +163,22 @@ async def get_tagging_history_detail(
             "xai_result": row["xai_result"],
         }
     )
+
+
+async def add_tagging_results(
+    session: sqlalchemy_async.AsyncSession,
+    tagging_results: list[TaggingResult],
+) -> list[int]:
+    """태깅 결과 엔티티를 세션에 추가하고 ID를 반환합니다.
+
+    Args:
+        session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
+        tagging_results: 저장할 태깅 결과 엔티티 목록입니다.
+
+    Returns:
+        저장된 태깅 결과의 result_id 목록입니다.
+    """
+    session.add_all(tagging_results)
+    await session.flush()
+
+    return [r.result_id for r in tagging_results]

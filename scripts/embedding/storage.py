@@ -18,7 +18,7 @@ PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 SKU_JSON_PATH = PROJECT_ROOT / "data" / "catalog" / "answer" / "sku.json"
 IMAGES_DIR = PROJECT_ROOT / "data" / "images"
-INCOMING_IMAGES_DIR = IMAGES_DIR / "incomming"
+INCOMING_IMAGES_DIR = IMAGES_DIR
 
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 
@@ -29,7 +29,7 @@ def get_settings() -> config.Settings:
 
 
 # ============================================================
-# data/images/incomming 파일명 규칙
+# data/images 파일명 규칙
 # ============================================================
 #
 #   {goods_id}_{sku_code}_{color}_{type}_{sequence}.{ext}
@@ -54,7 +54,7 @@ _FILENAME_PATTERN = re.compile(
 
 @dataclasses.dataclass(frozen=True)
 class IncomingImage:
-    """data/images/incomming의 파일명 1건을 파싱한 결과입니다."""
+    """data/images의 파일명 1건을 파싱한 결과입니다."""
 
     path: pathlib.Path
     goods_id: str
@@ -65,7 +65,7 @@ class IncomingImage:
 
 
 def list_incoming_images() -> list[IncomingImage]:
-    """data/images/incomming을 스캔해 파일명 규칙에 맞는 이미지만 돌려준다.
+    """data/images을 스캔해 파일명 규칙에 맞는 이미지만 돌려준다.
 
     Returns:
         파일명 규칙과 image_type 토큰이 유효한 이미지 목록입니다.

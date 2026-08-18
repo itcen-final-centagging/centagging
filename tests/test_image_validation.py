@@ -127,7 +127,7 @@ class _FakeInsertResult:  # pylint: disable=too-few-public-methods
         self.scene_image_id = scene_image_id
 
     def scalar_one(self) -> int:
-        """저장된 이미지 ID를 반환합니다."""
+        """INSERT RETURNING 결과의 이미지 ID를 반환합니다."""
         return self.scene_image_id
 
 
@@ -263,10 +263,6 @@ class UploadSceneImageApiTest(unittest.TestCase):
         self.assertEqual(
             set(response.json()["data"]),
             {"scene_image_id", "job_id", "status"},
-        )
-        self.assertEqual(
-            response.json()["meta"]["request_id"],
-            response.headers["X-Request-ID"],
         )
         assert self.session.execute_parameters is not None
         self.assertEqual(

@@ -179,7 +179,7 @@ def register_exception_handlers(application: fastapi.FastAPI) -> None:
     @application.exception_handler(Exception)
     async def handle_unexpected_exception(
         request: starlette.requests.Request,
-        exception: Exception,
+        _exception: Exception,
     ) -> starlette.responses.JSONResponse:
         """예상하지 못한 오류를 기록하고 안전한 공통 오류 응답을 반환합니다."""
         _logger.exception(

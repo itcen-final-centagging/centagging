@@ -21,7 +21,7 @@ from app.services.image_processing_service import (
     CroppedObject,
     read_sku_image_bytes,
 )
-from app.services.xai_prompt import XAI_PROMPT
+from app.services.prompt.xai_prompt.xai_prompt import XAI_PROMPT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,6 +116,10 @@ class XaiScoringService:
             crop_bytes, detected_objects
         )
         if not scoring_crops:
+            _LOGGER.warning(
+                "XAI 채점 입력을 만들지 못했습니다. object_idxs=%s",
+                [item.object_idx for item in detected_objects],
+            )
             return detected_objects
 
         try:
@@ -134,8 +138,20 @@ class XaiScoringService:
 
         # 응답 순서가 요청 순서와 다를 수 있으므로 crop_index로 색인합니다.
         scores = {crop.crop_index: crop for crop in score_result.crops}
+        requested_indexes = {item.object_idx for item in detected_objects}
+        returned_indexes = set(scores)
+        missing_indexes = requested_indexes - returned_indexes
+        unexpected_indexes = returned_indexes - requested_indexes
+
+        if missing_indexes or unexpected_indexes:
+            _LOGGER.warning(
+                "XAI crop_index 불일치: requested=%s returned=%s",
+                sorted(requested_indexes),
+                sorted(returned_indexes),
+            )
+
         for detected in detected_objects:
-            crop_score = scores.get(detected.object_index)
+            crop_score = scores.get(detected.object_idx)
             if crop_score is not None:
                 self._apply_crop_score(detected, crop_score)
 
@@ -157,7 +173,7 @@ class XaiScoringService:
         """
         scoring_crops = []
         for detected in detected_objects:
-            if detected.object_index not in crop_bytes:
+            if detected.object_idx not in crop_bytes:
                 continue
 
             image_bytes_list = await asyncio.gather(
@@ -187,8 +203,8 @@ class XaiScoringService:
 
             scoring_crops.append(
                 ScoringCrop(
-                    crop_index=detected.object_index,
-                    crop_image_bytes=crop_bytes[detected.object_index],
+                    crop_index=detected.object_idx,
+                    crop_image_bytes=crop_bytes[detected.object_idx],
                     candidates=candidates,
                 )
             )
@@ -289,7 +305,14 @@ class XaiScoringService:
                 raise GeminiResponseInvalidError(
                     "Gemini 루브릭 채점 응답이 비어 있습니다."
                 )
-            return RubricScoreResult.model_validate_json(response.text)
+
+            score_result = RubricScoreResult.model_validate_json(response.text)
+            if not score_result.crops:
+                raise GeminiResponseInvalidError(
+                    "Gemini 루브릭 채점 결과에 crops가 없습니다."
+                )
+            return score_result
+
         except GeminiResponseInvalidError:
             raise
         except errors.ClientError as error:

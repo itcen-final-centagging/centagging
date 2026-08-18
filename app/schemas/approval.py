@@ -39,7 +39,7 @@ class ApprovalListItem(_CamelModel):
     reviewed_by_name: str | None = None
     scene_image_id: int
     origin_name: str
-    object_index: int
+    object_idx: int
     category: str | None = None
     sku_code: str
     product_name: str
@@ -63,7 +63,7 @@ class ApprovalSceneImage(_CamelModel):
 class ApprovalObject(_CamelModel):
     """승인 대상 객체의 현재 위치·카테고리입니다."""
 
-    object_index: int
+    object_idx: int
     category: str | None = None
     bbox: BoundingBox
 

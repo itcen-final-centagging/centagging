@@ -90,13 +90,17 @@ async def _rollback(
     ],
     status_code=fastapi.status.HTTP_202_ACCEPTED,
 )
-async def upload_scene_image(
+# 보상 트랜잭션 상태를 유지하므로 지역 변수가 많습니다.
+async def upload_scene_image(  # pylint: disable=too-many-locals
     file: fastapi.UploadFile = fastapi.File(...),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
 ) -> common_schema.SuccessResponse[ai_job_schema.AiJobAcceptedResponse]:
     """이미지를 저장하고 가구 탐지 작업을 비동기로 접수합니다.
+
+    검증, 파일 저장, DB 기록과 탐지 상태 전환을 하나의 보상 트랜잭션으로
+    관리하므로 지역 변수를 단계별로 유지합니다.
 
     Args:
         file: multipart/form-data의 이미지 파일입니다.

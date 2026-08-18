@@ -7,7 +7,7 @@ docker/db/init/schema.sql의 sku_catalog·sku_image 테이블을 그대로 쓴�
         └─ sku_image.sku_id (FK, ON DELETE CASCADE)
 
 
-data/images/incomming의 이미지는 파일명에 sku_id가 아니라 sku_code를
+data/images의 이미지는 파일명에 sku_id가 아니라 sku_code를
 쓰므로, 이미지 적재 시에는 sku_code -> sku_id 매핑을 먼저 조회해서 쓴다
 (fetch_sku_ids_by_code).
 """
@@ -135,7 +135,7 @@ def update_text_embedding(
 def fetch_sku_ids_by_code(conn: psycopg.Connection) -> dict[str, int]:
     """sku_code -> sku_id 매핑을 돌려준다.
 
-    data/images/incomming의 파일명은 sku_id가 아니라 sku_code를 쓰므로,
+    data/images의 파일명은 sku_id가 아니라 sku_code를 쓰므로,
     이미지를 적재하기 전에 이 매핑으로 sku_id를 찾는다.
     """
     with conn.cursor() as cur:

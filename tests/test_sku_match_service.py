@@ -92,7 +92,7 @@ class _IdempotentFakeSession(_FakeSession):
 
         key = (
             typing.cast(int, values["scene_image_id"]),
-            typing.cast(int, values["object_index"]),
+            typing.cast(int, values["object_idx"]),
         )
         if key in self.result_ids and "ON CONFLICT" not in statement_sql:
             raise sqlalchemy.exc.IntegrityError(
@@ -133,7 +133,7 @@ def _matching(
 ) -> tagging.SkuMatching:
     """테스트에서 공통으로 사용하는 SKU 확정 요청을 반환합니다."""
     return tagging.SkuMatching(
-        object_index=0,
+        object_idx=0,
         sku_code=sku_code,
         match_rank=match_rank,
         similarity_score=92,
@@ -163,17 +163,17 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(session.executions), 4)
         stored = session.executions[1]
         self.assertEqual(stored["scene_image_id"], 7)
-        self.assertEqual(stored["object_index"], 0)
+        self.assertEqual(stored["object_idx"], 0)
         self.assertEqual(stored["match_source"], "RECOMMEND")
         self.assertEqual(stored["match_rank"], 2)
         self.assertEqual(stored["similarity_score"], 0.92)
         insert_sql = str(session.statements[1])
         self.assertNotIn("tag_values", insert_sql)
-        self.assertIn("object_index", insert_sql)
+        self.assertIn("object_idx", insert_sql)
         self.assertIn("match_source", insert_sql)
         self.assertIn("match_rank", insert_sql)
         self.assertIn(
-            "ON CONFLICT (scene_image_id, object_index)",
+            "ON CONFLICT (scene_image_id, object_idx)",
             insert_sql,
         )
         self.assertIn("CAST(:xai_result AS jsonb)", insert_sql)

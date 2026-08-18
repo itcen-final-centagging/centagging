@@ -10,7 +10,10 @@ from app.core.config import Settings
 from app.models.ai_job import AiJob, AiJobType
 from app.models.scene_image import SceneImage
 from app.repositories import ai_job_repository, scene_image_repository
-from app.schemas.furniture_detection import DetectedObjectResponse
+from app.schemas.furniture_detection import (
+    BoundingBoxResponse,
+    DetectedObjectResponse,
+)
 from app.schemas.gemini_detection import GeminiDetectionResult
 from app.services import furniture_detection_service
 from app.services.gemini_service import GeminiService
@@ -50,16 +53,19 @@ def _build_detected_objects(
     """내부 Gemini 탐지 결과를 공개 응답 객체로 변환합니다."""
     return [
         DetectedObjectResponse(
-            label=detection.label,
-            box_2d=[round(coordinate) for coordinate in detection.box_2d],
-            evidence=detection.evidence,
-            confidence=(
-                round(detection.confidence * 100)
-                if detection.confidence is not None
-                else None
+            object_idx=object_index,
+            category=detection.category,
+            sub_category=None,
+            bbox_coord=BoundingBoxResponse(
+                xmin=round(detection.bbox_coord.xmin),
+                ymin=round(detection.bbox_coord.ymin),
+                xmax=round(detection.bbox_coord.xmax),
+                ymax=round(detection.bbox_coord.ymax),
             ),
+            evidence=detection.evidence,
+            confidence=detection.confidence,
         )
-        for detection in detection_result.detections
+        for object_index, detection in enumerate(detection_result.detections)
     ]
 
 
@@ -70,16 +76,11 @@ def _store_detection_result(
     """장면 이미지 엔티티에 탐지 객체와 성공 상태를 기록합니다."""
     scene.object_metadata = [
         {
-            "object_idx": object_index,
-            "bbox_coord": {
-                "xmin": detection.box_2d[1],
-                "ymin": detection.box_2d[0],
-                "xmax": detection.box_2d[3],
-                "ymax": detection.box_2d[2],
-            },
-            "attribute": {"label": detection.label},
+            "object_idx": detection.object_idx,
+            "category": detection.category,
+            "bbox_coord": detection.bbox_coord.model_dump(),
         }
-        for object_index, detection in enumerate(detections)
+        for detection in detections
     ]
     scene.analysis_status = "detected"
     scene.analysis_error = None
@@ -107,7 +108,7 @@ async def _detect_scene(
 
     return {
         "scene_image_id": scene.scene_image_id,
-        "detections": [
+        "objects": [
             detection.model_dump(mode="json") for detection in detections
         ],
     }
@@ -136,10 +137,16 @@ async def _recommend_sku(
     settings: Settings,
 ) -> dict[str, object]:
     """장면의 탐지 객체에 대한 SKU 추천 결과를 작업 결과로 만듭니다."""
+    object_idxs = job.input_payload.get("object_idxs")
+    if not isinstance(object_idxs, list) or not all(
+        isinstance(object_idx, int) for object_idx in object_idxs
+    ):
+        object_idxs = None
+
     result = await _build_tagging_service(
         session,
         settings,
-    ).get_sku_candidates(job.scene_image_id)
+    ).get_sku_candidates(job.scene_image_id, object_idxs=object_idxs)
     return result.model_dump(mode="json")
 
 

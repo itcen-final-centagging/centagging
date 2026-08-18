@@ -5,15 +5,25 @@ import type {
   RubricEvaluation,
   SkuCandidate,
   TaggingHistory,
+  TaggingValues,
   VlmMood,
   XaiResult,
 } from '../types';
 
+type ApiBoundingBox = {
+  xmin: number;
+  ymin: number;
+  xmax: number;
+  ymax: number;
+};
+
 type DevDetection = {
-  box_2d: number[];
+  object_idx: number;
+  category: string;
+  sub_category: string;
+  bbox_coord: ApiBoundingBox;
   confidence: number | null;
   evidence: string;
-  label: string;
 };
 
 type AiJobAcceptedData = {
@@ -23,7 +33,7 @@ type AiJobAcceptedData = {
 };
 
 type DetectionJobResult = {
-  detections: DevDetection[];
+  objects: DevDetection[];
   scene_image_id: number;
 };
 
@@ -36,6 +46,7 @@ type AiJobData<ResultPayload> = {
 };
 
 type DevCandidate = {
+  sku_id: number;
   attrs: Record<string, unknown>;
   category: string | null;
   matched_sku_image: {
@@ -50,7 +61,7 @@ type DevCandidate = {
 
 type DevRecommendationData = {
   objects: Array<{
-    object_index: number;
+    object_idx: number;
     sku_candidates: DevCandidate[];
   }>;
 };
@@ -150,15 +161,26 @@ const waitForAiJob = async <ResultPayload>(
   throw new Error('AI 분석 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.');
 };
 
-const toBbox = (coordinates: number[]): [number, number, number, number] => [
-  coordinates[0] ?? 0,
-  coordinates[1] ?? 0,
-  coordinates[2] ?? 0,
-  coordinates[3] ?? 0,
+const toBbox = (bbox: ApiBoundingBox): [number, number, number, number] => [
+  bbox.ymin,
+  bbox.xmin,
+  bbox.ymax,
+  bbox.xmax,
 ];
 
 const nullableText = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
+
+const NULL_TAG_VALUE = 'null';
+
+const reviewedText = (
+  value: string | undefined,
+  fallback: string | null | undefined,
+): string =>
+  value && value !== NULL_TAG_VALUE ? value : (fallback ?? '');
+
+const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
+  tags?.filter((tag) => tag !== NULL_TAG_VALUE);
 
 const resolveAssetUrl = (value: unknown): string | null => {
   const path = nullableText(value);
@@ -184,8 +206,11 @@ const toDevCandidate = (
   candidate: DevCandidate,
   candidateIndex: number,
 ): SkuCandidate => ({
+  skuId: candidate.sku_id,
+  style: nullableText(candidate.attrs.style),
   attrs: candidate.attrs ?? {},
   category: candidate.category,
+  subCategory: candidate.sub_category,
   color: nullableText(candidate.attrs.color),
   imageUrl: resolveAssetUrl(candidate.matched_sku_image.image_url),
   kind: toKind(candidate.category, candidate.sub_category),
@@ -282,33 +307,33 @@ export const analyzeImage = async (
   return {
     analysisId: String(accepted.data.scene_image_id),
     mode: null,
-    objects: detectionResult.detections.map((detection, objectIndex) => ({
-      bbox: toBbox(detection.box_2d),
+    objects: detectionResult.objects.map((detection) => ({
+      bbox: toBbox(detection.bbox_coord),
       candidates: [],
-      category: nullableText(detection.label),
+      category: nullableText(detection.category),
       confidence: detection.confidence,
-      description: nullableText(detection.evidence),
-      id: `${accepted.data.scene_image_id}-${objectIndex}`,
+      description: detection.evidence,
+      id: `${accepted.data.scene_image_id}-${detection.object_idx}`,
       metadata: {
         attributes: {},
-        category: nullableText(detection.label),
-        description: nullableText(detection.evidence),
+        category: nullableText(detection.category),
+        description: detection.evidence,
         keyFeatures: [],
-        subCategory: null,
+        subCategory: detection.sub_category,
       },
-      name: detection.label,
-      objectIndex,
+      name: detection.category,
+      objectIdx: detection.object_idx,
     })),
   };
 };
 
 export const fetchRecommendations = async (
   sceneImageId: string,
-  objectIndex: number,
+  objectIdx: number,
 ): Promise<SkuCandidate[]> => {
   const candidatesByObjectIndex =
     await fetchObjectRecommendations(sceneImageId);
-  return candidatesByObjectIndex.get(objectIndex) ?? [];
+  return candidatesByObjectIndex.get(objectIdx) ?? [];
 };
 
 /** 수정 완료된 장면의 모든 객체에 대한 SKU 후보를 한 번에 불러옵니다. */
@@ -325,7 +350,7 @@ export const fetchObjectRecommendations = async (
 
   return new Map(
     recommendationResult.objects.map((object) => [
-      object.object_index,
+      object.object_idx,
       object.sku_candidates.map(toDevCandidate),
     ]),
   );
@@ -346,8 +371,8 @@ export const updateSceneObjects = async (
         objects: objects.map((object) => {
           const [ymin, xmin, ymax, xmax] = object.bbox;
           return {
-            bbox: { xmax, xmin, ymax, ymin },
-            label: object.category ?? object.name,
+            bbox_coord: { xmax, xmin, ymax, ymin },
+            category: object.category ?? object.name,
           };
         }),
       }),
@@ -374,8 +399,10 @@ export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
 };
 
 type TaggingReviewMatch = {
-  objectIndex: number;
+  object: FurnitureObject;
+  objectIdx: number;
   selectedSku: SkuCandidate;
+  values?: TaggingValues;
 };
 
 type SaveTaggingReviewInput = {
@@ -392,6 +419,7 @@ export const saveTaggingReview = async (
     matching.length === 0 ||
     matching.some(
       ({ selectedSku }) =>
+        !selectedSku.skuId ||
         selectedSku.matchRank === null ||
         selectedSku.score === null ||
         selectedSku.vlmMood === null ||
@@ -402,20 +430,48 @@ export const saveTaggingReview = async (
   }
 
   await requestJson<ApiSuccessResponse<{ result_ids: number[] }>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}/results`,
     {
       body: JSON.stringify({
-        matching: matching.map(({ objectIndex, selectedSku }) => ({
-          match_rank: selectedSku.matchRank,
-          object_index: objectIndex,
-          similarity_score: selectedSku.score,
-          sku_code: selectedSku.sku,
-          vlm_mood: selectedSku.vlmMood,
-          xai_result: selectedSku.xaiResult,
-        })),
+        tagging_results: matching.map(
+          ({ object, objectIdx, selectedSku, values }) => {
+            const [ymin, xmin, ymax, xmax] = object.bbox;
+            const styleTags = reviewedTags(values?.styleTags);
+            return {
+              match_rank: selectedSku.matchRank,
+              object_idx: objectIdx,
+              object_metadata: {
+                attrs: {
+                  color: reviewedText(values?.color, selectedSku.color),
+                  material: reviewedText(
+                    values?.material,
+                    selectedSku.material,
+                  ),
+                  style: reviewedText(styleTags?.[0], selectedSku.style),
+                },
+                bbox_coord: { xmax, xmin, ymax, ymin },
+                category: reviewedText(values?.category, selectedSku.category),
+                object_idx: objectIdx,
+                sub_category: selectedSku.subCategory ?? '',
+              },
+              similarity_score: Math.round(selectedSku.score ?? 0),
+              sku_id: selectedSku.skuId,
+              vlm_mood: {
+                summary: reviewedText(
+                  values?.mood,
+                  selectedSku.vlmMood?.summary,
+                ),
+                tags: styleTags?.length
+                  ? styleTags
+                  : (selectedSku.vlmMood?.tags ?? []),
+              },
+              xai_result: selectedSku.xaiResult,
+            };
+          },
+        ),
       }),
       headers: { 'Content-Type': 'application/json' },
-      method: 'PUT',
+      method: 'POST',
     },
   );
 };

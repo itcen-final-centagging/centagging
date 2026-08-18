@@ -36,7 +36,7 @@ export interface FurnitureObject {
   isNew?: boolean;
   metadata: ExtractedMetadata;
   name: string;
-  objectIndex: number;
+  objectIdx: number;
 }
 
 export interface ExtractedMetadata {
@@ -76,6 +76,9 @@ export interface VlmMood {
 }
 
 export interface SkuCandidate {
+  skuId?: number;
+  style?: string | null;
+  subCategory?: string | null;
   attrs: Record<string, unknown>;
   category: string | null;
   color: string | null;

@@ -160,8 +160,13 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
             return_value=GeminiDetectionResult(
                 detections=[
                     GeminiRawDetection(
-                        label="chair",
-                        box_2d=[100, 200, 700, 800],
+                        category="chair",
+                        bbox_coord={
+                            "xmin": 200,
+                            "ymin": 100,
+                            "xmax": 800,
+                            "ymax": 700,
+                        },
                         evidence="chair shape",
                         confidence=0.9,
                     )
@@ -219,13 +224,13 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
             [
                 {
                     "object_idx": 0,
+                    "category": "chair",
                     "bbox_coord": {
                         "xmin": 200,
                         "ymin": 100,
                         "xmax": 800,
                         "ymax": 700,
                     },
-                    "attribute": {"label": "chair"},
                 }
             ],
         )
@@ -237,12 +242,19 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
         result_payload = success_call.args[2]
         self.assertEqual(result_payload["scene_image_id"], 42)
         self.assertEqual(
-            result_payload["detections"][0],
+            result_payload["objects"][0],
             {
-                "label": "chair",
-                "box_2d": [100, 200, 700, 800],
+                "object_idx": 0,
+                "category": "chair",
+                "sub_category": None,
+                "bbox_coord": {
+                    "xmin": 200,
+                    "ymin": 100,
+                    "xmax": 800,
+                    "ymax": 700,
+                },
                 "evidence": "chair shape",
-                "confidence": 90,
+                "confidence": 0.9,
             },
         )
         self.failure_mock.assert_not_awaited()
@@ -298,7 +310,10 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
             self.session,
             self.settings,
         )
-        self.tagging_service.get_sku_candidates.assert_awaited_once_with(42)
+        self.tagging_service.get_sku_candidates.assert_awaited_once_with(
+            42,
+            object_idxs=None,
+        )
         self.scene_mock.assert_not_awaited()
         self.success_mock.assert_awaited_once_with(
             self.session,

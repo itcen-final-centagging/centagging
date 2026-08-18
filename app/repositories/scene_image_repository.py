@@ -37,6 +37,25 @@ async def get_scene_image(
     return scene_image
 
 
+async def add_detected_object_metadata(
+    session: AsyncSession,
+    scene_id: int,
+    object_metadata: list[dict[str, typing.Any]],
+) -> None:
+    """연출 이미지 내 검출 객체 메타데이터를 저장합니다.
+
+    Args:
+        session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
+        scene_id: 연출 이미지 id 입니다.
+        object_metadata: 탐지된 객체의 메타데이터입니다.
+
+    Raises:
+        SceneImageNotFoundError: 해당 ID의 장면 이미지가 없는 경우입니다.
+    """
+    scene_image = await get_scene_image(session, scene_id)
+    scene_image.object_metadata = object_metadata
+
+
 async def update_scene_object_metadata(
     session: AsyncSession,
     scene_image_id: int,
@@ -50,16 +69,13 @@ async def update_scene_object_metadata(
     scene_image = await get_scene_image(session, scene_image_id)
     scene_image.object_metadata = [
         {
-            "object_idx": object_index,
-            "bbox_coord": {
-                "xmin": object["bbox"]["xmin"],
-                "ymin": object["bbox"]["ymin"],
-                "xmax": object["bbox"]["xmax"],
-                "ymax": object["bbox"]["ymax"],
-            },
-            "attribute": {"label": object["label"]},
+            "object_idx": object_idx,
+            "bbox_coord": object["bbox_coord"],
+            "category": object["category"],
+            "sub_category": None,
+            "attrs": {},
         }
-        for object_index, object in enumerate(objects)
+        for object_idx, object in enumerate(objects)
     ]
     scene_image.analysis_status = "detected"
     scene_image.analysis_error = None

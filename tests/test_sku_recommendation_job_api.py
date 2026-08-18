@@ -102,6 +102,7 @@ class SkuRecommendationJobApiTest(unittest.TestCase):
             self.session,
             17,
             AiJobType.RECOMMEND_SKU,
+            input_payload={"object_idxs": []},
         )
 
     def test_rejects_recommendation_before_detection_completes(self) -> None:
