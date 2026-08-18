@@ -8,6 +8,7 @@ from sqlalchemy import orm
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext import mutable
 
+from app.models.app_user import AppUser
 from app.models.sku import Base
 
 
@@ -24,6 +25,7 @@ class SceneImage(Base):
         sqlalchemy.ForeignKey("app_user.user_id"),
         nullable=False,
     )
+    user: orm.Mapped[AppUser] = orm.relationship()
     image_url: orm.Mapped[str] = orm.mapped_column(
         sqlalchemy.Text, nullable=False
     )
