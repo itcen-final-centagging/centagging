@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core import database
 from app.dependencies import get_sku_match_service, get_tagging_service
-from app.repositories import scene_image_repository
+from app.models.ai_job import AiJobType
+from app.repositories import ai_job_repository, scene_image_repository
 from app.repositories.scene_image_repository import SceneImageNotFoundError
+from app.schemas import ai_job as ai_job_schema
 from app.schemas import common as common_schema
 from app.schemas.tagging import (
     DetectionResult,
@@ -18,6 +20,11 @@ from app.services import sku_match_service as sku_match
 from app.services.tagging_service import TaggingService
 
 router = APIRouter(prefix="/tagging", tags=["tagging"])
+
+_DETECTED_SCENE_STATUS = "detected"
+_RECOMMENDATION_NOT_READY_MESSAGE = (
+    "가구 탐지가 완료된 이미지에 대해서만 SKU 추천을 요청할 수 있습니다."
+)
 
 
 @router.post("/scenes/{scene_id}")
@@ -40,6 +47,57 @@ async def update_scene_objects(
 
     return common_schema.success_response(
         SceneObjectUpdateResult(object_count=len(update_request.objects))
+    )
+
+
+@router.post(
+    "/scenes/{scene_id}/recommendations",
+    response_model=common_schema.SuccessResponse[
+        ai_job_schema.AiJobAcceptedResponse
+    ],
+    status_code=202,
+)
+async def enqueue_sku_recommendation(
+    scene_id: int,
+    database_session: database.sqlalchemy_async.AsyncSession = Depends(
+        database.get_database_session
+    ),
+) -> common_schema.SuccessResponse[ai_job_schema.AiJobAcceptedResponse]:
+    """탐지 완료된 장면의 SKU 추천 작업을 비동기로 접수합니다."""
+    try:
+        scene = await scene_image_repository.get_scene_image(
+            database_session,
+            scene_id,
+        )
+    except SceneImageNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail="연출 이미지를 찾을 수 없습니다.",
+        ) from error
+
+    if scene.analysis_status != _DETECTED_SCENE_STATUS:
+        raise HTTPException(
+            status_code=409,
+            detail=_RECOMMENDATION_NOT_READY_MESSAGE,
+        )
+
+    try:
+        job = await ai_job_repository.create_job(
+            database_session,
+            scene_id,
+            AiJobType.RECOMMEND_SKU,
+        )
+    except ai_job_repository.ActiveAiJobExistsError as error:
+        raise HTTPException(
+            status_code=409,
+            detail="이미 진행 중인 SKU 추천 작업이 있습니다.",
+        ) from error
+
+    return common_schema.success_response(
+        ai_job_schema.AiJobAcceptedResponse(
+            scene_image_id=scene_id,
+            job_id=job.job_id,
+        )
     )
 
 
