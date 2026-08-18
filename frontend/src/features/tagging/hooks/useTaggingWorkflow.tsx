@@ -376,6 +376,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         save: () =>
           saveTaggingReview({
             matching: confirmedSelections.map(({ object, sku }) => ({
+              object,
               objectIndex: object.objectIndex,
               selectedSku: sku,
             })),

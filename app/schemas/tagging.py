@@ -38,6 +38,7 @@ class XaiResult(BaseModel):
 class SkuCandidate(BaseModel):
     """탐지된 객체 1건에 대한 SKU 후보입니다."""
 
+    sku_id: int
     sku_code: str
     product_name: str
     category: str

@@ -22,6 +22,7 @@ type DevUploadResponse = {
 };
 
 type DevCandidate = {
+  sku_id: number;
   attrs: Record<string, unknown>;
   category: string | null;
   matched_sku_image: {
@@ -137,7 +138,10 @@ const toDevCandidate = (
   candidate: DevCandidate,
   candidateIndex: number,
 ): SkuCandidate => ({
+  skuId: candidate.sku_id,
+  style: nullableText(candidate.attrs.style),
   category: candidate.category,
+  subCategory: candidate.sub_category,
   color: nullableText(candidate.attrs.color),
   grade: null,
   imageUrl: resolveAssetUrl(candidate.matched_sku_image.image_url),
@@ -322,6 +326,7 @@ export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
 };
 
 type TaggingReviewMatch = {
+  object: FurnitureObject;
   objectIndex: number;
   selectedSku: SkuCandidate;
 };
@@ -340,6 +345,7 @@ export const saveTaggingReview = async (
     matching.length === 0 ||
     matching.some(
       ({ selectedSku }) =>
+        selectedSku.skuId === null ||
         selectedSku.matchRank === null ||
         selectedSku.score === null ||
         selectedSku.vlmMood === null ||
@@ -350,20 +356,36 @@ export const saveTaggingReview = async (
   }
 
   await requestJson<ApiSuccessResponse<{ result_ids: number[] }>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}/results`,
     {
       body: JSON.stringify({
-        matching: matching.map(({ objectIndex, selectedSku }) => ({
-          match_rank: selectedSku.matchRank,
-          object_index: objectIndex,
-          similarity_score: selectedSku.score,
-          sku_code: selectedSku.sku,
-          vlm_mood: selectedSku.vlmMood,
-          xai_result: selectedSku.xaiResult,
-        })),
+        tagging_results: matching.map(
+          ({ object, objectIndex, selectedSku }) => {
+            const [ymin, xmin, ymax, xmax] = object.bbox;
+            return {
+              match_rank: selectedSku.matchRank,
+              object_index: objectIndex,
+              object_metadata: {
+                attrs: {
+                  color: selectedSku.color ?? '',
+                  material: selectedSku.material ?? '',
+                  style: selectedSku.style ?? '',
+                },
+                bbox_coord: { xmax, xmin, ymax, ymin },
+                category: selectedSku.category ?? '',
+                object_index: objectIndex,
+                sub_category: selectedSku.subCategory ?? '',
+              },
+              similarity_score: Math.round(selectedSku.score ?? 0),
+              sku_id: selectedSku.skuId,
+              vlm_mood: selectedSku.vlmMood,
+              xai_result: selectedSku.xaiResult,
+            };
+          },
+        ),
       }),
       headers: { 'Content-Type': 'application/json' },
-      method: 'PUT',
+      method: 'POST',
     },
   );
 };

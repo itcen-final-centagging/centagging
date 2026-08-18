@@ -76,6 +76,9 @@ export interface VlmMood {
 }
 
 export interface SkuCandidate {
+  skuId?: number;
+  style?: string | null;
+  subCategory?: string | null;
   category: string | null;
   color: string | null;
   grade: string | null;
