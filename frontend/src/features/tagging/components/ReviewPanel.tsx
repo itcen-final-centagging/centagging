@@ -5,7 +5,11 @@ import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ImagePreview } from '@/features/tagging/components/ImagePreview';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
-import type { TaggingValues } from '@/features/tagging/types';
+import type {
+  FurnitureObject,
+  SkuCandidate,
+  TaggingValues,
+} from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = ['소파', '테이블', '의자', '수납', '조명'];
@@ -44,42 +48,67 @@ const getMetadataText = (
   return typeof value === 'string' && value ? value : fallback;
 };
 
+/** 아직 검수하지 않은 객체에 보여줄 초기 태깅 값을 만듭니다. */
+const buildDefaultValues = (
+  object: FurnitureObject,
+  sku: SkuCandidate,
+): TaggingValues => ({
+  category: object.metadata.category ?? sku.category ?? 'null',
+  color: getMetadataText(
+    object.metadata.attributes,
+    'color',
+    sku.color ?? 'null',
+  ),
+  material: getMetadataText(
+    object.metadata.attributes,
+    'material',
+    sku.material ?? 'null',
+  ),
+  mood: object.metadata.description ?? 'null',
+  styleTags: object.metadata.keyFeatures.length
+    ? object.metadata.keyFeatures.slice(0, 3)
+    : ['null'],
+});
+
 export const ReviewPanel = () => {
   const {
     changeStage,
     confirmedSelections,
     saveTagging,
+    selectObject,
     selectedObject,
-    selectedSku,
     uploadedImage,
   } = useTaggingWorkflow();
 
-  const [values, setValues] = useState<TaggingValues>({
-    category:
-      selectedObject?.metadata.category ?? selectedSku?.category ?? 'null',
-    color: getMetadataText(
-      selectedObject?.metadata.attributes,
-      'color',
-      selectedSku?.color ?? 'null',
-    ),
-    material: getMetadataText(
-      selectedObject?.metadata.attributes,
-      'material',
-      selectedSku?.material ?? 'null',
-    ),
-    mood: selectedObject?.metadata.description ?? 'null',
-    styleTags: selectedObject?.metadata.keyFeatures.length
-      ? selectedObject.metadata.keyFeatures.slice(0, 3)
-      : ['null'],
-  });
+  // 검수 값은 객체별로 보관해, 목록에서 객체를 오가도 입력이 유지됩니다.
+  const [valuesByObject, setValuesByObject] = useState<
+    Record<string, TaggingValues>
+  >({});
 
-  if (!selectedSku || confirmedSelections.length === 0) return null;
+  if (confirmedSelections.length === 0) return null;
+
+  const currentIndex = Math.max(
+    confirmedSelections.findIndex(
+      ({ object }) => object.id === selectedObject?.id,
+    ),
+    0,
+  );
+  const { object: currentObject, sku: currentSku } =
+    confirmedSelections[currentIndex];
+  const values =
+    valuesByObject[currentObject.id] ??
+    buildDefaultValues(currentObject, currentSku);
 
   const handleChangeValue = <Key extends keyof TaggingValues>(
     key: Key,
     value: TaggingValues[Key],
   ): void => {
-    setValues((currentValues) => ({ ...currentValues, [key]: value }));
+    setValuesByObject((currentValues) => {
+      const base =
+        currentValues[currentObject.id] ??
+        buildDefaultValues(currentObject, currentSku);
+      return { ...currentValues, [currentObject.id]: { ...base, [key]: value } };
+    });
   };
 
   const handleToggleTag = (tag: string): void => {
@@ -96,7 +125,15 @@ export const ReviewPanel = () => {
   };
 
   const handleTaggingSave = (): void => {
-    void saveTagging(selectedObject ? { [selectedObject.id]: values } : undefined);
+    // 검수하지 않은 객체도 화면에 보이던 기본값 그대로 저장합니다.
+    void saveTagging(
+      Object.fromEntries(
+        confirmedSelections.map(({ object, sku }) => [
+          object.id,
+          valuesByObject[object.id] ?? buildDefaultValues(object, sku),
+        ]),
+      ),
+    );
   };
 
   return (
@@ -108,7 +145,8 @@ export const ReviewPanel = () => {
               확정한 객체 · SKU
             </h2>
             <p className="mt-1.5 text-sm text-neutral-500">
-              {confirmedSelections.length}개 객체의 SKU가 확정되었습니다.
+              객체를 선택하면 아래에서 해당 객체의 태깅 정보를 검수할 수
+              있습니다.
             </p>
           </div>
           <span className="rounded-full bg-success-50 px-2.5 py-1 text-xs font-bold text-success-600">
@@ -116,41 +154,58 @@ export const ReviewPanel = () => {
           </span>
         </div>
         <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {confirmedSelections.map(({ object, sku }) => (
-            <li
-              className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-bg-primary p-3"
-              key={object.id}
-            >
-              <FurnitureArtwork
-                className="h-12 w-12 shrink-0"
-                imageUrl={sku.imageUrl}
-                kind={sku.kind}
-              />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-bold text-text-primary">
-                  {object.name}
-                </span>
-                <span className="mt-1 block truncate font-mono text-[11px] font-bold text-text-tertiary">
-                  {sku.sku}
-                </span>
-                <span className="mt-1 block truncate text-xs text-text-secondary">
-                  {sku.name}
-                </span>
-              </span>
-            </li>
-          ))}
+          {confirmedSelections.map(({ object, sku }) => {
+            const isSelected = object.id === currentObject.id;
+            return (
+              <li key={object.id}>
+                <button
+                  aria-current={isSelected}
+                  className={cn(
+                    'flex w-full min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors',
+                    isSelected
+                      ? 'border-primary-300 bg-primary-20 ring-3 ring-primary-50'
+                      : 'border-border bg-bg-primary hover:bg-neutral-50',
+                  )}
+                  onClick={() => selectObject(object)}
+                  type="button"
+                >
+                  <FurnitureArtwork
+                    className="h-12 w-12 shrink-0"
+                    imageUrl={sku.imageUrl}
+                    kind={sku.kind}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-text-primary">
+                      {object.name}
+                    </span>
+                    <span className="mt-1 block truncate font-mono text-[11px] font-bold text-text-tertiary">
+                      {sku.sku}
+                    </span>
+                    <span className="mt-1 block truncate text-xs text-text-secondary">
+                      {sku.name}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </article>
       <article className="studio-surface p-5">
-        <h2 className="text-base font-extrabold text-neutral-800">
-          현재 선택 객체
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-extrabold text-neutral-800">
+            현재 선택 객체
+          </h2>
+          <span className="shrink-0 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-bold text-neutral-500">
+            {currentIndex + 1} / {confirmedSelections.length}
+          </span>
+        </div>
         <p className="mt-4 text-xs font-bold text-neutral-500">원본 이미지</p>
         <div className="mt-2">
           <ImagePreview
             image={uploadedImage}
-            objects={selectedObject ? [selectedObject] : []}
-            selectedObjectIds={selectedObject ? [selectedObject.id] : []}
+            objects={[currentObject]}
+            selectedObjectIds={[currentObject.id]}
             showBoxes
           />
         </div>
@@ -159,31 +214,31 @@ export const ReviewPanel = () => {
         </p>
         <FurnitureArtwork
           className="mt-2"
-          imageUrl={selectedSku.imageUrl}
-          kind={selectedSku.kind}
+          imageUrl={currentSku.imageUrl}
+          kind={currentSku.kind}
         />
         <p className="mt-2 text-sm font-bold text-neutral-700">
-          {selectedObject?.name ?? '선택 객체'}
+          {currentObject.name}
         </p>
       </article>
       <article className="studio-surface p-5">
         <h2 className="text-base font-extrabold text-neutral-800">선택 SKU</h2>
         <FurnitureArtwork
           className="mt-4"
-          imageUrl={selectedSku.imageUrl}
-          kind={selectedSku.kind}
+          imageUrl={currentSku.imageUrl}
+          kind={currentSku.kind}
         />
         <p className="mt-4 font-mono text-xs font-bold text-neutral-400">
-          {selectedSku.sku}
+          {currentSku.sku}
         </p>
         <p className="mt-1 text-base font-extrabold text-neutral-800">
-          {selectedSku.name}
+          {currentSku.name}
         </p>
         <dl className="mt-4">
           <MetadataRow label="카테고리" value={values.category} />
-          <MetadataRow label="색상" value={selectedSku.color ?? 'null'} />
-          <MetadataRow label="소재" value={selectedSku.material ?? 'null'} />
-          <MetadataRow label="규격" value={selectedSku.size ?? 'null'} />
+          <MetadataRow label="색상" value={currentSku.color ?? 'null'} />
+          <MetadataRow label="소재" value={currentSku.material ?? 'null'} />
+          <MetadataRow label="규격" value={currentSku.size ?? 'null'} />
         </dl>
       </article>
       <article className="studio-surface p-5">
