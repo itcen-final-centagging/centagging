@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Check, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Save, Sparkles } from 'lucide-react';
 
 import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
@@ -76,21 +76,23 @@ export const ReviewPanel = () => {
     confirmedSelections,
     saveTagging,
     selectObject,
-    selectedObject,
     uploadedImage,
   } = useTaggingWorkflow();
+
+  // 추천 단계에서 마지막으로 선택된 객체가 아니라 항상 첫 객체부터 검수합니다.
+  const [currentObjectId, setCurrentObjectId] = useState<string>();
 
   // 검수 값은 객체별로 보관해, 목록에서 객체를 오가도 입력이 유지됩니다.
   const [valuesByObject, setValuesByObject] = useState<
     Record<string, TaggingValues>
   >({});
+  // 객체별 검수 완료 여부입니다. 전부 완료해야 저장할 수 있습니다.
+  const [reviewedIds, setReviewedIds] = useState<Record<string, boolean>>({});
 
   if (confirmedSelections.length === 0) return null;
 
   const currentIndex = Math.max(
-    confirmedSelections.findIndex(
-      ({ object }) => object.id === selectedObject?.id,
-    ),
+    confirmedSelections.findIndex(({ object }) => object.id === currentObjectId),
     0,
   );
   const { object: currentObject, sku: currentSku } =
@@ -98,6 +100,12 @@ export const ReviewPanel = () => {
   const values =
     valuesByObject[currentObject.id] ??
     buildDefaultValues(currentObject, currentSku);
+  const isReviewed = reviewedIds[currentObject.id] === true;
+  const reviewedCount = confirmedSelections.filter(
+    ({ object }) => reviewedIds[object.id],
+  ).length;
+  const isAllReviewed = reviewedCount === confirmedSelections.length;
+  const isLastObject = currentIndex === confirmedSelections.length - 1;
 
   const handleChangeValue = <Key extends keyof TaggingValues>(
     key: Key,
@@ -124,8 +132,25 @@ export const ReviewPanel = () => {
     changeStage('recommend');
   };
 
+  const handleToggleReviewed = (): void => {
+    setReviewedIds((current) => ({
+      ...current,
+      [currentObject.id]: !current[currentObject.id],
+    }));
+  };
+
+  const handleSelectObject = (object: FurnitureObject): void => {
+    setCurrentObjectId(object.id);
+    selectObject(object);
+  };
+
+  const handleNextObject = (): void => {
+    const nextSelection = confirmedSelections[currentIndex + 1];
+    if (nextSelection) handleSelectObject(nextSelection.object);
+  };
+
   const handleTaggingSave = (): void => {
-    // 검수하지 않은 객체도 화면에 보이던 기본값 그대로 저장합니다.
+    if (!isAllReviewed) return;
     void saveTagging(
       Object.fromEntries(
         confirmedSelections.map(({ object, sku }) => [
@@ -145,12 +170,18 @@ export const ReviewPanel = () => {
               확정한 객체 · SKU
             </h2>
             <p className="mt-1.5 text-sm text-neutral-500">
-              객체를 선택하면 아래에서 해당 객체의 태깅 정보를 검수할 수
-              있습니다.
+              객체를 하나씩 선택해 태깅 정보를 확인하고 검수를 완료해 주세요.
             </p>
           </div>
-          <span className="rounded-full bg-success-50 px-2.5 py-1 text-xs font-bold text-success-600">
-            {confirmedSelections.length}건
+          <span
+            className={cn(
+              'rounded-full px-2.5 py-1 text-xs font-bold',
+              isAllReviewed
+                ? 'bg-success-50 text-success-600'
+                : 'bg-neutral-100 text-neutral-500',
+            )}
+          >
+            검수 {reviewedCount} / {confirmedSelections.length}
           </span>
         </div>
         <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -166,7 +197,7 @@ export const ReviewPanel = () => {
                       ? 'border-primary-300 bg-primary-20 ring-3 ring-primary-50'
                       : 'border-border bg-bg-primary hover:bg-neutral-50',
                   )}
-                  onClick={() => selectObject(object)}
+                  onClick={() => handleSelectObject(object)}
                   type="button"
                 >
                   <FurnitureArtwork
@@ -174,9 +205,17 @@ export const ReviewPanel = () => {
                     imageUrl={sku.imageUrl}
                     kind={sku.kind}
                   />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold text-text-primary">
-                      {object.name}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-bold text-text-primary">
+                        {object.name}
+                      </span>
+                      {reviewedIds[object.id] ? (
+                        <Check
+                          className="shrink-0 text-success-600"
+                          size={14}
+                        />
+                      ) : null}
                     </span>
                     <span className="mt-1 block truncate font-mono text-[11px] font-bold text-text-tertiary">
                       {sku.sku}
@@ -333,22 +372,44 @@ export const ReviewPanel = () => {
           />
         </label>
       </article>
-      <div className="col-span-full grid gap-3 sm:grid-cols-2">
+      <div className="col-span-full flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
         <Button
-          fullWidth
           onClick={handleSkuSelectionReturn}
           startDecorator={<ArrowLeft size={17} />}
           variant="neutral-outlined"
         >
           SKU 확정 목록으로
         </Button>
-        <Button
-          endDecorator={<Save size={17} />}
-          fullWidth
-          onClick={handleTaggingSave}
-        >
-          {confirmedSelections.length}개 객체 태깅 저장
-        </Button>
+        <div className="grid gap-3 sm:flex">
+          <Button
+            onClick={handleToggleReviewed}
+            startDecorator={
+              isReviewed ? <Check size={17} /> : <Sparkles size={17} />
+            }
+            variant={isReviewed ? 'neutral-outlined' : 'primary-solid'}
+          >
+            {isReviewed ? '검수 완료됨' : '이 객체 검수 완료'}
+          </Button>
+          {isLastObject ? null : (
+            <Button
+              disabled={!isReviewed}
+              endDecorator={<ArrowRight size={17} />}
+              onClick={handleNextObject}
+              variant="neutral-outlined"
+            >
+              다음 객체 검수
+            </Button>
+          )}
+          <Button
+            disabled={!isAllReviewed}
+            endDecorator={<Save size={17} />}
+            onClick={handleTaggingSave}
+          >
+            {isAllReviewed
+              ? `${confirmedSelections.length}개 객체 태깅 저장`
+              : `검수 ${reviewedCount} / ${confirmedSelections.length}`}
+          </Button>
+        </div>
       </div>
     </section>
   );
