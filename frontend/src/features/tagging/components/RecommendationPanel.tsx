@@ -117,6 +117,7 @@ export const RecommendationPanel = () => {
       (recommendationObject) => recommendationObject.id === object.id,
     ),
   ).length;
+  const isFirstObject = objectPage === 0;
   const isLastObject = objectPage === recommendationObjects.length - 1;
 
   const handleObjectPageMove = (offset: number): void => {
@@ -138,7 +139,11 @@ export const RecommendationPanel = () => {
   };
 
   const handlePreviousStage = (): void => {
-    changeStage('detect');
+    if (isFirstObject) {
+      changeStage('detect');
+      return;
+    }
+    handleObjectPageMove(-1);
   };
 
   const handleSkuConfirmation = (): void => {
@@ -365,7 +370,7 @@ export const RecommendationPanel = () => {
               startDecorator={<ChevronLeft size={16} />}
               variant="neutral-outlined"
             >
-              전 단계로
+              {isFirstObject ? '탐지 단계로' : '이전 객체 처리'}
             </Button>
             <div className="grid gap-3 sm:flex">
               <Button
