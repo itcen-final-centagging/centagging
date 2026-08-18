@@ -76,8 +76,8 @@ async def get_recommendation_sku(
     return common_schema.success_response(result)
 
 
-@router.put("/scenes/{scene_id}")
-async def confirm_scene_matching(
+@router.post("/scenes/{scene_id}/results")
+async def save_tagging_results(
     scene_id: int,
     match_request: SkuMatchingRequest,
     match_service: sku_match.SkuMatchService = Depends(get_sku_match_service),
@@ -97,8 +97,8 @@ async def confirm_scene_matching(
             중복되거나 범위를 벗어나면 422를 반환합니다.
     """
     try:
-        result_ids = await match_service.confirm_matching(
-            scene_id, match_request.matching
+        result_ids = await match_service.save_tagging_results(
+            scene_id, match_request.tagging_results
         )
     except (
         sku_match.SceneImageNotFoundError,

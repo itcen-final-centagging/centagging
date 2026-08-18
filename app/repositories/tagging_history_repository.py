@@ -6,6 +6,8 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 from app.schemas import history as history_schema
 from app.services import sku_image_storage
 
+from app.models.tagging_result import TaggingResult
+
 _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
     SELECT tr.result_id,
            sc.sku_code,
@@ -171,3 +173,12 @@ async def get_tagging_history_detail(
             "xai_result": row["xai_result"],
         }
     )
+    
+async def add_tagging_results(
+    session: sqlalchemy_async.AsyncSession,
+    tagging_results: list[TaggingResult]
+):
+    session.add_all(tagging_results)
+    await session.flush()
+    
+    return [r.result_id for r in tagging_results]

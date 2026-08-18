@@ -134,7 +134,7 @@ test('save and history requests use their backend contracts', async (t) => {
   const requests = [];
   globalThis.fetch = async (input, init) => {
     requests.push({ init, input });
-    if (init?.method === 'PUT') {
+    if (init?.method === 'POST') {
       return new Response(
         JSON.stringify({
           status: 'success',
@@ -178,11 +178,18 @@ test('save and history requests use their backend contracts', async (t) => {
   await saveTaggingReview({
     matching: [
       {
+        object: { bbox: [100, 200, 800, 900] },
         objectIndex: 1,
         selectedSku: {
+          category: '의자',
+          color: 'white',
           matchRank: 2,
+          material: 'mesh',
           score: 92,
           sku: 'CHR-2041',
+          skuId: 50,
+          style: 'modern',
+          subCategory: 'office chair',
           vlmMood: {
             summary: 'A warm living room.',
             tags: ['natural'],
@@ -200,11 +207,18 @@ test('save and history requests use their backend contracts', async (t) => {
         },
       },
       {
+        object: { bbox: [50, 60, 400, 500] },
         objectIndex: 2,
         selectedSku: {
+          category: '테이블',
+          color: 'oak',
           matchRank: 1,
+          material: 'wood',
           score: 88,
           sku: 'TBL-1007',
+          skuId: 71,
+          style: 'natural',
+          subCategory: 'dining table',
           vlmMood: {
             summary: 'A compact dining area.',
             tags: ['modern'],
@@ -220,21 +234,35 @@ test('save and history requests use their backend contracts', async (t) => {
             summary: 'The table shape is a close match.',
           },
         },
+        values: {
+          category: '테이블',
+          color: '브라운',
+          material: '원목',
+          mood: '따뜻한 다이닝룸입니다.',
+          styleTags: ['null', '내추럴'],
+        },
       },
     ],
     sceneImageId: '7',
   });
   const history = await fetchTaggingHistory();
 
-  assert.equal(requests[0].input, '/tagging/scenes/7');
-  assert.equal(requests[0].init.method, 'PUT');
+  assert.equal(requests[0].input, '/tagging/scenes/7/results');
+  assert.equal(requests[0].init.method, 'POST');
   assert.deepEqual(JSON.parse(requests[0].init.body), {
-    matching: [
+    tagging_results: [
       {
         match_rank: 2,
         object_index: 1,
+        object_metadata: {
+          attrs: { color: 'white', material: 'mesh', style: 'modern' },
+          bbox_coord: { xmax: 900, xmin: 200, ymax: 800, ymin: 100 },
+          category: '의자',
+          object_index: 1,
+          sub_category: 'office chair',
+        },
         similarity_score: 92,
-        sku_code: 'CHR-2041',
+        sku_id: 50,
         vlm_mood: {
           summary: 'A warm living room.',
           tags: ['natural'],
@@ -253,11 +281,18 @@ test('save and history requests use their backend contracts', async (t) => {
       {
         match_rank: 1,
         object_index: 2,
+        object_metadata: {
+          attrs: { color: '브라운', material: '원목', style: '내추럴' },
+          bbox_coord: { xmax: 500, xmin: 60, ymax: 400, ymin: 50 },
+          category: '테이블',
+          object_index: 2,
+          sub_category: 'dining table',
+        },
         similarity_score: 88,
-        sku_code: 'TBL-1007',
+        sku_id: 71,
         vlm_mood: {
-          summary: 'A compact dining area.',
-          tags: ['modern'],
+          summary: '따뜻한 다이닝룸입니다.',
+          tags: ['내추럴'],
         },
         xai_result: {
           criteria: [
