@@ -13,13 +13,11 @@ import { useTaggingObjectEditor } from './useTaggingObjectEditor';
 import {
   analyzeImage,
   fetchObjectRecommendations,
-  fetchTaggingHistory,
   saveTaggingReview,
   searchCatalogItems,
   updateSceneObjects,
 } from '../api/tagging';
 import { DEMO_IMAGE_URL, DEMO_OBJECTS } from '../constants/demoScenario';
-import { saveTaggingAndRefreshHistory } from '../services/save-tagging-workflow';
 import { validateImage } from '../utils/image';
 
 import type {
@@ -27,7 +25,6 @@ import type {
   ConfirmedSkuSelection,
   FurnitureObject,
   SkuCandidate,
-  TaggingHistory,
   UploadedImage,
   WorkflowStage,
 } from '../types';
@@ -46,8 +43,6 @@ type TaggingWorkflowContextValue = {
   deleteObject: (objectId: string) => void;
   finishEditing: () => void;
   focusObjectForEditing: (object: FurnitureObject) => void;
-  history: TaggingHistory[];
-  historyError?: string;
   isRecommendationLoading: boolean;
   isEditing: boolean;
   loadDemoWorkflow: () => Promise<void>;
@@ -88,8 +83,6 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
   const [catalogResults, setCatalogResults] = useState<SkuCandidate[]>([]);
   const [analysisScenario, setAnalysisScenario] =
     useState<AnalysisScenario>('detected');
-  const [history, setHistory] = useState<TaggingHistory[]>([]);
-  const [historyError, setHistoryError] = useState<string>();
   const [isRecommendationLoading, setIsRecommendationLoading] = useState(false);
   const handleMinimumObjectError = useCallback(() => {
     setWorkflowError('최소 한 개의 탐지 객체는 남겨야 합니다.');
@@ -126,29 +119,6 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     selectedObject,
     setSelectedObject,
   });
-
-  useEffect(() => {
-    let isMounted = true;
-    void fetchTaggingHistory()
-      .then((nextHistory) => {
-        if (isMounted) {
-          setHistory(nextHistory);
-          setHistoryError(undefined);
-        }
-      })
-      .catch((error: unknown) => {
-        if (isMounted) {
-          setHistoryError(
-            error instanceof Error
-              ? error.message
-              : '이력을 불러오지 못했습니다.',
-          );
-        }
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   useEffect(
     () => () => {
@@ -364,26 +334,16 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     try {
       if (analysisMode === 'mock') {
         setStage('saved');
-        setHistoryError(undefined);
         return;
       }
-      const result = await saveTaggingAndRefreshHistory({
-        onSaved: () => {
-          setStage('saved');
-          setHistoryError(undefined);
-        },
-        refreshHistory: fetchTaggingHistory,
-        save: () =>
-          saveTaggingReview({
-            matching: confirmedSelections.map(({ object, sku }) => ({
-              objectIndex: object.objectIndex,
-              selectedSku: sku,
-            })),
-            sceneImageId: analysisId,
-          }),
+      await saveTaggingReview({
+        matching: confirmedSelections.map(({ object, sku }) => ({
+          objectIndex: object.objectIndex,
+          selectedSku: sku,
+        })),
+        sceneImageId: analysisId,
       });
-      if (result.history) setHistory(result.history);
-      setHistoryError(result.historyError);
+      setStage('saved');
     } catch (error) {
       setWorkflowError(
         error instanceof Error
@@ -424,8 +384,6 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       deleteObject,
       finishEditing,
       focusObjectForEditing,
-      history,
-      historyError,
       isRecommendationLoading,
       isEditing,
       loadDemoWorkflow,
@@ -462,8 +420,6 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       deleteObject,
       finishEditing,
       focusObjectForEditing,
-      history,
-      historyError,
       isRecommendationLoading,
       isEditing,
       loadDemoWorkflow,

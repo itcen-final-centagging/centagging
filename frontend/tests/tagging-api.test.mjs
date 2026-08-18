@@ -15,60 +15,6 @@ const loadTaggingApi = async (t) => {
   return server.ssrLoadModule('/src/features/tagging/api/tagging.ts');
 };
 
-const loadSaveWorkflow = async (t) => {
-  const server = await createServer({
-    appType: 'custom',
-    logLevel: 'silent',
-    root: fileURLToPath(new URL('..', import.meta.url)),
-    server: { middlewareMode: true },
-  });
-  t.after(() => server.close());
-  return server.ssrLoadModule(
-    '/src/features/tagging/services/save-tagging-workflow.ts',
-  );
-};
-
-test('history refresh failure does not undo a successful save', async (t) => {
-  const { saveTaggingAndRefreshHistory } = await loadSaveWorkflow(t);
-  const events = [];
-
-  const result = await saveTaggingAndRefreshHistory({
-    onSaved: () => events.push('saved'),
-    refreshHistory: async () => {
-      events.push('history');
-      throw new Error('이력 서버 오류');
-    },
-    save: async () => events.push('put'),
-  });
-
-  assert.deepEqual(events, ['put', 'saved', 'history']);
-  assert.deepEqual(result, {
-    historyError: '이력 서버 오류',
-  });
-});
-
-test('save failure does not mark saved or refresh history', async (t) => {
-  const { saveTaggingAndRefreshHistory } = await loadSaveWorkflow(t);
-  const events = [];
-
-  await assert.rejects(
-    saveTaggingAndRefreshHistory({
-      onSaved: () => events.push('saved'),
-      refreshHistory: async () => {
-        events.push('history');
-        return [];
-      },
-      save: async () => {
-        events.push('put');
-        throw new Error('저장 서버 오류');
-      },
-    }),
-    /저장 서버 오류/,
-  );
-
-  assert.deepEqual(events, ['put']);
-});
-
 test('history results are mapped from the backend response', async (t) => {
   const { fetchTaggingHistory } = await loadTaggingApi(t);
   const originalFetch = globalThis.fetch;
@@ -128,8 +74,8 @@ test('history results are mapped from the backend response', async (t) => {
   ]);
 });
 
-test('save and history requests use their backend contracts', async (t) => {
-  const { fetchTaggingHistory, saveTaggingReview } = await loadTaggingApi(t);
+test('save request uses its backend contract without refreshing history', async (t) => {
+  const { saveTaggingReview } = await loadTaggingApi(t);
   const originalFetch = globalThis.fetch;
   const requests = [];
   globalThis.fetch = async (input, init) => {
@@ -224,8 +170,6 @@ test('save and history requests use their backend contracts', async (t) => {
     ],
     sceneImageId: '7',
   });
-  const history = await fetchTaggingHistory();
-
   assert.equal(requests[0].input, '/tagging/scenes/7');
   assert.equal(requests[0].init.method, 'PUT');
   assert.deepEqual(JSON.parse(requests[0].init.body), {
@@ -272,8 +216,7 @@ test('save and history requests use their backend contracts', async (t) => {
       },
     ],
   });
-  assert.equal(requests[1].input, '/history/results');
-  assert.equal(history[0].id, '91');
+  assert.equal(requests.length, 1);
 });
 
 test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
