@@ -81,7 +81,7 @@ gcloud auth configure-docker \
   --quiet > /dev/null
 
 compose config --quiet
-compose pull cloud-sql-proxy api frontend
+compose pull cloud-sql-proxy api ai-worker frontend
 
 rollback() {
   if [[ -z "${previous_api_image}" || -z "${previous_frontend_image}" ]]; then
@@ -100,6 +100,14 @@ if ! compose up -d --no-build --remove-orphans; then
   exit 1
 fi
 
+worker_container_id="$(compose ps -q ai-worker 2>/dev/null || true)"
+if [[ -z "${worker_container_id}" ]]; then
+  echo "AI worker container did not start." >&2
+  compose logs --tail=100 ai-worker >&2 || true
+  rollback
+  exit 1
+fi
+
 health_check_passed=false
 
 for _ in $(seq 1 30); do
@@ -114,7 +122,7 @@ for _ in $(seq 1 30); do
 done
 
 if [[ "${health_check_passed}" != "true" ]]; then
-  compose logs --tail=100 api frontend >&2 || true
+  compose logs --tail=100 api ai-worker frontend >&2 || true
   rollback
   exit 1
 fi

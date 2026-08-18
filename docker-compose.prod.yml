@@ -84,6 +84,37 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  ai-worker:
+    image: ${API_IMAGE:-centagging-api:prod}
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: python -m app.workers.ai_job_worker
+    environment:
+      APP_ENV: prod
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set}
+      VERTEX_AI_LOCATION: ${VERTEX_AI_LOCATION:-global}
+      GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
+      IMAGE_STORAGE_ROOT: ${IMAGE_STORAGE_ROOT:-uploads}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: cloud-sql-proxy
+      POSTGRES_PORT: 5432
+    volumes:
+      - ${GCS_MOUNT_ROOT:?GCS_MOUNT_ROOT must be set}/uploads:/app/uploads:ro
+    depends_on:
+      cloud-sql-proxy:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   frontend:
     image: ${FRONTEND_IMAGE:-centagging-frontend:prod}
     build:
