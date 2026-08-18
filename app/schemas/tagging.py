@@ -2,7 +2,7 @@
 
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class MatchedSkuImage(BaseModel):
@@ -64,10 +64,39 @@ class SceneImageInfo(BaseModel):
 class BoundingBox(BaseModel):
     """0~1000으로 정규화된 탐지 객체 좌표입니다."""
 
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
+    xmin: float = Field(ge=0, le=1000)
+    ymin: float = Field(ge=0, le=1000)
+    xmax: float = Field(ge=0, le=1000)
+    ymax: float = Field(ge=0, le=1000)
+
+    @model_validator(mode="after")
+    def validate_area(self) -> "BoundingBox":
+        """크롭 가능한 넓이를 가진 좌표인지 검증합니다."""
+        if self.xmin >= self.xmax or self.ymin >= self.ymax:
+            raise ValueError(
+                "bbox는 xmin < xmax 및 ymin < ymax를 만족해야 합니다."
+            )
+        return self
+
+
+class EditedSceneObject(BaseModel):
+    """사용자가 편집 완료한 탐지 객체입니다."""
+
+    label: str = Field(min_length=1, max_length=100)
+    bbox: BoundingBox
+
+
+class SceneObjectUpdateRequest(BaseModel):
+    """추천 전에 반영할 최종 탐지 객체 목록입니다."""
+
+    objects: list[EditedSceneObject] = Field(min_length=1)
+
+
+class SceneObjectUpdateResult(BaseModel):
+    """객체 편집 반영 결과입니다."""
+
+    object_count: int
+    processing_status: typing.Literal["DETECTED"] = "DETECTED"
 
 
 class DetectedObject(BaseModel):

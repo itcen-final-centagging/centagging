@@ -53,9 +53,6 @@ export const LoginPage = () => {
           <h1 className="text-2xl font-bold text-text-primary" id="login-title">
             로그인
           </h1>
-          <p className="mt-2 text-sm text-text-secondary">
-            계정 정보를 입력해 태깅 작업을 시작하세요.
-          </p>
         </div>
 
         {displayedError ? (

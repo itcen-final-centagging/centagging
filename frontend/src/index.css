@@ -67,6 +67,8 @@
     #f1f5f9;
   --shadow-card: 0 1px 3px rgb(15 23 42 / 8%), 0 1px 2px rgb(15 23 42 / 5%);
   --shadow-panel: 0 12px 28px rgb(15 23 42 / 7%);
+  --shadow-popup:
+    0 20px 25px -5px rgb(15 23 42 / 10%), 0 8px 10px -6px rgb(15 23 42 / 10%);
   --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
   --color-primary: var(--blue-700);
   --color-primary-20: var(--blue-50);
@@ -311,6 +313,7 @@ textarea:focus-visible {
   border: 2px solid #155dfc;
   border-radius: 5px;
   box-shadow: 0 0 0 2px rgb(255 255 255 / 78%);
+  cursor: pointer;
 }
 
 .detection-box span {
@@ -350,6 +353,27 @@ textarea:focus-visible {
 .detection-box-selected {
   border-width: 3px;
   box-shadow: 0 0 0 4px rgb(219 234 254 / 92%);
+}
+
+.detection-box-editing {
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px var(--blue-100);
+  cursor: move;
+  touch-action: none;
+}
+
+.detection-box-resize-handle {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--blue-600);
+  box-shadow: var(--shadow-card);
+  cursor: nwse-resize;
+  touch-action: none;
 }
 
 @media (max-width: 900px) {

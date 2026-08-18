@@ -73,7 +73,7 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             ObjectIndexOutOfRangeError: 장면에 없는 인덱스인 경우입니다.
             MatchingTargetNotFoundError: 활성 사용자가 없는 경우입니다.
         """
-        async with self.session.begin():  
+        async with self.session.begin():
             object_metadatas = []
             results = []
             user_result = await self.session.execute(

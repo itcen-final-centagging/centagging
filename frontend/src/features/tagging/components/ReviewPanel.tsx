@@ -8,10 +8,10 @@ import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow'
 import type { TaggingValues } from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
 
-const categories = ['소파', '테이블', '의자', '수납', '조명'];
-const colors = ['그레이', '베이지', '화이트', '블랙', '브라운'];
-const materials = ['패브릭', '가죽', '원목', '메탈', '플라스틱'];
-const styleTags = [
+const CATEGORIES = ['소파', '테이블', '의자', '수납', '조명'];
+const COLORS = ['그레이', '베이지', '화이트', '블랙', '브라운'];
+const MATERIALS = ['패브릭', '가죽', '원목', '메탈', '플라스틱'];
+const STYLE_TAGS = [
   'null',
   '모던',
   '미니멀',
@@ -47,6 +47,7 @@ const getMetadataText = (
 export const ReviewPanel = () => {
   const {
     changeStage,
+    confirmedSelections,
     saveTagging,
     selectedObject,
     selectedSku,
@@ -72,7 +73,7 @@ export const ReviewPanel = () => {
       : ['null'],
   });
 
-  if (!selectedSku) return null;
+  if (!selectedSku || confirmedSelections.length === 0) return null;
 
   const handleChangeValue = <Key extends keyof TaggingValues>(
     key: Key,
@@ -90,16 +91,66 @@ export const ReviewPanel = () => {
     );
   };
 
+  const handleSkuSelectionReturn = (): void => {
+    changeStage('recommend');
+  };
+
+  const handleTaggingSave = (): void => {
+    void saveTagging();
+  };
+
   return (
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(320px,1.12fr)]">
+      <article className="col-span-full studio-surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-extrabold text-neutral-800">
+              확정한 객체 · SKU
+            </h2>
+            <p className="mt-1.5 text-sm text-neutral-500">
+              {confirmedSelections.length}개 객체의 SKU가 확정되었습니다.
+            </p>
+          </div>
+          <span className="rounded-full bg-success-50 px-2.5 py-1 text-xs font-bold text-success-600">
+            {confirmedSelections.length}건
+          </span>
+        </div>
+        <ul className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {confirmedSelections.map(({ object, sku }) => (
+            <li
+              className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-bg-primary p-3"
+              key={object.id}
+            >
+              <FurnitureArtwork
+                className="h-12 w-12 shrink-0"
+                imageUrl={sku.imageUrl}
+                kind={sku.kind}
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-text-primary">
+                  {object.name}
+                </span>
+                <span className="mt-1 block truncate font-mono text-[11px] font-bold text-text-tertiary">
+                  {sku.sku}
+                </span>
+                <span className="mt-1 block truncate text-xs text-text-secondary">
+                  {sku.name}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </article>
       <article className="studio-surface p-5">
-        <h2 className="text-base font-extrabold text-neutral-800">선택 객체</h2>
+        <h2 className="text-base font-extrabold text-neutral-800">
+          현재 선택 객체
+        </h2>
         <p className="mt-4 text-xs font-bold text-neutral-500">원본 이미지</p>
         <div className="mt-2">
           <ImagePreview
             image={uploadedImage}
             objects={selectedObject ? [selectedObject] : []}
-            selectedObject={selectedObject}
+            selectedObjectIds={selectedObject ? [selectedObject.id] : []}
             showBoxes
           />
         </div>
@@ -153,7 +204,7 @@ export const ReviewPanel = () => {
               value={values.category}
             >
               <option value="null">null</option>
-              {categories.map((category) => (
+              {CATEGORIES.map((category) => (
                 <option key={category}>{category}</option>
               ))}
             </select>
@@ -168,7 +219,7 @@ export const ReviewPanel = () => {
               value={values.color}
             >
               <option value="null">null</option>
-              {colors.map((color) => (
+              {COLORS.map((color) => (
                 <option key={color}>{color}</option>
               ))}
             </select>
@@ -183,7 +234,7 @@ export const ReviewPanel = () => {
               value={values.material}
             >
               <option value="null">null</option>
-              {materials.map((material) => (
+              {MATERIALS.map((material) => (
                 <option key={material}>{material}</option>
               ))}
             </select>
@@ -194,7 +245,7 @@ export const ReviewPanel = () => {
             스타일 태그
           </legend>
           <div className="mt-2 flex flex-wrap gap-2">
-            {styleTags.map((tag) => {
+            {STYLE_TAGS.map((tag) => {
               const isSelected = values.styleTags.includes(tag);
               return (
                 <button
@@ -230,18 +281,18 @@ export const ReviewPanel = () => {
       <div className="col-span-full grid gap-3 sm:grid-cols-2">
         <Button
           fullWidth
-          onClick={() => changeStage('recommend')}
+          onClick={handleSkuSelectionReturn}
           startDecorator={<ArrowLeft size={17} />}
           variant="neutral-outlined"
         >
-          SKU 다시 선택
+          SKU 확정 목록으로
         </Button>
         <Button
           endDecorator={<Save size={17} />}
           fullWidth
-          onClick={() => void saveTagging()}
+          onClick={handleTaggingSave}
         >
-          태깅 결과 저장
+          {confirmedSelections.length}개 객체 태깅 저장
         </Button>
       </div>
     </section>
