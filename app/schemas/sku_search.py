@@ -12,15 +12,16 @@ class SkuSearchItem(BaseModel):
     product_name: str
     category: str | None
     sub_category: str | None
+    image_url: str | None
+    brand: str | None
+    price: int | None
+    similarity_score: float
 
 
 class SkuSearchData(BaseModel):
-    """SKU 검색 결과와 페이지 정보입니다."""
+    """SKU 검색 결과 목록입니다."""
 
-    total_count: int
-    page: int
-    size: int
-    items: list[SkuSearchItem]
+    skus: list[SkuSearchItem]
 
 
 class SkuSearchResponse(BaseModel):
@@ -30,29 +31,21 @@ class SkuSearchResponse(BaseModel):
     data: SkuSearchData
 
 
-class SkuImageItem(BaseModel):
-    """SKU 상품 이미지 정보입니다."""
-
-    sku_image_id: int
-    image_type: typing.Literal["MAIN", "ANGLE", "DETAIL", "STYLING"]
-    image_url: str
-
-
 class SkuDetailData(BaseModel):
-    """SKU 상품 상세 정보입니다."""
+    """SKU 상세 정보입니다. attrs는 카테고리별 속성을 그대로 담습니다."""
 
     sku_code: str
     product_name: str
+    brand: str | None
+    price: int | None
     category: str | None
     sub_category: str | None
-    key_features: dict[str, typing.Any]
-    description: str | None
     attrs: dict[str, typing.Any]
-    images: list[SkuImageItem]
+    image_url: str | None
 
 
 class SkuDetailResponse(BaseModel):
-    """SKU 상품 상세 성공 응답입니다."""
+    """SKU 상세 조회 성공 응답입니다."""
 
     status: typing.Literal["success"] = "success"
     data: SkuDetailData
