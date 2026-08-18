@@ -11,7 +11,7 @@
     2. sku_catalog 메타데이터 적재(upsert), sku_id 시퀀스 동기화
     3. 텍스트 임베딩: sku.json 기준으로 문장을 만들어 Gemini로 임베딩,
        sku_catalog.text_embedding에 저장
-    4. 이미지 임베딩: data/images/incomming의
+    4. 이미지 임베딩: data/images의
        {goods_id}_{sku_code}_{color}_{type}_{sequence}.{ext} 파일을
        Gemini로 임베딩해 sku_image에 적재한다. type 토큰(m/a)이
        image_type(MAIN/ANGLE)이 되고, sku_code로 sku_id를 찾아 연관
@@ -161,7 +161,7 @@ def embed_images(
     dry_run: bool,
     force: bool,
 ) -> None:
-    """data/images/incomming의 이미지를 임베딩해 sku_image에 적재한다.
+    """data/images의 이미지를 임베딩해 sku_image에 적재한다.
 
     파일명에서 sku_code/color/image_type/sequence를 읽고, sku_code로
     sku_id를 찾는다(upsert_metadata가 먼저 실행돼 있어야 한다). 파일명
