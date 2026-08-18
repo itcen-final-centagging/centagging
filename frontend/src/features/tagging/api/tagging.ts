@@ -10,16 +10,37 @@ import type {
   XaiResult,
 } from '../types';
 
+type ApiBoundingBox = {
+  xmin: number;
+  ymin: number;
+  xmax: number;
+  ymax: number;
+};
+
 type DevDetection = {
-  box_2d: number[];
+  object_idx: number;
+  category: string;
+  sub_category: string;
+  bbox_coord: ApiBoundingBox;
   confidence: number | null;
   evidence: string;
-  label: string;
 };
 
 type DevUploadResponse = {
-  detections: DevDetection[];
-  scene_image_id: number;
+  scene_image: {
+    scene_image_id: number;
+    image_url: string;
+    origin_name: string;
+    mime_type: string;
+    file_size: number;
+    analysis_status: string;
+    analysis_error: string | null;
+    width_px: number;
+    height_px: number;
+    created_at: string;
+  };
+  object_count: number;
+  objects: DevDetection[];
 };
 
 type DevCandidate = {
@@ -38,7 +59,7 @@ type DevCandidate = {
 
 type DevRecommendationData = {
   objects: Array<{
-    object_index: number;
+    object_idx: number;
     sku_candidates: DevCandidate[];
   }>;
 };
@@ -104,11 +125,11 @@ const API_BASE_URL =
     '',
   ) ?? '';
 
-const toBbox = (coordinates: number[]): [number, number, number, number] => [
-  coordinates[0] ?? 0,
-  coordinates[1] ?? 0,
-  coordinates[2] ?? 0,
-  coordinates[3] ?? 0,
+const toBbox = (bbox: ApiBoundingBox): [number, number, number, number] => [
+  bbox.ymin,
+  bbox.xmin,
+  bbox.ymax,
+  bbox.xmax,
 ];
 
 const nullableText = (value: unknown): string | null =>
@@ -243,41 +264,42 @@ export const analyzeImage = async (
       method: 'POST',
     },
   );
+  const sceneImageId = response.data.scene_image.scene_image_id;
 
   return {
-    analysisId: String(response.data.scene_image_id),
+    analysisId: String(sceneImageId),
     mode: null,
-    objects: response.data.detections.map((detection, objectIndex) => ({
-      bbox: toBbox(detection.box_2d),
+    objects: response.data.objects.map((detection) => ({
+      bbox: toBbox(detection.bbox_coord),
       candidates: [],
-      category: nullableText(detection.label),
+      category: nullableText(detection.category),
       confidence: detection.confidence,
-      description: nullableText(detection.evidence),
-      id: `${response.data.scene_image_id}-${objectIndex}`,
+      description: detection.evidence,
+      id: `${sceneImageId}-${detection.object_idx}`,
       metadata: {
         attributes: {},
-        category: nullableText(detection.label),
-        description: nullableText(detection.evidence),
+        category: nullableText(detection.category),
+        description: detection.evidence,
         keyFeatures: [],
-        subCategory: null,
+        subCategory: detection.sub_category,
       },
-      name: detection.label,
-      objectIndex,
+      name: detection.category,
+      objectIdx: detection.object_idx,
     })),
   };
 };
 
 export const fetchRecommendations = async (
   sceneImageId: string,
-  objectIndex: number,
+  objectIdx: number,
 ): Promise<SkuCandidate[]> => {
   const query = new URLSearchParams();
-  query.append('object_indexes', String(objectIndex));
+  query.append('object_idxs', String(objectIdx));
   const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
   );
   const object = response.data.objects.find(
-    (item) => item.object_index === objectIndex,
+    (item) => item.object_idx === objectIdx,
   );
   return object?.sku_candidates.map(toDevCandidate) ?? [];
 };
@@ -292,7 +314,7 @@ export const fetchObjectRecommendations = async (
 
   return new Map(
     response.data.objects.map((object) => [
-      object.object_index,
+      object.object_idx,
       object.sku_candidates.map(toDevCandidate),
     ]),
   );
@@ -313,8 +335,8 @@ export const updateSceneObjects = async (
         objects: objects.map((object) => {
           const [ymin, xmin, ymax, xmax] = object.bbox;
           return {
-            bbox: { xmax, xmin, ymax, ymin },
-            label: object.category ?? object.name,
+            bbox_coord: { xmax, xmin, ymax, ymin },
+            category: object.category ?? object.name,
           };
         }),
       }),
@@ -342,7 +364,7 @@ export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
 
 type TaggingReviewMatch = {
   object: FurnitureObject;
-  objectIndex: number;
+  objectIdx: number;
   selectedSku: SkuCandidate;
   values?: TaggingValues;
 };
@@ -376,12 +398,12 @@ export const saveTaggingReview = async (
     {
       body: JSON.stringify({
         tagging_results: matching.map(
-          ({ object, objectIndex, selectedSku, values }) => {
+          ({ object, objectIdx, selectedSku, values }) => {
             const [ymin, xmin, ymax, xmax] = object.bbox;
             const styleTags = reviewedTags(values?.styleTags);
             return {
               match_rank: selectedSku.matchRank,
-              object_index: objectIndex,
+              object_idx: objectIdx,
               object_metadata: {
                 attrs: {
                   color: reviewedText(values?.color, selectedSku.color),
@@ -393,7 +415,7 @@ export const saveTaggingReview = async (
                 },
                 bbox_coord: { xmax, xmin, ymax, ymin },
                 category: reviewedText(values?.category, selectedSku.category),
-                object_index: objectIndex,
+                object_idx: objectIdx,
                 sub_category: selectedSku.subCategory ?? '',
               },
               similarity_score: Math.round(selectedSku.score ?? 0),

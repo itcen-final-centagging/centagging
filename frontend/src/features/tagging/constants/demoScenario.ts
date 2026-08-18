@@ -172,6 +172,6 @@ export const DEMO_OBJECTS: FurnitureObject[] = [
       subCategory: '소파베드',
     },
     name: '2인 소파베드',
-    objectIndex: 0,
+    objectIdx: 0,
   },
 ];

@@ -46,7 +46,7 @@ async def update_scene_objects(
 @router.get("/scenes/{scene_id}")
 async def get_recommendation_sku(
     scene_id: int,
-    object_indexes: list[int] | None = Query(
+    object_idxs: list[int] | None = Query(
         default=None, description="탐지 객체 인덱스 목록입니다. "
     ),
     taggin_service: TaggingService = Depends(get_tagging_service),
@@ -55,7 +55,7 @@ async def get_recommendation_sku(
 
     Args:
         scene_id: 조회할 장면 이미지 ID입니다.
-        object_indexes: 조회할 탐지 객체의 인덱스 목록입니다.
+        object_idxs: 조회할 탐지 객체의 인덱스 목록입니다.
         taggin_service: 유사 SKU 조회 및 XAI 근거 산출 서비스입니다.
 
     Returns:
@@ -67,9 +67,12 @@ async def get_recommendation_sku(
     """
     # NOTE: 기존 클라이언트의 선택 인덱스 쿼리 호환성은 유지합니다.
     # 추천 서비스가 현재 장면의 모든 객체를 처리하므로 아직 필터링하지 않습니다.
-    _ = object_indexes
+    _ = object_idxs
     try:
-        result = await taggin_service.get_sku_candidates(scene_id)
+        result = await taggin_service.get_sku_candidates(
+            scene_id,
+            object_idxs=object_idxs,
+        )
     except SceneImageNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -106,8 +109,8 @@ async def save_tagging_results(
     ) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except (
-        sku_match.DuplicateObjectIndexError,
-        sku_match.ObjectIndexOutOfRangeError,
+        sku_match.DuplicateObjectIdxError,
+        sku_match.ObjectIdxOutOfRangeError,
     ) as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 

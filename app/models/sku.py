@@ -51,8 +51,8 @@ class SkuCatalog(Base):  # pylint: disable=too-few-public-methods
         postgresql.JSONB, nullable=False, default=dict
     )
     # 상품 메타데이터(상품명·카테고리·속성 등) 텍스트 임베딩입니다.
-    text_embedding: orm.Mapped[typing.Optional[list[float]]] = orm.mapped_column(
-        pgvector_sa.Vector(3072), deferred=True
+    text_embedding: orm.Mapped[typing.Optional[list[float]]] = (
+        orm.mapped_column(pgvector_sa.Vector(3072), deferred=True)
     )
     created_at: orm.Mapped[datetime.datetime] = orm.mapped_column(
         sqlalchemy.TIMESTAMP(timezone=True),

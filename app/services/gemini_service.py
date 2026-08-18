@@ -4,6 +4,7 @@ Service for live Gemini model calls through Vertex AI or Developer API.
 """
 
 import io
+import json
 import logging
 import time
 import typing
@@ -12,12 +13,22 @@ from google.genai import errors, types
 from PIL import Image
 from pydantic import ValidationError
 
-from app.core import config, genai_client
+from app.core import catalog_spec, config, genai_client
+from app.schemas.furniture_attribute import FurnitureAttributeResult
 from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiModelDetectionResult,
 )
-from app.services.furniture_detect_prompt import FURNITURE_DETECTION_PROMPT
+from app.services.furniture_attribute_rules import (
+    build_allowed_attribute_schema,
+    validate_attribute_result,
+)
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
+    FURNITURE_ATTRIBUTE_PROMPT,
+)
+from app.services.prompt.detect_prompt.furniture_detect_prompt import (
+    FURNITURE_DETECTION_PROMPT,
+)
 
 
 # 오류 클래스들 모음
@@ -152,9 +163,15 @@ class GeminiService:
         try:
             client = genai_client.create_client(self._settings)
 
+            category_context = json.dumps(
+                {"allowed_categories": catalog_spec.CATEGORIES},
+                ensure_ascii=False,
+            )
+
             contents: list[types.ContentUnionDict] = [
                 image,
                 FURNITURE_DETECTION_PROMPT,
+                category_context,
             ]
 
             response = client.models.generate_content(
@@ -173,6 +190,18 @@ class GeminiService:
             result = GeminiModelDetectionResult.model_validate_json(
                 response.text
             )
+
+            invalid_categories = [
+                detection.category
+                for detection in result.detections
+                if detection.category not in catalog_spec.CATEGORIES
+            ]
+
+            if invalid_categories:
+                raise GeminiResponseInvalidError(
+                    f"허용되지 않은 카테고리입니다: {invalid_categories}"
+                )
+
             processing_time_ms = round(
                 (time.perf_counter() - started_at) * 1000
             )
@@ -212,6 +241,70 @@ class GeminiService:
             detections=result.detections,
             processing_time_ms=processing_time_ms,
         )
+
+    def extract_furniture_attributes(
+        self, image: Image.Image, category: str
+    ) -> FurnitureAttributeResult:
+        """크롭 이미지에서 카테고리별 가구 속성을 추출합니다."""
+        if not self.is_configured:
+            raise GeminiConfigurationError("GEMINI_API_KEY is not configured.")
+
+        try:
+            attribute_schema = build_allowed_attribute_schema(category)
+            attribute_context = json.dumps(attribute_schema, ensure_ascii=False)
+
+            client = genai_client.create_client(self._settings)
+            contents: list[types.ContentUnionDict] = [
+                image,
+                FURNITURE_ATTRIBUTE_PROMPT,
+                attribute_context,
+            ]
+
+            response = client.models.generate_content(
+                model=self._settings.gemini_vlm_model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=FurnitureAttributeResult,
+                ),
+            )
+
+            if not response.text:
+                raise GeminiResponseInvalidError(
+                    "Gemini 속성 응답이 비어 있습니다."
+                )
+
+            result = FurnitureAttributeResult.model_validate_json(response.text)
+
+            return validate_attribute_result(category, result)
+
+        except GeminiResponseInvalidError:
+            raise
+
+        except ValidationError as error:
+            raise GeminiResponseInvalidError(
+                "Gemini에서 반환된 속성 응답이 올바르지 않습니다."
+            ) from error
+
+        except errors.ClientError as error:
+            if getattr(error, "code", None) in (401, 403):
+                raise GeminiAuthenticationError(
+                    "Gemini 인증이 실패했습니다."
+                ) from error
+
+            raise GeminiInferenceError(
+                "Gemini 속성 추출 요청이 실패했습니다."
+            ) from error
+
+        except ValueError as error:
+            raise GeminiResponseInvalidError(
+                "Gemini 속성 결과 확인 실패했습니다."
+            ) from error
+
+        except Exception as error:
+            raise GeminiInferenceError(
+                "Gemini 속성 추출 요청이 실패했습니다."
+            ) from error
 
     def embed_image(self, image: Image.Image) -> list[float]:
         """이미지를 임베딩하여 벡터 값을 반환합니다.
@@ -259,9 +352,7 @@ class GeminiService:
         except GeminiEmbeddingError:
             raise
         except Exception as error:
-            logging.getLogger(__name__).exception(
-                "Gemini 이미지 임베딩 실패"
-            )
+            logging.getLogger(__name__).exception("Gemini 이미지 임베딩 실패")
             raise GeminiEmbeddingError(
                 f"Gemini 이미지 임베딩에 실패했습니다: {error}"
             ) from error

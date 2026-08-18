@@ -19,46 +19,47 @@ FURNITURE_DETECTION_PROMPT = """
     7. A smaller region should be suppressed only when it is a component of the larger furniture, not an independent furniture object.
 
     ## Bounding-box rules
-    1. box_2d must use [ymin, xmin, ymax, xmax].
+    1. bbox_coord must be an object containing xmin, ymin, xmax, and ymax.
     2. Coordinates must be integers normalized to the range 0 to 1000.
     3. The detection box should tightly enclose the confidently visible or visually continuous extent of the furniture.
-    4. Do not intentionally add crop padding to box_2d.
+    4. Do not intentionally add crop padding to bbox_coord.
     5. Do not include cast shadows, reflections, or unrelated nearby objects.
-    6. If furniture touches or extends beyond an image boundary, clamp the box to that boundary and set is_truncated to true.
-    7. If the exact boundary is uncertain because of occlusion, prefer a conservative box that does not absorb a separate neighboring object.
-    8. The following must always hold:
+    6. If the exact boundary is uncertain because of occlusion, prefer a conservative box that does not absorb a separate neighboring object.
+    7. The following must always hold:
         0 <= ymin < ymax <= 1000
         0 <= xmin < xmax <= 1000
 
     ## Uncertain objects rules
     1. Favor recall when there is clear visual evidence that the region is furniture.
-    2. If the object is clearly furniture but its detailed type is uncertain, include it using the most reliable coarse label.
-    3. Use "other_furniture" when the object is clearly furniture but none of the allowed labels can be determined reliably.
-    4. Do not invent a specific label from hidden or invisible parts.
-    5. Exclude a candidate only when there is insufficient evidence that it is actually furniture.
-    6. Explain visible evidence and uncertainty briefly in the evidence field.
+    2. If the object is clearly furniture but its detailed type is uncertain, include it using the most reliable category.
+    3. Do not invent a specific category from hidden or invisible parts.
+    4. Exclude a candidate only when there is insufficient evidence that it is actually furniture.
+    5. Explain visible evidence and uncertainty briefly in the evidence field.
 
     ## Occlusion and truncation rules
     1. Detect a partially occluded object when enough visible structure exists to identify it as an independent furniture instance.
     2. Detect furniture truncated by the image boundary when it can still be identified as furniture.
-    3. For an image-boundary-truncated object, clamp the bounding box to the image boundary and set is_truncated to true.
-    4. Do not invent coordinates for portions located outside the image.
-    5. When part of the object is hidden behind another object, box the reliably estimated object extent only when its continuation is visually obvious. Otherwise, box the visible extent and set is_occluded to true.
-    6. Do not treat shadows or reflections as part of the furniture boundary.
+    3. Do not invent coordinates for portions located outside the image.
+    4. Do not treat shadows or reflections as part of the furniture boundary.
 
-    ## Label rules
-    - Use a coarse furniture label from the provided allowed label list.
+    ## Category rules
+    - Use a coarse furniture category from the provided allowed category list.
     - Do not infer a detailed product category or attributes at this stage.
-    - Do not guess an unsupported label when visual evidence is insufficient.
+    - Do not guess an unsupported category when visual evidence is insufficient.
 
     ## Output format
     {
         "detections": [
             {
-            "label": "chair",
-            "box_2d": [251, 99, 977, 631],
-            "evidence": "A separately visible chair with a backrest and four legs.",
-            "confidence": 0.82
+                "category": "의자",
+                "bbox_coord": {
+                    "xmin": 99,
+                    "ymin": 251,
+                    "xmax": 631,
+                    "ymax": 977
+                },
+                "evidence": "A separately visible chair with a backrest and four legs.",
+                "confidence": 0.82
             }
         ]
     }

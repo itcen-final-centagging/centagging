@@ -36,22 +36,20 @@ const buildAttributeRows = (
 ): Array<[string, string]> => {
   const category = candidate.category ?? fallbackCategory;
   const attrs = candidate.attrs ?? {};
-  const categoryKeys = category ? (CATEGORY_ATTRIBUTE_FIELDS[category] ?? []) : [];
+  const categoryKeys = category
+    ? (CATEGORY_ATTRIBUTE_FIELDS[category] ?? [])
+    : [];
 
   return [
     ['카테고리', category ?? '가구'],
-    ...COMMON_ATTRIBUTE_KEYS.map(
-      (key): [string, string] => [
-        ATTRIBUTE_LABELS[key] ?? key,
-        formatAttributeValue(attrs[key]),
-      ],
-    ),
-    ...categoryKeys.map(
-      (key): [string, string] => [
-        ATTRIBUTE_LABELS[key] ?? key,
-        formatAttributeValue(attrs[key]),
-      ],
-    ),
+    ...COMMON_ATTRIBUTE_KEYS.map((key): [string, string] => [
+      ATTRIBUTE_LABELS[key] ?? key,
+      formatAttributeValue(attrs[key]),
+    ]),
+    ...categoryKeys.map((key): [string, string] => [
+      ATTRIBUTE_LABELS[key] ?? key,
+      formatAttributeValue(attrs[key]),
+    ]),
   ];
 };
 
@@ -102,7 +100,7 @@ export const RecommendationPanel = () => {
     focusedCandidate,
     selectedObject?.category ?? null,
   );
-        
+
   const completedObjectCount = confirmedSelections.filter(({ object }) =>
     recommendationObjects.some(
       (recommendationObject) => recommendationObject.id === object.id,
@@ -148,7 +146,6 @@ export const RecommendationPanel = () => {
     }
     handleObjectPageMove(1);
   };
-
 
   return (
     <section>

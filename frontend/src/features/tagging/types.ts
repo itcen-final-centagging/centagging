@@ -36,7 +36,7 @@ export interface FurnitureObject {
   isNew?: boolean;
   metadata: ExtractedMetadata;
   name: string;
-  objectIndex: number;
+  objectIdx: number;
 }
 
 export interface ExtractedMetadata {

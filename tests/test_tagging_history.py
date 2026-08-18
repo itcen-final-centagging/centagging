@@ -111,12 +111,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "xmax": 500,
                 "ymax": 800,
             },
-            "object_label": "의자",
-            "object_attributes": {
-                "label": "의자",
-                "color": "화이트",
-                "material": "메쉬",
-            },
+            "object_category": "의자",
             "vlm_mood": {
                 "summary": "차분한 홈오피스 분위기입니다.",
                 "tags": ["미니멀", "홈오피스"],
@@ -204,18 +199,18 @@ class TaggingHistoryApiTest(unittest.TestCase):
             },
         )
 
-    def test_queries_new_object_metadata_by_object_index(self) -> None:
-        """새 객체 메타데이터에서 라벨과 좌표를 조회합니다."""
+    def test_queries_bbox_by_object_idx_in_newest_first_order(self) -> None:
+        """객체 좌표를 선택하고 저장 시각 최신순으로 조회합니다."""
         self.client.get("/history/results")
         query = " ".join(self.session.executed_statement.split())
 
         self.assertIn(
-            "si.object_metadata -> tr.object_index "
-            "-> 'attribute' ->> 'label' AS object_name",
+            "si.object_metadata -> tr.object_idx "
+            "->> 'category' AS object_name",
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_index "
+            "si.object_metadata -> tr.object_idx "
             "-> 'bbox_coord' AS bbox",
             query,
         )
@@ -225,25 +220,21 @@ class TaggingHistoryApiTest(unittest.TestCase):
         )
         self.assertIn("tr.vlm_mood", query)
 
-    def test_queries_detail_object_fields_by_object_index(self) -> None:
-        """상세 조회도 동일 객체의 라벨, 좌표, 속성을 선택합니다."""
+    def test_queries_detail_object_fields_by_object_idx(self) -> None:
+        """상세 조회도 동일 객체의 카테고리와 좌표를 선택합니다."""
         self.client.get("/history/results/9901")
         query = " ".join(self.session.executed_statement.split())
 
         self.assertIn(
-            "si.object_metadata -> tr.object_index "
-            "-> 'attribute' ->> 'label' AS object_label",
+            "si.object_metadata -> tr.object_idx "
+            "->> 'category' AS object_category",
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_index "
-            "-> 'attribute' AS object_attributes",
+            "si.object_metadata -> tr.object_idx " "-> 'bbox_coord' AS bbox",
             query,
         )
-        self.assertIn(
-            "si.object_metadata -> tr.object_index " "-> 'bbox_coord' AS bbox",
-            query,
-        )
+        self.assertNotIn("'attribute'", query)
         self.assertIn("tr.vlm_mood", query)
 
     def test_returns_saved_tagging_history_detail(self) -> None:
@@ -260,14 +251,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
             {"xmin": 100, "ymin": 200, "xmax": 500, "ymax": 800},
         )
         self.assertEqual(data["detected_object"]["category"], "의자")
-        self.assertEqual(
-            data["detected_object"]["attrs"],
-            {
-                "label": "의자",
-                "color": "화이트",
-                "material": "메쉬",
-            },
-        )
+        self.assertEqual(data["detected_object"]["attrs"], {})
         self.assertEqual(
             data["detected_object"]["vlm_mood"],
             {
