@@ -11,6 +11,8 @@ import type {
 
 type DevDetection = {
   box_2d: number[];
+  confidence: number | null;
+  evidence: string;
   label: string;
 };
 
@@ -38,6 +40,8 @@ type DevRecommendationData = {
     sku_candidates: DevCandidate[];
   }>;
 };
+
+type EditedSceneObject = Pick<FurnitureObject, 'bbox' | 'category' | 'name'>;
 
 type ApiRubric = {
   breakdown: RubricEvaluation['breakdown'];
@@ -231,13 +235,13 @@ export const analyzeImage = async (
       bbox: toBbox(detection.box_2d),
       candidates: [],
       category: nullableText(detection.label),
-      confidence: null,
-      description: null,
+      confidence: detection.confidence,
+      description: nullableText(detection.evidence),
       id: `${response.data.scene_image_id}-${objectIndex}`,
       metadata: {
         attributes: {},
         category: nullableText(detection.label),
-        description: null,
+        description: nullableText(detection.evidence),
         keyFeatures: [],
         subCategory: null,
       },
@@ -262,6 +266,48 @@ export const fetchRecommendations = async (
   return object?.sku_candidates.map(toDevCandidate) ?? [];
 };
 
+/** 수정 완료된 장면의 모든 객체에 대한 SKU 후보를 한 번에 불러옵니다. */
+export const fetchObjectRecommendations = async (
+  sceneImageId: string,
+): Promise<Map<number, SkuCandidate[]>> => {
+  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+  );
+
+  return new Map(
+    response.data.objects.map((object) => [
+      object.object_index,
+      object.sku_candidates.map(toDevCandidate),
+    ]),
+  );
+};
+
+/**
+ * 사용자가 확정한 객체 목록을 서버에 반영합니다. bbox는 API 계약에 맞춰
+ * [ymin, xmin, ymax, xmax] 배열에서 명시적인 좌표 객체로 변환합니다.
+ */
+export const updateSceneObjects = async (
+  sceneImageId: string,
+  objects: EditedSceneObject[],
+): Promise<void> => {
+  await requestJson(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+    {
+      body: JSON.stringify({
+        objects: objects.map((object) => {
+          const [ymin, xmin, ymax, xmax] = object.bbox;
+          return {
+            bbox: { xmax, xmin, ymax, ymin },
+            label: object.category ?? object.name,
+          };
+        }),
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+};
+
 export const searchCatalogItems = async (
   query: string,
 ): Promise<SkuCandidate[]> => {
@@ -278,20 +324,30 @@ export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
   return response.data.items.map(toHistory);
 };
 
-export const saveTaggingReview = async ({
-  objectIndex,
-  sceneImageId,
-  selectedSku,
-}: {
+type TaggingReviewMatch = {
   objectIndex: number;
-  sceneImageId: string;
   selectedSku: SkuCandidate;
-}): Promise<void> => {
+};
+
+type SaveTaggingReviewInput = {
+  matching: TaggingReviewMatch[];
+  sceneImageId: string;
+};
+
+export const saveTaggingReview = async (
+  input: SaveTaggingReviewInput,
+): Promise<void> => {
+  const { matching, sceneImageId } = input;
+
   if (
-    selectedSku.matchRank === null ||
-    selectedSku.score === null ||
-    selectedSku.vlmMood === null ||
-    selectedSku.xaiResult === null
+    matching.length === 0 ||
+    matching.some(
+      ({ selectedSku }) =>
+        selectedSku.matchRank === null ||
+        selectedSku.score === null ||
+        selectedSku.vlmMood === null ||
+        selectedSku.xaiResult === null,
+    )
   ) {
     throw new Error('추천 후보의 저장 정보가 없습니다.');
   }
@@ -300,16 +356,14 @@ export const saveTaggingReview = async ({
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
     {
       body: JSON.stringify({
-        matching: [
-          {
-            match_rank: selectedSku.matchRank,
-            object_index: objectIndex,
-            similarity_score: selectedSku.score,
-            sku_code: selectedSku.sku,
-            vlm_mood: selectedSku.vlmMood,
-            xai_result: selectedSku.xaiResult,
-          },
-        ],
+        matching: matching.map(({ objectIndex, selectedSku }) => ({
+          match_rank: selectedSku.matchRank,
+          object_index: objectIndex,
+          similarity_score: selectedSku.score,
+          sku_code: selectedSku.sku,
+          vlm_mood: selectedSku.vlmMood,
+          xai_result: selectedSku.xaiResult,
+        })),
       }),
       headers: { 'Content-Type': 'application/json' },
       method: 'PUT',

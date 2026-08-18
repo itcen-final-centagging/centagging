@@ -53,7 +53,7 @@ VITE_API_BASE_URL=https://your-api-base-url.com
 ```text
 src/
 ├── commons/                         # 여러 feature에서 재사용하는 UI·테마·상수
-│   ├── components/                  # Button, Header, Layout, SideBar
+│   ├── components/                  # Button, Layout, SideBar
 │   ├── constants/                   # 공통 메뉴 등
 │   └── theme/                       # 팔레트와 시맨틱 토큰
 │
@@ -61,8 +61,8 @@ src/
 │   └── tagging/
 │       ├── api/                     # 태깅 API 요청 및 응답 매핑
 │       ├── components/              # 태깅 화면 전용 UI
-│       ├── constants/               # 업로드 제한·기본 태그
-│       ├── hooks/                   # useTaggingWorkflow 상태·액션
+│       ├── constants/               # 업로드 제한·데모 시나리오
+│       ├── hooks/                   # 워크플로 조합·객체 편집·SKU 선택 상태
 │       ├── utils/                   # 이미지 유효성 검사
 │       └── types.ts                 # 도메인 타입
 │
@@ -76,6 +76,10 @@ src/
 ├── main.tsx                         # React 진입점
 └── index.css                        # Tailwind import와 전역 디자인 토큰
 ```
+
+`TaggingHeader`처럼 특정 도메인의 진행 상태를 아는 UI는 해당 feature의
+`components`에 둡니다. `commons/components`에는 feature 상태에 의존하지 않는
+레이아웃과 재사용 UI만 둡니다.
 
 ### 구조 원칙
 
