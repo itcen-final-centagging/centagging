@@ -191,26 +191,30 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             )
             user_id = user_result.scalar_one_or_none()
             for tagging_result in tagging_results:
-                object_metadatas.append(
-                    tagging_result.object_metadata.model_dump()
-                )
-                results.append(
-                    TaggingResult(
-                        scene_image_id=scene_id,
-                        object_idx=tagging_result.object_idx,
-                        sku_id=tagging_result.sku_id,
-                        match_source="RECOMMEND",
-                        match_rank=tagging_result.match_rank,
-                        status="PENDING",
-                        similarity_score=tagging_result.similarity_score / 100,
-                        xai_result=tagging_result.xai_result.model_dump(),
-                        vlm_mood=tagging_result.vlm_mood.model_dump(),
-                        created_by=user_id,
-                    )
-                )
+                object_metadatas.append(tagging_result.object_metadata.model_dump())
+                results.append(TaggingResult(
+                    scene_image_id=scene_id,
+                    object_idx=tagging_result.object_idx,
+                    sku_id=tagging_result.sku_id,
+                    sku_image_id=tagging_result.sku_image_id,
+                    match_source=tagging_result.match_source,
+                    match_rank=tagging_result.match_rank,
+                    status="PENDING",
+                    similarity_score=(
+                        tagging_result.similarity_score / 100
+                        if tagging_result.similarity_score is not None
+                        else None
+                    ),
+                    xai_result=(
+                        tagging_result.xai_result.model_dump()
+                        if tagging_result.xai_result is not None
+                        else None
+                    ),
+                    vlm_mood=tagging_result.vlm_mood.model_dump(),
+                    created_by=user_id
+                ))
             await add_detected_object_metadata(
                 self.session,
                 scene_id,
-                object_metadatas,
-            )
+                object_metadatas)
             return await add_tagging_results(self.session, results)

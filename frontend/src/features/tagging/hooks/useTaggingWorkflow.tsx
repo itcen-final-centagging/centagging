@@ -33,6 +33,7 @@ import type {
 type TaggingWorkflowContextValue = {
   analysisMode?: 'live' | 'mock' | null;
   analysisScenario: AnalysisScenario;
+  addCatalogSkuToCandidates: (sku: SkuCandidate) => void;
   addObject: () => void;
   beginAnalysis: () => Promise<void>;
   catalogResults: SkuCandidate[];
@@ -322,6 +323,38 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [],
   );
 
+  /**
+   * 전체 카탈로그 검색에서 직접 고른 SKU를 현재 선택된 객체의 추천 후보
+   * 목록 맨 뒤에 추가하고 확정한 뒤, 추천 화면으로 돌아갑니다. 같은
+   * SKU가 이미 후보에 있으면 중복으로 추가하지 않고 그 자리를 갱신합니다.
+   */
+  const addCatalogSkuToCandidates = useCallback(
+    (sku: SkuCandidate): void => {
+      if (!selectedObject) return;
+      const targetObjectId = selectedObject.id;
+
+      const appendSku = (object: FurnitureObject): FurnitureObject => ({
+        ...object,
+        candidates: [
+          ...object.candidates.filter((candidate) => candidate.sku !== sku.sku),
+          sku,
+        ],
+      });
+
+      setDetectedObjects((objects) =>
+        objects.map((object) =>
+          object.id === targetObjectId ? appendSku(object) : object,
+        ),
+      );
+      setSelectedObject((object) =>
+        object && object.id === targetObjectId ? appendSku(object) : object,
+      );
+      selectSku(sku);
+      setStage('recommend');
+    },
+    [selectSku, selectedObject, setDetectedObjects, setSelectedObject],
+  );
+
   const saveTagging = useCallback(async (
     valuesByObject?: Record<string, TaggingValues>,
   ): Promise<void> => {
@@ -380,6 +413,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     () => ({
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
       addObject,
       beginAnalysis,
       catalogResults,
@@ -418,6 +452,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
       addObject,
       beginAnalysis,
       catalogResults,

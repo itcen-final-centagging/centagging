@@ -48,6 +48,7 @@ class SkuCandidate(BaseModel):
     similarity_score: int
     matched_sku_image: MatchedSkuImage
     xai_result: XaiResult
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
 class SceneImageInfo(BaseModel):
@@ -120,10 +121,12 @@ class DetectionResult(BaseModel):
 
 class ObjectAttributes(BaseModel):
     """탐지 객체 속성입니다."""
-
+    
     color: str
     material: str
     style: str
+
+
 
 class ObjectMetadata(BaseModel):
     """확정 시점의 탐지 객체 속성입니다."""
@@ -137,17 +140,43 @@ class ObjectMetadata(BaseModel):
 class SkuMatching(BaseModel):
     """확정할 객체-SKU 매핑 1건입니다.
 
-    tagging_result 테이블 1행에 대응하며, 추천 응답에서 사용자가 선택한
-    후보를 그대로 돌려받습니다.
+     tagging_result 한 건에 해당하는 선택된 SKU입니다.
+     - RECOMMEND: AI 추천 후보에서 사용자가 선택한 SKU
+       → 순위와 유사도가 있어야 합니다.
+     - SEARCH: 전체 검색에서 사용자가 직접 선택한 SKU
+       → 순위와 유사도가 없어야 합니다.
+     DB의 ck_result_source 조건과 같은 규칙을 따릅니다.
     """
 
     object_idx: int = Field(ge=0)
     sku_id: int = Field(ge=1)
-    match_rank: int = Field(ge=1)
-    similarity_score: int = Field(ge=0, le=100)
+    sku_image_id: int | None = None
+    match_source: typing.Literal["RECOMMEND", "SEARCH"]
+    match_rank: int | None = Field(default=None, ge=1)
+    similarity_score: int | None = Field(default=None, ge=0, le=100)
     object_metadata: ObjectMetadata
-    xai_result: XaiResult
+    xai_result: XaiResult | None = None
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
+
+    @model_validator(mode="after")
+    def validate_source_consistency(self) -> "SkuMatching":
+        """match_source별 필드 조합이 DB 제약(ck_result_source)과 맞는지 검증합니다."""
+        if self.match_source == "SEARCH":
+            if (
+                self.match_rank is not None
+                or self.similarity_score is not None
+                or self.xai_result is not None
+            ):
+                raise ValueError(
+                    "match_source가 SEARCH이면 match_rank/similarity_score/"
+                    "xai_result는 비어 있어야 합니다."
+                )
+        elif self.match_rank is None or self.similarity_score is None:
+            raise ValueError(
+                "match_source가 RECOMMEND이면 match_rank와 similarity_score가 "
+                "필요합니다."
+            )
+        return self
 
 
 class SkuMatchingRequest(BaseModel):
