@@ -2,7 +2,6 @@ import { requestJson, type ApiSuccessResponse } from '../../../lib/api-request';
 
 import type {
   FurnitureObject,
-  RubricEvaluation,
   SkuCandidate,
   TaggingHistory,
   TaggingValues,
@@ -476,7 +475,7 @@ export const saveTaggingReview = async (
               match_rank: selectedSku.matchRank,
               object_idx: objectIdx,
               match_source: toMatchSource(selectedSku),
-              object_index: objectIndex,
+              object_index: objectIdx,
               object_metadata: {
                 attrs: {
                   color: reviewedText(values?.color, selectedSku.color),
