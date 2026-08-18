@@ -166,6 +166,12 @@ class SkuRecommendationJobApiTest(unittest.TestCase):
             "이미 진행 중인 SKU 추천 작업이 있습니다.",
         )
 
+    def test_legacy_sync_recommendation_endpoint_is_not_available(self) -> None:
+        """추천 API는 동기 GET이 아닌 비동기 작업 접수만 제공합니다."""
+        response = self.client.get("/tagging/scenes/17")
+
+        self.assertEqual(response.status_code, 405)
+
 
 if __name__ == "__main__":
     unittest.main()
