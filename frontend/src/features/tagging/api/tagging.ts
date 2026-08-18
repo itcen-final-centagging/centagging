@@ -27,10 +27,10 @@ type DetectionJobResult = {
   scene_image_id: number;
 };
 
-type AiJobData = {
+type AiJobData<ResultPayload> = {
   error_message: string | null;
   job_id: string;
-  result_payload: DetectionJobResult | null;
+  result_payload: ResultPayload | null;
   scene_image_id: number;
   status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 };
@@ -123,15 +123,15 @@ const sleep = async (milliseconds: number): Promise<void> =>
     globalThis.setTimeout(resolve, milliseconds);
   });
 
-const waitForDetectionJob = async (
+const waitForAiJob = async <ResultPayload>(
   jobId: string,
-): Promise<DetectionJobResult> => {
+): Promise<ResultPayload> => {
   const timeoutAt = Date.now() + JOB_POLL_TIMEOUT_MS;
 
   while (Date.now() < timeoutAt) {
-    const response = await requestJson<ApiSuccessResponse<AiJobData>>(
-      `${API_BASE_URL}/ai-jobs/${encodeURIComponent(jobId)}`,
-    );
+    const response = await requestJson<
+      ApiSuccessResponse<AiJobData<ResultPayload>>
+    >(`${API_BASE_URL}/ai-jobs/${encodeURIComponent(jobId)}`);
     const job = response.data;
 
     if (job.status === 'SUCCEEDED') {
@@ -275,7 +275,9 @@ export const analyzeImage = async (
       method: 'POST',
     },
   );
-  const detectionResult = await waitForDetectionJob(accepted.data.job_id);
+  const detectionResult = await waitForAiJob<DetectionJobResult>(
+    accepted.data.job_id,
+  );
 
   return {
     analysisId: String(accepted.data.scene_image_id),
@@ -304,27 +306,25 @@ export const fetchRecommendations = async (
   sceneImageId: string,
   objectIndex: number,
 ): Promise<SkuCandidate[]> => {
-  const query = new URLSearchParams();
-  query.append('object_indexes', String(objectIndex));
-  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
-  );
-  const object = response.data.objects.find(
-    (item) => item.object_index === objectIndex,
-  );
-  return object?.sku_candidates.map(toDevCandidate) ?? [];
+  const candidatesByObjectIndex =
+    await fetchObjectRecommendations(sceneImageId);
+  return candidatesByObjectIndex.get(objectIndex) ?? [];
 };
 
 /** 수정 완료된 장면의 모든 객체에 대한 SKU 후보를 한 번에 불러옵니다. */
 export const fetchObjectRecommendations = async (
   sceneImageId: string,
 ): Promise<Map<number, SkuCandidate[]>> => {
-  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+  const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}/recommendations`,
+    { method: 'POST' },
+  );
+  const recommendationResult = await waitForAiJob<DevRecommendationData>(
+    accepted.data.job_id,
   );
 
   return new Map(
-    response.data.objects.map((object) => [
+    recommendationResult.objects.map((object) => [
       object.object_index,
       object.sku_candidates.map(toDevCandidate),
     ]),

@@ -420,51 +420,81 @@ test('save and history requests use their backend contracts', async (t) => {
 test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
   const { fetchRecommendations } = await loadTaggingApi(t);
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () =>
-    new Response(
-      JSON.stringify({
-        status: 'success',
-        data: {
-          objects: [
-            {
-              object_index: 1,
-              sku_candidates: [
+  const originalSetTimeout = globalThis.setTimeout;
+  const requests = [];
+  globalThis.setTimeout = (callback) => {
+    callback();
+    return 0;
+  };
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    requests.push({ init, url });
+    const data =
+      url === '/tagging/scenes/7/recommendations'
+        ? {
+            job_id: 'job-789',
+            scene_image_id: 7,
+            status: 'PENDING',
+          }
+        : {
+            error_message: null,
+            job_id: 'job-789',
+            result_payload: {
+              objects: [
                 {
-                  attrs: { color: 'white', material: 'mesh' },
-                  category: 'chair',
-                  matched_sku_image: { image_url: '/images/chair.png' },
-                  product_name: 'work chair',
-                  similarity_score: 92,
-                  sku_code: 'CHR-2041',
-                  sub_category: 'office chair',
-                  xai_result: {
-                    criteria: [
-                      {
-                        comment: 'The backrest structure matches.',
-                        label: 'structure',
-                        score: 29,
+                  object_index: 1,
+                  sku_candidates: [
+                    {
+                      attrs: { color: 'white', material: 'mesh' },
+                      category: 'chair',
+                      matched_sku_image: { image_url: '/images/chair.png' },
+                      product_name: 'work chair',
+                      similarity_score: 92,
+                      sku_code: 'CHR-2041',
+                      sub_category: 'office chair',
+                      xai_result: {
+                        criteria: [
+                          {
+                            comment: 'The backrest structure matches.',
+                            label: 'structure',
+                            score: 29,
+                          },
+                        ],
+                        summary: 'The structure and color are similar.',
+                        vlm_mood: {
+                          summary: 'A warm living room.',
+                          tags: ['natural'],
+                        },
                       },
-                    ],
-                    summary: 'The structure and color are similar.',
-                    vlm_mood: {
-                      summary: 'A warm living room.',
-                      tags: ['natural'],
                     },
-                  },
+                  ],
                 },
               ],
             },
-          ],
-        },
+            scene_image_id: 7,
+            status: 'SUCCEEDED',
+          };
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data,
         meta: { request_id: 'request-123' },
       }),
       { headers: { 'Content-Type': 'application/json' }, status: 200 },
     );
+  };
   t.after(() => {
     globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
   });
 
   const [candidate] = await fetchRecommendations('7', 1);
+
+  assert.deepEqual(
+    requests.map((request) => request.url),
+    ['/tagging/scenes/7/recommendations', '/ai-jobs/job-789'],
+  );
+  assert.equal(requests[0].init.method, 'POST');
 
   assert.deepEqual(
     {
