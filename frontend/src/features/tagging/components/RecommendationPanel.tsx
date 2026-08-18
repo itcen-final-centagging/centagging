@@ -18,14 +18,11 @@ import {
 } from '@/features/tagging/constants/skuAttributes';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import type { SkuCandidate } from '@/features/tagging/types';
+import {
+  getRubricScores,
+  getRubricTotal,
+} from '@/features/tagging/utils/rubric';
 import { cn } from '@/lib/utils';
-
-const RUBRIC_LABELS = [
-  ['구조', 30],
-  ['색상', 30],
-  ['디테일', 20],
-  ['맥락', 20],
-] as const;
 
 const formatAttributeValue = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return 'null';
@@ -95,14 +92,8 @@ export const RecommendationPanel = () => {
 
   if (!focusedCandidate) return null;
 
-  const rubricScores: Array<number | null> = focusedCandidate.rubric
-    ? [
-        focusedCandidate.rubric.breakdown.structure,
-        focusedCandidate.rubric.breakdown.color,
-        focusedCandidate.rubric.breakdown.detail,
-        focusedCandidate.rubric.breakdown.context,
-      ]
-    : [null, null, null, null];
+  const rubricScores = getRubricScores(focusedCandidate);
+  const rubricTotal = getRubricTotal(focusedCandidate, rubricScores);
   const isConfirmed = selectedSku?.sku === focusedCandidate.sku;
 
   // 소규모 배열 조합이라 useMemo 없이 매 렌더마다 계산해도 무방합니다.
@@ -117,6 +108,7 @@ export const RecommendationPanel = () => {
       (recommendationObject) => recommendationObject.id === object.id,
     ),
   ).length;
+  const isFirstObject = objectPage === 0;
   const isLastObject = objectPage === recommendationObjects.length - 1;
 
   const handleObjectPageMove = (offset: number): void => {
@@ -138,7 +130,11 @@ export const RecommendationPanel = () => {
   };
 
   const handlePreviousStage = (): void => {
-    changeStage('detect');
+    if (isFirstObject) {
+      changeStage('detect');
+      return;
+    }
+    handleObjectPageMove(-1);
   };
 
   const handleSkuConfirmation = (): void => {
@@ -221,7 +217,7 @@ export const RecommendationPanel = () => {
                         <span className="text-[11px] font-extrabold text-emerald-700">
                           {candidate.score === null
                             ? 'null'
-                            : `${candidate.score}%`}
+                            : `${candidate.score}점`}
                         </span>
                       </span>
                     </span>
@@ -261,7 +257,7 @@ export const RecommendationPanel = () => {
               <p className="text-2xl font-extrabold tracking-[-0.04em] text-emerald-700">
                 {focusedCandidate.score === null
                   ? 'null'
-                  : `${focusedCandidate.score}%`}
+                  : `${focusedCandidate.score}점`}
               </p>
               <p className="text-[11px] font-semibold text-text-tertiary">
                 최종 매칭 점수
@@ -302,19 +298,17 @@ export const RecommendationPanel = () => {
                   VLM 루브릭 채점
                 </p>
                 <span className="text-sm font-extrabold text-text-primary">
-                  {focusedCandidate.rubric?.totalScore ?? 'null'}
-                  /100
+                  {rubricTotal === null ? 'null' : `${rubricTotal}점`}
                 </span>
               </div>
               <div className="mt-4 space-y-3">
-                {RUBRIC_LABELS.map(([label, maximum], index) => {
-                  const value = rubricScores[index];
+                {rubricScores.map(({ key, label, maximum, score }) => {
                   const percentage =
-                    value === null ? 0 : (value / maximum) * 100;
+                    score === null ? 0 : (score / maximum) * 100;
                   return (
                     <div
                       className="grid grid-cols-[42px_minmax(0,1fr)_44px] items-center gap-2"
-                      key={label}
+                      key={key}
                     >
                       <span className="text-xs font-semibold text-text-secondary">
                         {label}
@@ -326,14 +320,17 @@ export const RecommendationPanel = () => {
                         />
                       </span>
                       <span className="text-right text-xs font-bold text-emerald-700">
-                        {value === null ? 'null' : `${value}/${maximum}`}
+                        {score === null
+                          ? 'null'
+                          : `${score}점/${maximum}점`}
                       </span>
                     </div>
                   );
                 })}
               </div>
               <p className="mt-4 border-t border-neutral-100 pt-3 text-xs leading-5 text-text-secondary">
-                {focusedCandidate.rubric?.xaiReason ??
+                {focusedCandidate.xaiResult?.summary ??
+                  focusedCandidate.rubric?.xaiReason ??
                   focusedCandidate.xaiReason ??
                   'null'}
               </p>
@@ -365,7 +362,7 @@ export const RecommendationPanel = () => {
               startDecorator={<ChevronLeft size={16} />}
               variant="neutral-outlined"
             >
-              전 단계로
+              {isFirstObject ? '탐지 단계로' : '이전 객체 처리'}
             </Button>
             <div className="grid gap-3 sm:flex">
               <Button
