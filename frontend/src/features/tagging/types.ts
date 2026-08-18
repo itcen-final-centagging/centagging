@@ -29,6 +29,11 @@ export interface FurnitureObject {
   confidence: number | null;
   description: string | null;
   id: string;
+  /**
+   * 브라우저에서 새로 추가한 객체인지 나타냅니다. 추천을 요청하기 직전에
+   * 서버가 객체 목록을 다시 색인하므로, 이 값은 화면 상태에만 사용합니다.
+   */
+  isNew?: boolean;
   metadata: ExtractedMetadata;
   name: string;
   objectIdx: number;
@@ -71,9 +76,9 @@ export interface VlmMood {
 }
 
 export interface SkuCandidate {
+  attrs: Record<string, unknown>;
   category: string | null;
   color: string | null;
-  grade: string | null;
   imageUrl: string | null;
   kind: 'sofa' | 'table' | 'lamp' | 'chair' | 'cabinet' | null;
   material: string | null;
@@ -88,6 +93,11 @@ export interface SkuCandidate {
   vlmMood: VlmMood | null;
   xaiReason: string | null;
   xaiResult: XaiResult | null;
+}
+
+export interface ConfirmedSkuSelection {
+  object: FurnitureObject;
+  sku: SkuCandidate;
 }
 
 export interface TaggingValues {

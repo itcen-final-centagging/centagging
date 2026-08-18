@@ -120,6 +120,24 @@ _UPSERT_TAGGING_RESULT = sqlalchemy.text(f"""
     RETURNING result_id
     """)
 
+_CREATE_PENDING_APPROVAL = sqlalchemy.text("""
+    INSERT INTO approval (
+        tagging_result_id,
+        scene_image_id,
+        object_index,
+        requested_by,
+        status
+    )
+    SELECT tr.result_id,
+           tr.scene_image_id,
+           tr.object_index,
+           tr.created_by,
+           'PENDING'
+      FROM tagging_result tr
+     WHERE tr.result_id = :result_id
+    ON CONFLICT DO NOTHING
+    """)
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -171,7 +189,9 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
 
             result_ids = []
             for item in matching:
-                result_ids.append(await self._upsert_matching(scene_id, item))
+                result_id = await self._upsert_matching(scene_id, item)
+                result_ids.append(result_id)
+                await self._create_pending_approval(result_id)
 
             await self._mark_scene_completed(scene_id)
             await self.session.commit()
@@ -270,6 +290,13 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
             raise MatchingTargetNotFoundError(item.sku_code)
 
         return int(result_id)
+
+    async def _create_pending_approval(self, result_id: int) -> None:
+        """새 SKU 확정 결과를 최종 관리자 승인 대기열에 넣습니다."""
+        await self.session.execute(
+            _CREATE_PENDING_APPROVAL,
+            {"result_id": result_id},
+        )
 
     async def _mark_scene_completed(self, scene_id: int) -> None:
         """태깅 결과가 저장된 연출 이미지의 처리를 완료합니다.

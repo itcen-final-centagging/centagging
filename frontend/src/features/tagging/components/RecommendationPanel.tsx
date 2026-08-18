@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
-  ArrowLeft,
   ArrowRight,
   Check,
+  ChevronLeft,
   ChevronRight,
   Search,
   Sparkles,
@@ -11,19 +11,72 @@ import {
 import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ObjectCropPreview } from '@/features/tagging/components/ImagePreview';
+import {
+  ATTRIBUTE_LABELS,
+  CATEGORY_ATTRIBUTE_FIELDS,
+  COMMON_ATTRIBUTE_KEYS,
+} from '@/features/tagging/constants/skuAttributes';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
+import type { SkuCandidate } from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
 
-const rubricLabels = [
+const RUBRIC_LABELS = [
   ['구조', 30],
   ['색상', 30],
   ['디테일', 20],
   ['맥락', 20],
 ] as const;
 
+const formatAttributeValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return 'null';
+  if (typeof value === 'boolean') return value ? '있음' : '없음';
+  return String(value);
+};
+
+const buildAttributeRows = (
+  candidate: SkuCandidate,
+  fallbackCategory: string | null,
+): Array<[string, string]> => {
+  const category = candidate.category ?? fallbackCategory;
+  const attrs = candidate.attrs ?? {};
+  const categoryKeys = category
+    ? (CATEGORY_ATTRIBUTE_FIELDS[category] ?? [])
+    : [];
+
+  return [
+    ['카테고리', category ?? '가구'],
+    ...COMMON_ATTRIBUTE_KEYS.map((key): [string, string] => [
+      ATTRIBUTE_LABELS[key] ?? key,
+      formatAttributeValue(attrs[key]),
+    ]),
+    ...categoryKeys.map((key): [string, string] => [
+      ATTRIBUTE_LABELS[key] ?? key,
+      formatAttributeValue(attrs[key]),
+    ]),
+  ];
+};
+
 export const RecommendationPanel = () => {
-  const { changeStage, selectSku, selectedObject, selectedSku, uploadedImage } =
-    useTaggingWorkflow();
+  const {
+    changeStage,
+    confirmedSelections,
+    detectedObjects,
+    selectObject,
+    selectSku,
+    selectedObject,
+    selectedSku,
+    uploadedImage,
+  } = useTaggingWorkflow();
+  const recommendationObjects = useMemo(
+    () => detectedObjects.filter((object) => object.candidates.length > 0),
+    [detectedObjects],
+  );
+  const objectPage = Math.max(
+    0,
+    recommendationObjects.findIndex(
+      (object) => object.id === selectedObject?.id,
+    ),
+  );
   const candidates = useMemo(
     () => selectedObject?.candidates ?? [],
     [selectedObject],
@@ -50,30 +103,70 @@ export const RecommendationPanel = () => {
     : [null, null, null, null];
   const isConfirmed = selectedSku?.sku === focusedCandidate.sku;
 
+  // 소규모 배열 조합이라 useMemo 없이 매 렌더마다 계산해도 무방합니다.
+  // (아래 return null 분기 뒤라 훅으로 두면 훅 규칙에 걸립니다.)
+  const attributeRows = buildAttributeRows(
+    focusedCandidate,
+    selectedObject?.category ?? null,
+  );
+
+  const completedObjectCount = confirmedSelections.filter(({ object }) =>
+    recommendationObjects.some(
+      (recommendationObject) => recommendationObject.id === object.id,
+    ),
+  ).length;
+  const isLastObject = objectPage === recommendationObjects.length - 1;
+
+  const handleObjectPageMove = (offset: number): void => {
+    const nextObject = recommendationObjects[objectPage + offset];
+    if (!nextObject) return;
+    selectObject(nextObject);
+    const nextSelection = confirmedSelections.find(
+      ({ object }) => object.id === nextObject.id,
+    );
+    setFocusedSku(nextSelection?.sku.sku ?? nextObject.candidates[0]?.sku);
+  };
+
+  const handleCandidateFocus = (sku: string): void => {
+    setFocusedSku(sku);
+  };
+
+  const handleCatalogSearchOpen = (): void => {
+    changeStage('catalog');
+  };
+
+  const handlePreviousStage = (): void => {
+    changeStage('detect');
+  };
+
+  const handleSkuConfirmation = (): void => {
+    selectSku(focusedCandidate);
+  };
+
+  const handleNextObject = (): void => {
+    if (isLastObject) {
+      changeStage('review');
+      return;
+    }
+    handleObjectPageMove(1);
+  };
+
   return (
     <section>
       <div className="mb-4 flex flex-col gap-4 rounded-xl border border-border bg-bg-primary px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-base font-extrabold text-neutral-800">
-            유사 SKU 후보 · {selectedObject?.category ?? '선택 객체'}
+            SKU 처리 {objectPage + 1} / {recommendationObjects.length} ·{' '}
+            {selectedObject?.category ?? '선택 객체'}
           </p>
           <p className="mt-1 text-xs leading-5 text-neutral-500">
-            객체 크롭 이미지의 임베딩 유사도와 루브릭 검증 결과입니다. 총{' '}
-            {candidates.length}건
+            현재 객체의 후보를 확정하면 다음 객체의 SKU를 순서대로 처리합니다.{' '}
+            후보 {candidates.length}건
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-md bg-bg-tertiary px-3 py-2 text-xs font-bold text-text-secondary">
-            객체 1 / 1
-          </span>
-          <Button
-            onClick={() => changeStage('detect')}
-            size="sm"
-            variant="neutral-outlined"
-          >
-            객체 다시 선택
-          </Button>
-        </div>
+        <span className="rounded-full bg-success-50 px-2.5 py-1 text-xs font-bold text-success-600">
+          {completedObjectCount} / {recommendationObjects.length}개 확정
+        </span>
       </div>
 
       <div className="grid overflow-hidden rounded-2xl border border-border bg-bg-primary shadow-[0_1px_3px_rgba(15,23,42,0.08)] xl:grid-cols-[300px_minmax(0,1fr)]">
@@ -94,7 +187,7 @@ export const RecommendationPanel = () => {
                       : 'border-border bg-white hover:border-blue-300',
                   )}
                   key={candidate.sku}
-                  onClick={() => setFocusedSku(candidate.sku)}
+                  onClick={() => handleCandidateFocus(candidate.sku)}
                   type="button"
                 >
                   <div className="flex items-start gap-3">
@@ -137,7 +230,7 @@ export const RecommendationPanel = () => {
           <Button
             className="mt-3"
             fullWidth
-            onClick={() => changeStage('catalog')}
+            onClick={handleCatalogSearchOpen}
             size="sm"
             startDecorator={<Search size={15} />}
             variant="neutral-outlined"
@@ -211,7 +304,7 @@ export const RecommendationPanel = () => {
                 </span>
               </div>
               <div className="mt-4 space-y-3">
-                {rubricLabels.map(([label, maximum], index) => {
+                {RUBRIC_LABELS.map(([label, maximum], index) => {
                   const value = rubricScores[index];
                   const percentage =
                     value === null ? 0 : (value / maximum) * 100;
@@ -249,25 +342,14 @@ export const RecommendationPanel = () => {
               SKU 카탈로그 속성
             </p>
             <dl className="mt-2 divide-y divide-neutral-100 border-y border-neutral-100">
-              {[
-                [
-                  '카테고리',
-                  focusedCandidate.category ??
-                    selectedObject?.category ??
-                    '가구',
-                ],
-                ['소재', focusedCandidate.material],
-                ['색상', focusedCandidate.color],
-                ['규격', focusedCandidate.size],
-                ['추천 등급', focusedCandidate.grade ?? 'null'],
-              ].map(([label, value]) => (
+              {attributeRows.map(([label, value]) => (
                 <div
                   className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 px-2 py-3"
                   key={label}
                 >
                   <dt className="text-xs text-text-tertiary">{label}</dt>
                   <dd className="text-xs font-bold text-text-primary">
-                    {value ?? 'null'}
+                    {value}
                   </dd>
                 </div>
               ))}
@@ -276,28 +358,32 @@ export const RecommendationPanel = () => {
 
           <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-between">
             <Button
-              onClick={() => changeStage('detect')}
-              startDecorator={<ArrowLeft size={16} />}
+              onClick={handlePreviousStage}
+              startDecorator={<ChevronLeft size={16} />}
               variant="neutral-outlined"
             >
-              객체 다시 선택
+              전 단계로
             </Button>
             <div className="grid gap-3 sm:flex">
               <Button
-                onClick={() => selectSku(focusedCandidate)}
+                onClick={handleSkuConfirmation}
                 startDecorator={
                   isConfirmed ? <Check size={16} /> : <Sparkles size={16} />
                 }
                 variant={isConfirmed ? 'neutral-outlined' : 'primary-solid'}
               >
-                {isConfirmed ? '선택됨' : '이 SKU 확정'}
+                {isConfirmed
+                  ? '이 SKU로 확정됨'
+                  : selectedSku
+                    ? '이 SKU로 변경'
+                    : '이 SKU 확정'}
               </Button>
               <Button
                 disabled={!isConfirmed}
                 endDecorator={<ArrowRight size={16} />}
-                onClick={() => changeStage('review')}
+                onClick={handleNextObject}
               >
-                검수로 이동
+                {isLastObject ? '전체 검수로 이동' : '다음 객체 처리'}
               </Button>
             </div>
           </div>

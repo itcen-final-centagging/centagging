@@ -1,8 +1,15 @@
-import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent,
+} from 'react';
 import {
   ImagePlus,
   LoaderCircle,
   ShieldCheck,
+  Sparkles,
   UploadCloud,
 } from 'lucide-react';
 
@@ -18,6 +25,7 @@ export const UploadPanel = () => {
   const {
     beginAnalysis,
     clearUploadError,
+    loadDemoWorkflow,
     uploadError,
     uploadedImage,
     uploadImage,
@@ -43,6 +51,26 @@ export const UploadPanel = () => {
     await handleFile(event.dataTransfer.files[0]);
   };
 
+  const handleUploadAreaClick = (): void => {
+    fileInputRef.current?.click();
+  };
+
+  const handleUploadAreaKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+  ): void => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      handleUploadAreaClick();
+    }
+  };
+
+  const handleAnalysisStart = (): void => {
+    void beginAnalysis();
+  };
+
+  const handleDemoWorkflowStart = (): void => {
+    void loadDemoWorkflow();
+  };
+
   const isAnalyzing = false;
 
   return (
@@ -63,7 +91,7 @@ export const UploadPanel = () => {
               ? 'border-primary bg-primary-20'
               : 'border-blue-300 bg-bg-tertiary hover:border-blue-500 hover:bg-white',
           )}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handleUploadAreaClick}
           onDragEnter={(event) => {
             event.preventDefault();
             setIsDragging(true);
@@ -73,11 +101,7 @@ export const UploadPanel = () => {
           onDrop={handleDrop}
           role="button"
           tabIndex={0}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              fileInputRef.current?.click();
-            }
-          }}
+          onKeyDown={handleUploadAreaKeyDown}
         >
           <span className="flex size-16 items-center justify-center rounded-full bg-white text-blue-700 shadow-sm">
             <UploadCloud size={30} strokeWidth={2.15} />
@@ -130,7 +154,7 @@ export const UploadPanel = () => {
           className="mt-5"
           disabled={!uploadedImage || isAnalyzing}
           fullWidth
-          onClick={() => void beginAnalysis()}
+          onClick={handleAnalysisStart}
           size="lg"
           startDecorator={
             isAnalyzing ? (
@@ -142,6 +166,19 @@ export const UploadPanel = () => {
         >
           AI 분석 시작
         </Button>
+        <Button
+          className="mt-3"
+          fullWidth
+          onClick={handleDemoWorkflowStart}
+          size="lg"
+          startDecorator={<Sparkles size={18} />}
+          variant="neutral-outlined"
+        >
+          데모로 객체 · SKU 선택 보기
+        </Button>
+        <p className="mt-2 text-center text-xs leading-5 text-text-tertiary">
+          AI 호출 없이 소파 객체 선택과 SKU 후보 비교 화면을 바로 확인합니다.
+        </p>
       </section>
 
       <aside className="studio-surface h-fit p-6">

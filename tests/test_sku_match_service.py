@@ -160,7 +160,7 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
         result_ids = await service.confirm_matching(7, [matching])
 
         self.assertEqual(result_ids, [91])
-        self.assertEqual(len(session.executions), 3)
+        self.assertEqual(len(session.executions), 4)
         stored = session.executions[1]
         self.assertEqual(stored["scene_image_id"], 7)
         self.assertEqual(stored["object_idx"], 0)
@@ -180,6 +180,7 @@ class SkuMatchServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("xai_status", insert_sql)
         self.assertNotIn("xai_fallback_reason", insert_sql)
         self.assertIn("CAST(:vlm_mood AS jsonb)", insert_sql)
+        self.assertIn("tagging_result_id", str(session.statements[2]))
         self.assertEqual(
             json.loads(typing.cast(str, stored["xai_result"])),
             {
