@@ -89,11 +89,20 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
                     scene_image_id=scene_id,
                     object_index=tagging_result.object_index,
                     sku_id=tagging_result.sku_id,
-                    match_source="RECOMMEND",
+                    sku_image_id=tagging_result.sku_image_id,
+                    match_source=tagging_result.match_source,
                     match_rank=tagging_result.match_rank,
                     status="PENDING",
-                    similarity_score=tagging_result.similarity_score / 100,
-                    xai_result=tagging_result.xai_result.model_dump(),
+                    similarity_score=(
+                        tagging_result.similarity_score / 100
+                        if tagging_result.similarity_score is not None
+                        else None
+                    ),
+                    xai_result=(
+                        tagging_result.xai_result.model_dump()
+                        if tagging_result.xai_result is not None
+                        else None
+                    ),
                     vlm_mood=tagging_result.vlm_mood.model_dump(),
                     created_by=user_id
                 ))
