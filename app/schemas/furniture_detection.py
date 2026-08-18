@@ -11,6 +11,8 @@ class DetectedObjectResponse(BaseModel):
         min_length=4,
         max_length=4,
     )
+    evidence: str
+    confidence: int | None = Field(default=None, ge=0, le=100)
 
 
 class FurnitureDetectionResponse(BaseModel):

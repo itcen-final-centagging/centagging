@@ -274,6 +274,17 @@ class UploadSceneImageApiTest(unittest.TestCase):
         )
         self.assertEqual(response.json()["data"]["scene_image_id"], 42)
         self.assertEqual(
+            response.json()["data"]["detections"],
+            [
+                {
+                    "box_2d": [100, 200, 700, 800],
+                    "confidence": 90,
+                    "evidence": "chair shape",
+                    "label": "chair",
+                }
+            ],
+        )
+        self.assertEqual(
             response.json()["meta"]["request_id"],
             response.headers["X-Request-ID"],
         )

@@ -41,3 +41,4 @@ resource
 .idea/
 .DS_Store
 Thumbs.db
+/zz-sku-catalog-embeddings.sql

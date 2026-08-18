@@ -15,6 +15,10 @@ const CatalogItem = ({ item }: CatalogItemProps) => {
   const { selectSku, selectedSku } = useTaggingWorkflow();
   const isSelected = selectedSku?.sku === item.sku;
 
+  const handleSkuSelect = (): void => {
+    selectSku(item);
+  };
+
   return (
     <article
       className={cn(
@@ -37,7 +41,7 @@ const CatalogItem = ({ item }: CatalogItemProps) => {
         {item.color ?? 'null'} · {item.material ?? 'null'}
       </p>
       <Button
-        onClick={() => selectSku(item)}
+        onClick={handleSkuSelect}
         size="sm"
         startDecorator={isSelected ? <Check size={14} /> : undefined}
         variant={isSelected ? 'primary-solid' : 'neutral-outlined'}
@@ -49,13 +53,8 @@ const CatalogItem = ({ item }: CatalogItemProps) => {
 };
 
 export const CatalogPanel = () => {
-  const {
-    catalogResults,
-    changeStage,
-    searchCatalog,
-    selectedSku,
-    workflowError,
-  } = useTaggingWorkflow();
+  const { catalogResults, changeStage, searchCatalog, workflowError } =
+    useTaggingWorkflow();
   const [query, setQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [searchError, setSearchError] = useState<string>();
@@ -73,11 +72,23 @@ export const CatalogPanel = () => {
     setHasSearched(true);
   };
 
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>): void => {
+    void handleSearch(event);
+  };
+
+  const handleQueryChange = (query: string): void => {
+    setQuery(query);
+  };
+
+  const handleRecommendationReturn = (): void => {
+    changeStage('recommend');
+  };
+
   return (
     <section className="studio-surface p-6">
       <form
         className="flex flex-col gap-3 sm:flex-row"
-        onSubmit={(event) => void handleSearch(event)}
+        onSubmit={handleSearchSubmit}
       >
         <label className="sr-only" htmlFor="catalog-search">
           상품명 또는 SKU 코드
@@ -90,7 +101,7 @@ export const CatalogPanel = () => {
           <input
             className="h-11 w-full rounded-md border border-neutral-200 bg-white pl-10 pr-3 text-sm text-neutral-800 outline-none transition-shadow placeholder:text-neutral-400 focus:border-primary focus:ring-3 focus:ring-primary-50"
             id="catalog-search"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => handleQueryChange(event.target.value)}
             placeholder="예: 엠버, SOF-EMB-350-GR"
             value={query}
           />
@@ -150,19 +161,18 @@ export const CatalogPanel = () => {
       <div className="mt-7 grid gap-3 sm:grid-cols-2">
         <Button
           fullWidth
-          onClick={() => changeStage('recommend')}
+          onClick={handleRecommendationReturn}
           startDecorator={<ArrowLeft size={17} />}
           variant="neutral-outlined"
         >
           추천 목록으로
         </Button>
         <Button
-          disabled={!selectedSku}
           endDecorator={<ArrowRight size={17} />}
           fullWidth
-          onClick={() => changeStage('review')}
+          onClick={handleRecommendationReturn}
         >
-          선택한 SKU 검수하기
+          SKU 처리로 돌아가기
         </Button>
       </div>
     </section>
