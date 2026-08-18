@@ -134,7 +134,7 @@ test('save and history requests use their backend contracts', async (t) => {
   const requests = [];
   globalThis.fetch = async (input, init) => {
     requests.push({ init, input });
-    if (init?.method === 'PUT') {
+    if (init?.method === 'POST') {
       return new Response(
         JSON.stringify({
           status: 'success',
@@ -176,42 +176,103 @@ test('save and history requests use their backend contracts', async (t) => {
   });
 
   await saveTaggingReview({
-    objectIdx: 1,
-    sceneImageId: '7',
-    selectedSku: {
-      matchRank: 2,
-      score: 92,
-      sku: 'CHR-2041',
-      vlmMood: {
-        summary: 'A warm living room.',
-        tags: ['natural'],
-      },
-      xaiResult: {
-        criteria: [
-          {
-            comment: 'The backrest structure matches.',
-            label: 'structure',
-            score: 29,
+    matching: [
+      {
+        object: { bbox: [100, 200, 800, 900], objectIdx: 1 },
+        objectIdx: 1,
+        selectedSku: {
+          category: 'chair',
+          color: 'white',
+          matchRank: 2,
+          material: 'mesh',
+          score: 92,
+          sku: 'CHR-2041',
+          skuId: 50,
+          style: 'modern',
+          subCategory: 'office chair',
+          vlmMood: {
+            summary: 'A warm living room.',
+            tags: ['modern'],
           },
-        ],
-        summary: 'The structure and color are similar.',
+          xaiResult: {
+            criteria: [
+              {
+                comment: 'The backrest structure matches.',
+                label: 'structure',
+                score: 29,
+              },
+            ],
+            summary: 'The structure and color are similar.',
+          },
+        },
+        values: {
+          category: 'chair',
+          color: 'white',
+          material: 'mesh',
+          mood: 'A warm living room.',
+          styleTags: ['modern'],
+        },
       },
-    },
+      {
+        object: { bbox: [50, 60, 400, 500], objectIdx: 2 },
+        objectIdx: 2,
+        selectedSku: {
+          category: 'table',
+          color: 'oak',
+          matchRank: 1,
+          material: 'wood',
+          score: 88,
+          sku: 'TBL-1007',
+          skuId: 71,
+          style: 'natural',
+          subCategory: 'dining table',
+          vlmMood: {
+            summary: 'A compact dining area.',
+            tags: ['natural'],
+          },
+          xaiResult: {
+            criteria: [
+              {
+                comment: 'The table legs and top shape match.',
+                label: 'structure',
+                score: 27,
+              },
+            ],
+            summary: 'The table shape is a close match.',
+          },
+        },
+        values: {
+          category: 'table',
+          color: 'brown',
+          material: 'oak',
+          mood: 'A compact dining area.',
+          styleTags: ['null', 'natural'],
+        },
+      },
+    ],
+    sceneImageId: '7',
   });
   const history = await fetchTaggingHistory();
 
-  assert.equal(requests[0].input, '/tagging/scenes/7');
-  assert.equal(requests[0].init.method, 'PUT');
+  assert.equal(requests[0].input, '/tagging/scenes/7/results');
+  assert.equal(requests[0].init.method, 'POST');
   assert.deepEqual(JSON.parse(requests[0].init.body), {
-    matching: [
+    tagging_results: [
       {
         match_rank: 2,
         object_idx: 1,
+        object_metadata: {
+          attrs: { color: 'white', material: 'mesh', style: 'modern' },
+          bbox_coord: { xmax: 900, xmin: 200, ymax: 800, ymin: 100 },
+          category: 'chair',
+          object_idx: 1,
+          sub_category: 'office chair',
+        },
         similarity_score: 92,
-        sku_code: 'CHR-2041',
+        sku_id: 50,
         vlm_mood: {
           summary: 'A warm living room.',
-          tags: ['natural'],
+          tags: ['modern'],
         },
         xai_result: {
           criteria: [
@@ -222,6 +283,33 @@ test('save and history requests use their backend contracts', async (t) => {
             },
           ],
           summary: 'The structure and color are similar.',
+        },
+      },
+      {
+        match_rank: 1,
+        object_idx: 2,
+        object_metadata: {
+          attrs: { color: 'brown', material: 'oak', style: 'natural' },
+          bbox_coord: { xmax: 500, xmin: 60, ymax: 400, ymin: 50 },
+          category: 'table',
+          object_idx: 2,
+          sub_category: 'dining table',
+        },
+        similarity_score: 88,
+        sku_id: 71,
+        vlm_mood: {
+          summary: 'A compact dining area.',
+          tags: ['natural'],
+        },
+        xai_result: {
+          criteria: [
+            {
+              comment: 'The table legs and top shape match.',
+              label: 'structure',
+              score: 27,
+            },
+          ],
+          summary: 'The table shape is a close match.',
         },
       },
     ],

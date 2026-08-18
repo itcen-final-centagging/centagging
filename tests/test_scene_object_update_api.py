@@ -32,8 +32,8 @@ class SceneObjectUpdateApiTest(unittest.TestCase):
                 json={
                     "objects": [
                         {
-                            "label": "의자",
-                            "bbox": {
+                            "category": "의자",
+                            "bbox_coord": {
                                 "xmin": 120,
                                 "ymin": 100,
                                 "xmax": 600,
@@ -54,7 +54,9 @@ class SceneObjectUpdateApiTest(unittest.TestCase):
         )
         update_objects.assert_awaited_once()
         self.assertEqual(update_objects.await_args.args[1], 7)
-        self.assertEqual(update_objects.await_args.args[2][0]["label"], "의자")
+        self.assertEqual(
+            update_objects.await_args.args[2][0]["category"], "의자"
+        )
 
     def test_rejects_an_invalid_bounding_box(self) -> None:
         """크롭할 수 없는 역방향 좌표는 공통 422 오류로 반환합니다."""
@@ -63,8 +65,8 @@ class SceneObjectUpdateApiTest(unittest.TestCase):
             json={
                 "objects": [
                     {
-                        "label": "의자",
-                        "bbox": {
+                        "category": "의자",
+                        "bbox_coord": {
                             "xmin": 900,
                             "ymin": 100,
                             "xmax": 200,
@@ -90,8 +92,8 @@ class SceneObjectUpdateApiTest(unittest.TestCase):
                 json={
                     "objects": [
                         {
-                            "label": "의자",
-                            "bbox": {
+                            "category": "의자",
+                            "bbox_coord": {
                                 "xmin": 100,
                                 "ymin": 100,
                                 "xmax": 300,

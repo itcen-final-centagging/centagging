@@ -5,6 +5,7 @@ import type {
   RubricEvaluation,
   SkuCandidate,
   TaggingHistory,
+  TaggingValues,
   VlmMood,
   XaiResult,
 } from '../types';
@@ -19,7 +20,7 @@ type ApiBoundingBox = {
 type DevDetection = {
   object_idx: number;
   category: string;
-  sub_category: string | null;
+  sub_category: string;
   bbox_coord: ApiBoundingBox;
   confidence: number | null;
   evidence: string;
@@ -43,6 +44,7 @@ type DevUploadResponse = {
 };
 
 type DevCandidate = {
+  sku_id: number;
   attrs: Record<string, unknown>;
   category: string | null;
   matched_sku_image: {
@@ -133,6 +135,17 @@ const toBbox = (bbox: ApiBoundingBox): [number, number, number, number] => [
 const nullableText = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
 
+const NULL_TAG_VALUE = 'null';
+
+const reviewedText = (
+  value: string | undefined,
+  fallback: string | null | undefined,
+): string =>
+  value && value !== NULL_TAG_VALUE ? value : (fallback ?? '');
+
+const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
+  tags?.filter((tag) => tag !== NULL_TAG_VALUE);
+
 const resolveAssetUrl = (value: unknown): string | null => {
   const path = nullableText(value);
   if (!path || /^https?:\/\//.test(path)) return path;
@@ -157,8 +170,11 @@ const toDevCandidate = (
   candidate: DevCandidate,
   candidateIndex: number,
 ): SkuCandidate => ({
+  skuId: candidate.sku_id,
+  style: nullableText(candidate.attrs.style),
   attrs: candidate.attrs ?? {},
   category: candidate.category,
+  subCategory: candidate.sub_category,
   color: nullableText(candidate.attrs.color),
   imageUrl: resolveAssetUrl(candidate.matched_sku_image.image_url),
   kind: toKind(candidate.category, candidate.sub_category),
@@ -319,8 +335,8 @@ export const updateSceneObjects = async (
         objects: objects.map((object) => {
           const [ymin, xmin, ymax, xmax] = object.bbox;
           return {
-            bbox: { xmax, xmin, ymax, ymin },
-            label: object.category ?? object.name,
+            bbox_coord: { xmax, xmin, ymax, ymin },
+            category: object.category ?? object.name,
           };
         }),
       }),
@@ -347,8 +363,10 @@ export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
 };
 
 type TaggingReviewMatch = {
+  object: FurnitureObject;
   objectIdx: number;
   selectedSku: SkuCandidate;
+  values?: TaggingValues;
 };
 
 type SaveTaggingReviewInput = {
@@ -365,6 +383,7 @@ export const saveTaggingReview = async (
     matching.length === 0 ||
     matching.some(
       ({ selectedSku }) =>
+        !selectedSku.skuId ||
         selectedSku.matchRank === null ||
         selectedSku.score === null ||
         selectedSku.vlmMood === null ||
@@ -375,20 +394,48 @@ export const saveTaggingReview = async (
   }
 
   await requestJson<ApiSuccessResponse<{ result_ids: number[] }>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}/results`,
     {
       body: JSON.stringify({
-        matching: matching.map(({ objectIdx, selectedSku }) => ({
-          match_rank: selectedSku.matchRank,
-          object_idx: objectIdx,
-          similarity_score: selectedSku.score,
-          sku_code: selectedSku.sku,
-          vlm_mood: selectedSku.vlmMood,
-          xai_result: selectedSku.xaiResult,
-        })),
+        tagging_results: matching.map(
+          ({ object, objectIdx, selectedSku, values }) => {
+            const [ymin, xmin, ymax, xmax] = object.bbox;
+            const styleTags = reviewedTags(values?.styleTags);
+            return {
+              match_rank: selectedSku.matchRank,
+              object_idx: objectIdx,
+              object_metadata: {
+                attrs: {
+                  color: reviewedText(values?.color, selectedSku.color),
+                  material: reviewedText(
+                    values?.material,
+                    selectedSku.material,
+                  ),
+                  style: reviewedText(styleTags?.[0], selectedSku.style),
+                },
+                bbox_coord: { xmax, xmin, ymax, ymin },
+                category: reviewedText(values?.category, selectedSku.category),
+                object_idx: objectIdx,
+                sub_category: selectedSku.subCategory ?? '',
+              },
+              similarity_score: Math.round(selectedSku.score ?? 0),
+              sku_id: selectedSku.skuId,
+              vlm_mood: {
+                summary: reviewedText(
+                  values?.mood,
+                  selectedSku.vlmMood?.summary,
+                ),
+                tags: styleTags?.length
+                  ? styleTags
+                  : (selectedSku.vlmMood?.tags ?? []),
+              },
+              xai_result: selectedSku.xaiResult,
+            };
+          },
+        ),
       }),
       headers: { 'Content-Type': 'application/json' },
-      method: 'PUT',
+      method: 'POST',
     },
   );
 };

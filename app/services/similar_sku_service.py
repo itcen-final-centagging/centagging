@@ -178,6 +178,7 @@ class SimilarSkuService:
             XAI 결과가 비어 있는 SKU 후보입니다.
         """
         return SkuCandidate(
+            sku_id=sku.sku_id,
             sku_code=sku.sku_code,
             product_name=sku.product_name,
             category=sku.category or "",

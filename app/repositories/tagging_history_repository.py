@@ -3,6 +3,7 @@
 import sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
+from app.models.tagging_result import TaggingResult
 from app.schemas import history as history_schema
 from app.services import sku_image_storage
 
@@ -162,3 +163,22 @@ async def get_tagging_history_detail(
             "xai_result": row["xai_result"],
         }
     )
+
+
+async def add_tagging_results(
+    session: sqlalchemy_async.AsyncSession,
+    tagging_results: list[TaggingResult],
+) -> list[int]:
+    """태깅 결과 엔티티를 세션에 추가하고 ID를 반환합니다.
+
+    Args:
+        session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
+        tagging_results: 저장할 태깅 결과 엔티티 목록입니다.
+
+    Returns:
+        저장된 태깅 결과의 result_id 목록입니다.
+    """
+    session.add_all(tagging_results)
+    await session.flush()
+
+    return [r.result_id for r in tagging_results]
