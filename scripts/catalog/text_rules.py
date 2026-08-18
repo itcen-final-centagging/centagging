@@ -35,6 +35,7 @@ COLOR_KEYWORDS: dict[str, tuple[str, ...]] = {
     "오렌지": ("오렌지", "코랄"),
 }
 
+
 def normalize_color(text: str | None) -> str | None:
     """텍스트에서 허용 색상 1개를 뽑는다.
 
@@ -169,6 +170,7 @@ MATERIAL_ALIAS = {
     "가공목(MDF 외)": ["가공목"],
     "철제/스틸": ["스틸", "철제"],
 }
+
 
 def _fit_material(canonical: str, allowed: list[str]) -> str | None:
     """정규 소재명을 해당 카테고리의 허용값 표기로 맞춘다."""

@@ -8,7 +8,7 @@
 3. 정의된 허용값 외의 값은 사용하지 않는다.
 4. 원본 데이터에서 확인할 수 없는 속성은 추측하지 않고 None을 사용한다.
 5. 존재 여부를 나타내는 속성은 bool을 사용하지 않고
-   "있음" / "없음" / "모름" 중 하나를 사용한다.
+   "있음" / "없음" 중 하나를 사용한다.
 6. 모든 카테고리는 공통 속성 + 카테고리별 속성을 사용한다.
 """
 
@@ -18,7 +18,6 @@ from typing import Any
 
 # ---------------------------------------------------------------------------
 # COLOR
-# ---------------------------------------------------------------------------
 # 색상 허용값과 참고용 HEX
 
 COLOR: dict[str, str] = {
@@ -36,6 +35,25 @@ COLOR: dict[str, str] = {
     "퍼플": "#800080",
     "그린": "#008000",
     "오렌지": "#FFA500",
+}
+
+# attributes.color 값(한국어)은 그대로 두고, 이미지 파일명 등 영문 표기가
+# 필요한 곳에서만 참조하는 보조 매핑이다.
+COLOR_EN: dict[str, str] = {
+    "블랙": "BLACK",
+    "화이트": "WHITE",
+    "베이지": "BEIGE",
+    "네이비": "NAVY",
+    "카키": "KHAKI",
+    "그레이": "GRAY",
+    "브라운": "BROWN",
+    "레드": "RED",
+    "옐로우": "YELLOW",
+    "블루": "BLUE",
+    "핑크": "PINK",
+    "퍼플": "PURPLE",
+    "그린": "GREEN",
+    "오렌지": "ORANGE",
 }
 
 # ---------------------------------------------------------------------------
@@ -214,7 +232,6 @@ _LEVELS = [
 _EXISTENCE = [
     "있음",
     "없음",
-    "모름",
 ]
 
 # ---------------------------------------------------------------------------
@@ -223,7 +240,7 @@ _EXISTENCE = [
 # 카테고리별 속성
 #
 # 모든 존재 여부 속성은:
-#     "있음" / "없음" / "모름"
+#     "있음" / "없음"
 #
 # 원본에서 확인할 수 없으면:
 #     None
@@ -542,13 +559,14 @@ PRODUCT_ATTRIBUTE: dict[str, dict[str, list[Any]]] = {
 # CATEGORY_MAP
 # ---------------------------------------------------------------------------
 # 오늘의집 원문 category_path[1] -> 프로젝트 대분류
+# 오늘의집의 카테고리 체계를 우리 프로젝트의 카테고리 체계로 변환해서, 이후 SKU 생성·메타데이터 추출에서 일관되게 사용하기 위한 매핑표
 
 CATEGORY_MAP: dict[str, str] = {
     "소파": "소파",
     "의자": "의자",
     "테이블·식탁·책상": "테이블·식탁·책상",
     "침대": "침대",
-    "매트리스·토퍼": "매트리스",
+    "매트리스·토퍼": "매트리스",  # here
     "매트리스": "매트리스",
     "서랍·수납장": "서랍·수납장",
     "거실장·TV장": "거실장·TV장",
@@ -585,6 +603,7 @@ CATEGORY_CODE: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
+# 카테고리가 정의되어 있으면 공통 속성과 카테고리별 전용 속성명을 합쳐 반환하고, 없으면 오류를 발생시킨다.
 def attribute_names(category: str) -> list[str]:
     """해당 대분류에서 사용하는 전체 속성명을 반환한다.
 
@@ -598,6 +617,7 @@ def attribute_names(category: str) -> list[str]:
     )
 
 
+# 해당 카테고리의 특정 속성(attribute)에서 사용할 수 있는 허용값을 반환한다.
 def allowed_values(
     category: str,
     attribute: str,
@@ -605,16 +625,17 @@ def allowed_values(
     """해당 대분류와 속성에서 허용되는 값을 반환한다."""
     if category not in PRODUCT_ATTRIBUTE:
         raise KeyError(f"정의되지 않은 대분류입니다: {category}")
-
+    # 공통 속성에서
     if attribute in COMMON_ATTRIBUTE:
         return COMMON_ATTRIBUTE[attribute]
-
+    # 특정 카테고리의 속성(attribute)에서
     if attribute in PRODUCT_ATTRIBUTE[category]:
         return PRODUCT_ATTRIBUTE[category][attribute]
 
     raise KeyError(f"'{category}'에서 정의되지 않은 속성입니다: {attribute}")
 
 
+# 메타데이터의 key와 각 속성값이 카테고리별 정의된 규칙과 허용값에 맞는지 검증한다.
 def validate_attrs(
     category: str,
     attrs: dict[str, Any],
