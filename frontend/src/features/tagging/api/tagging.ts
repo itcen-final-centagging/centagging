@@ -361,7 +361,7 @@ export const saveTaggingReview = async (
     matching.length === 0 ||
     matching.some(
       ({ selectedSku }) =>
-        selectedSku.skuId === null ||
+        !selectedSku.skuId ||
         selectedSku.matchRank === null ||
         selectedSku.score === null ||
         selectedSku.vlmMood === null ||
