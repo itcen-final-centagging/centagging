@@ -1,6 +1,7 @@
 """AI 분석 작업 생성과 단건 조회를 담당하는 Repository입니다."""
 
 import collections.abc
+import datetime
 import json
 import uuid
 
@@ -66,6 +67,25 @@ _MARK_JOB_FAILED = sqlalchemy.text("""
         updated_at = now()
     WHERE job_id = :job_id
       AND status = 'RUNNING'
+    RETURNING job_id
+""")
+_RECOVER_STALE_JOBS = sqlalchemy.text("""
+    UPDATE ai_job
+    SET status = CASE
+            WHEN attempt_count < max_attempts THEN 'PENDING'
+            ELSE 'FAILED'
+        END,
+        error_code = 'WORKER_LEASE_EXPIRED',
+        error_message = 'Worker lease expired before job completion.',
+        worker_id = NULL,
+        locked_at = NULL,
+        finished_at = CASE
+            WHEN attempt_count < max_attempts THEN NULL
+            ELSE now()
+        END,
+        updated_at = now()
+    WHERE status = 'RUNNING'
+      AND (locked_at IS NULL OR locked_at < :stale_before)
     RETURNING job_id
 """)
 
@@ -262,3 +282,35 @@ async def mark_job_failed(
             "error_message": error_message,
         },
     )
+
+
+async def recover_stale_jobs(
+    session: AsyncSession,
+    stale_before: datetime.datetime,
+) -> int:
+    """Worker 임대 시간이 만료된 RUNNING 작업을 복구합니다.
+
+    실행 횟수가 남은 작업은 다시 ``PENDING``으로 보내고, 최대 실행 횟수에
+    도달한 작업은 ``FAILED``로 종료합니다. ``locked_at``이 없는 비정상
+    RUNNING 작업도 복구 대상에 포함합니다.
+
+    Args:
+        session: Worker 범위의 비동기 SQLAlchemy 세션입니다.
+        stale_before: 이 시각보다 먼저 선점된 작업을 복구하는 UTC 기준입니다.
+
+    Returns:
+        재대기 또는 최종 실패로 전환한 작업 수입니다.
+
+    Raises:
+        ValueError: 시간대 정보가 없는 기준 시각이 전달된 경우입니다.
+    """
+    if stale_before.tzinfo is None or stale_before.utcoffset() is None:
+        raise ValueError("stale_before must be timezone-aware")
+
+    result = await session.execute(
+        _RECOVER_STALE_JOBS,
+        {"stale_before": stale_before},
+    )
+    recovered_count = len(result.all())
+    await session.commit()
+    return recovered_count

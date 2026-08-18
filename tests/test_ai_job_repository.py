@@ -1,5 +1,6 @@
 """AI 작업 생성·조회 Repository의 상태 저장 규격을 검증합니다."""
 
+import datetime
 import json
 import typing
 import unittest
@@ -30,12 +31,21 @@ class _DatabaseError(Exception):
 class _FakeResult:  # pylint: disable=too-few-public-methods
     """Raw SQL의 선택적 UUID 반환 결과를 표현합니다."""
 
-    def __init__(self, job_id: uuid.UUID | None) -> None:
+    def __init__(
+        self,
+        job_id: uuid.UUID | None = None,
+        job_ids: list[uuid.UUID] | None = None,
+    ) -> None:
         self.job_id = job_id
+        self.job_ids = list(job_ids or [])
 
     def scalar_one_or_none(self) -> uuid.UUID | None:
         """변경된 작업 UUID 또는 대기 작업 없음 상태를 반환합니다."""
         return self.job_id
+
+    def all(self) -> list[tuple[uuid.UUID]]:
+        """복구된 모든 작업 UUID 행을 반환합니다."""
+        return [(job_id,) for job_id in self.job_ids]
 
 
 class _FakeSession:  # pylint: disable=too-many-instance-attributes
@@ -46,10 +56,12 @@ class _FakeSession:  # pylint: disable=too-many-instance-attributes
         stored_job: AiJob | None = None,
         commit_error: sqlalchemy.exc.IntegrityError | None = None,
         execute_job_ids: list[uuid.UUID | None] | None = None,
+        execute_job_batches: list[list[uuid.UUID]] | None = None,
     ) -> None:
         self.stored_job = stored_job
         self.commit_error = commit_error
         self.execute_job_ids = list(execute_job_ids or [])
+        self.execute_job_batches = list(execute_job_batches or [])
         self.added_job: AiJob | None = None
         self.statements: list[object] = []
         self.parameters: list[dict[str, object]] = []
@@ -80,6 +92,8 @@ class _FakeSession:  # pylint: disable=too-many-instance-attributes
         """실행된 상태 변경 SQL과 파라미터를 기록합니다."""
         self.statements.append(statement)
         self.parameters.append(parameters)
+        if self.execute_job_batches:
+            return _FakeResult(job_ids=self.execute_job_batches.pop(0))
         if not self.execute_job_ids:
             return _FakeResult(None)
         return _FakeResult(self.execute_job_ids.pop(0))
@@ -337,6 +351,67 @@ class CompleteAiJobTest(unittest.IsolatedAsyncioTestCase):
                 error_code="UNKNOWN",
                 error_message="failed",
             )
+
+
+class RecoverStaleAiJobTest(unittest.IsolatedAsyncioTestCase):
+    """중단된 Worker의 RUNNING 작업 복구 규칙을 검증합니다."""
+
+    async def test_recovers_expired_jobs_for_retry_or_final_failure(
+        self,
+    ) -> None:
+        """임대 만료 작업을 실행 횟수에 따라 재대기 또는 종료합니다."""
+        stale_before = datetime.datetime(
+            2026,
+            8,
+            18,
+            12,
+            0,
+            tzinfo=datetime.timezone.utc,
+        )
+        fake_session = _FakeSession(
+            execute_job_batches=[[uuid.uuid4(), uuid.uuid4()]]
+        )
+
+        recovered_count = await ai_job_repository.recover_stale_jobs(
+            _session(fake_session), stale_before
+        )
+
+        self.assertEqual(recovered_count, 2)
+        recovery_sql = str(fake_session.statements[0])
+        self.assertIn("status = 'RUNNING'", recovery_sql)
+        self.assertIn("locked_at IS NULL", recovery_sql)
+        self.assertIn("locked_at < :stale_before", recovery_sql)
+        self.assertIn("THEN 'PENDING'", recovery_sql)
+        self.assertIn("ELSE 'FAILED'", recovery_sql)
+        self.assertIn("WORKER_LEASE_EXPIRED", recovery_sql)
+        self.assertEqual(
+            fake_session.parameters[0]["stale_before"], stale_before
+        )
+        self.assertEqual(fake_session.commit_count, 1)
+
+    async def test_returns_zero_when_no_stale_job_exists(self) -> None:
+        """복구 대상이 없어도 트랜잭션을 종료하고 0을 반환합니다."""
+        fake_session = _FakeSession(execute_job_batches=[[]])
+
+        recovered_count = await ai_job_repository.recover_stale_jobs(
+            _session(fake_session),
+            datetime.datetime.now(datetime.timezone.utc),
+        )
+
+        self.assertEqual(recovered_count, 0)
+        self.assertEqual(fake_session.commit_count, 1)
+
+    async def test_rejects_timezone_naive_cutoff_without_query(self) -> None:
+        """시간대 없는 기준 시각은 DB 조회 전에 거부합니다."""
+        fake_session = _FakeSession()
+
+        with self.assertRaisesRegex(ValueError, "timezone-aware"):
+            await ai_job_repository.recover_stale_jobs(
+                _session(fake_session),
+                datetime.datetime(2026, 8, 18, 12, 0),
+            )
+
+        self.assertEqual(fake_session.statements, [])
 
 
 if __name__ == "__main__":
