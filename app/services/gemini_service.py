@@ -265,3 +265,46 @@ class GeminiService:
             raise GeminiEmbeddingError(
                 f"Gemini 이미지 임베딩에 실패했습니다: {error}"
             ) from error
+
+    def embed_text(self, text: str) -> list[float]:
+        """텍스트를 임베딩하여 벡터 값을 반환합니다.
+
+        Args:
+            text: 임베딩할 텍스트입니다.
+
+        Returns:
+            임베딩 벡터(float 리스트)입니다.
+
+        Raises:
+            GeminiConfigurationError: Gemini API 키가 설정되지 않은 경우입니다.
+            GeminiEmbeddingError: 텍스트 임베딩에 실패한 경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "Google Gen AI 인증 설정이 누락되었습니다."
+            )
+
+        try:
+            client = genai_client.create_client(self._settings)
+
+            response = client.models.embed_content(
+                model=self._settings.gemini_embedding_model,
+                contents=text,
+            )
+
+            embeddings = response.embeddings
+            if not embeddings or not embeddings[0].values:
+                raise GeminiEmbeddingError(
+                    "Gemini 텍스트 임베딩 응답이 비어 있습니다."
+                )
+
+            return embeddings[0].values
+        except GeminiEmbeddingError:
+            raise
+        except Exception as error:
+            logging.getLogger(__name__).exception(
+                "Gemini 텍스트 임베딩 실패"
+            )
+            raise GeminiEmbeddingError(
+                f"Gemini 텍스트 임베딩에 실패했습니다: {error}"
+            ) from error
