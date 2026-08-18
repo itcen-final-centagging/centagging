@@ -10,6 +10,14 @@ AiJobType = typing.Literal["DETECT_SCENE", "RECOMMEND_SKU"]
 AiJobStatus = typing.Literal["PENDING", "RUNNING", "SUCCEEDED", "FAILED"]
 
 
+class AiJobAcceptedResponse(pydantic.BaseModel):
+    """비동기 AI 분석 요청의 접수 결과입니다."""
+
+    scene_image_id: int
+    job_id: uuid.UUID
+    status: typing.Literal["PENDING"] = "PENDING"
+
+
 class AiJobResponse(pydantic.BaseModel):
     """프론트엔드 폴링에 필요한 AI 작업의 공개 상태입니다."""
 
