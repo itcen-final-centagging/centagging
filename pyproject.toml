@@ -14,6 +14,10 @@ py-version = "3.10"
 [tool.pylint.format]
 max-line-length = 80
 
+[tool.pylint.similarities]
+# 짧은 선언부는 제외하고 16줄 이상의 구현 중복만 검사합니다.
+min-similarity-lines = 16
+
 [tool.mypy]
 python_version = "3.10"
 files = ["app"]

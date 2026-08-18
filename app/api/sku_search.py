@@ -66,7 +66,10 @@ async def search_skus(
                 "message": "검색 기능이 아직 설정되지 않았습니다.",
             },
         ) from error
-    except (GeminiEmbeddingError, sku_search_service.SkuSearchQueryError) as error:
+    except (
+        GeminiEmbeddingError,
+        sku_search_service.SkuSearchQueryError,
+    ) as error:
         raise fastapi.HTTPException(
             status_code=502,
             detail={

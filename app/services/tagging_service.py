@@ -16,7 +16,8 @@ from app.services.xai_scoring_service import XaiScoringService
 DETECTED_STATUS = "DETECTED"
 
 
-class TaggingService:
+# 단일 태깅 유스케이스를 제공하는 오케스트레이터입니다.
+class TaggingService:  # pylint: disable=too-few-public-methods
     """crop → 유사 SKU 탐색 → XAI 순으로 태깅 응답을 만드는 서비스입니다."""
 
     def __init__(
@@ -42,6 +43,7 @@ class TaggingService:
     async def get_sku_candidates(
         self,
         scene_image_id: int,
+        object_idxs: list[int] | None = None,
     ) -> DetectionResult:
         """장면 이미지 1건의 유사 SKU 추천 결과를 만듭니다.
 
@@ -50,6 +52,8 @@ class TaggingService:
 
         Args:
             scene_image_id: 조회할 장면 이미지 ID입니다.
+            object_idxs: 조회할 탐지 객체 인덱스 목록입니다. None이면
+                전체 객체를 조회합니다.
 
         Returns:
             탐지 객체별 SKU 후보와 XAI 판정이 담긴 결과입니다.
@@ -71,6 +75,11 @@ class TaggingService:
             self._resolve_image_path(scene),
             list(scene.object_metadata),
         )
+        if object_idxs is not None:
+            requested_idxs = set(object_idxs)
+            crops = [
+                crop for crop in crops if crop.crop_index in requested_idxs
+            ]
 
         # 2) 임베딩 및 유사 SKU 탐색
         result.objects = await self.similar_sku_service.build_detected_objects(

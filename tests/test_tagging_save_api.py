@@ -52,7 +52,7 @@ class TaggingSaveApiTest(unittest.TestCase):
             json={
                 "matching": [
                     {
-                        "object_index": 0,
+                        "object_idx": 0,
                         "sku_code": "MISSING-SKU",
                         "match_rank": 1,
                         "similarity_score": 80,
@@ -80,9 +80,9 @@ class TaggingSaveApiTest(unittest.TestCase):
             response.headers["X-Request-ID"],
         )
 
-    def test_returns_validation_error_for_duplicate_object_index(self) -> None:
+    def test_returns_validation_error_for_duplicate_object_idx(self) -> None:
         """요청 내부 객체 인덱스 중복은 입력값 오류로 구분합니다."""
-        self.service_error = sku_match_service.DuplicateObjectIndexError([0])
+        self.service_error = sku_match_service.DuplicateObjectIdxError([0])
 
         response = self._save_matching()
 
@@ -103,7 +103,7 @@ class TaggingSaveApiTest(unittest.TestCase):
 
     def test_returns_validation_error_for_out_of_range_object(self) -> None:
         """장면에 없는 객체 인덱스는 입력값 오류로 구분합니다."""
-        self.service_error = sku_match_service.ObjectIndexOutOfRangeError([9])
+        self.service_error = sku_match_service.ObjectIdxOutOfRangeError([9])
 
         response = self._save_matching()
 

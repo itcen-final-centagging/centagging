@@ -11,7 +11,9 @@ class LoginRequest(pydantic.BaseModel):
     """고정 계정 로그인 요청입니다."""
 
     model_config = pydantic.ConfigDict(
-        json_schema_extra={"examples": [{"login_id": "user", "password": "1234"}]}
+        json_schema_extra={
+            "examples": [{"login_id": "user", "password": "1234"}]
+        }
     )
 
     login_id: str = pydantic.Field(
@@ -43,7 +45,9 @@ class UserResponse(pydantic.BaseModel):
 
     user_id: int = pydantic.Field(description="사용자 고유 번호입니다.")
     login_id: str = pydantic.Field(description="사용자 로그인 아이디입니다.")
-    user_name: str = pydantic.Field(description="화면에 표시할 사용자 이름입니다.")
+    user_name: str = pydantic.Field(
+        description="화면에 표시할 사용자 이름입니다."
+    )
     role: UserRole = pydantic.Field(
         description="사용자 권한입니다. USER, ADMIN, SUPER_ADMIN 중 하나입니다."
     )

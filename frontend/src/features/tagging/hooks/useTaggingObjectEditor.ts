@@ -137,7 +137,7 @@ export const useTaggingObjectEditor = ({
         subCategory: null,
       },
       name: category,
-      objectIndex: detectedObjects.length,
+      objectIdx: detectedObjects.length,
     };
     setDetectedObjects((objects) => [...objects, object]);
     setSelectedObject(object);

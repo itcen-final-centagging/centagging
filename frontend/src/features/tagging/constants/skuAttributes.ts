@@ -55,7 +55,13 @@ export const ATTRIBUTE_LABELS: Record<string, string> = {
 };
 
 export const CATEGORY_ATTRIBUTE_FIELDS: Record<string, string[]> = {
-  '거실장·TV장': ['tv_stand_type', 'length', 'material', 'level_count', 'has_legs'],
+  '거실장·TV장': [
+    'tv_stand_type',
+    'length',
+    'material',
+    'level_count',
+    'has_legs',
+  ],
   거울: ['installation_type', 'shape', 'has_frame'],
   '서랍·수납장': [
     'storage_type',
@@ -77,7 +83,7 @@ export const CATEGORY_ATTRIBUTE_FIELDS: Record<string, string[]> = {
   ],
   의자: ['chair_type', 'material', 'has_wheels', 'has_backrest', 'has_armrest'],
   '진열장·책장': ['storage_type', 'material', 'frame_material', 'door_type'],
-  '침대': [
+  침대: [
     'bed_type',
     'size',
     'has_headboard',

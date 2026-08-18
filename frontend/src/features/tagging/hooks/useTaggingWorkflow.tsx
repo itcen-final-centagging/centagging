@@ -248,16 +248,16 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         return;
       }
       // 삭제·추가 이후 서버의 object_metadata 배열 순서와 인덱스를 맞춥니다.
-      const finalObjects = detectedObjects.map((object, objectIndex) => ({
+      const finalObjects = detectedObjects.map((object, objectIdx) => ({
         ...object,
-        objectIndex,
+        objectIdx,
       }));
       await updateSceneObjects(analysisId, finalObjects);
-      const candidatesByObjectIndex =
+      const candidatesByObjectIdx =
         await fetchObjectRecommendations(analysisId);
       const objectsWithCandidates = finalObjects.map((object) => ({
         ...object,
-        candidates: candidatesByObjectIndex.get(object.objectIndex) ?? [],
+        candidates: candidatesByObjectIdx.get(object.objectIdx) ?? [],
       }));
       if (
         objectsWithCandidates.every((object) => object.candidates.length === 0)
@@ -377,7 +377,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       await saveTaggingReview({
         matching: confirmedSelections.map(({ object, sku }) => ({
           object,
-          objectIndex: object.objectIndex,
+          objectIdx: object.objectIdx,
           selectedSku: sku,
           values: valuesByObject?.[object.id],
         })),

@@ -54,7 +54,9 @@ def configure_common_response_openapi(application: fastapi.FastAPI) -> None:
     def custom_openapi() -> dict[str, typing.Any]:
         """공통 오류 계약을 반영한 OpenAPI 스키마를 생성합니다."""
         if application.openapi_schema is not None:
-            return typing.cast(dict[str, typing.Any], application.openapi_schema)
+            return typing.cast(
+                dict[str, typing.Any], application.openapi_schema
+            )
 
         openapi_schema = typing.cast(
             dict[str, typing.Any],

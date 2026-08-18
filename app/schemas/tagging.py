@@ -33,6 +33,7 @@ class XaiResult(BaseModel):
 
     summary: str
     criteria: list[XaiCriterion] = Field(default_factory=list)
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
 class SkuCandidate(BaseModel):
@@ -83,8 +84,8 @@ class BoundingBox(BaseModel):
 class EditedSceneObject(BaseModel):
     """사용자가 편집 완료한 탐지 객체입니다."""
 
-    label: str = Field(min_length=1, max_length=100)
-    bbox: BoundingBox
+    category: str = Field(min_length=1, max_length=100)
+    bbox_coord: BoundingBox
 
 
 class SceneObjectUpdateRequest(BaseModel):
@@ -101,11 +102,11 @@ class SceneObjectUpdateResult(BaseModel):
 
 
 class DetectedObject(BaseModel):
-    """탐지된 가구 객체 1건과 해당 SKU 후보 목록입니다."""
+    """탐지된 가구 객체의 속성과 SKU 후보 목록입니다."""
 
-    object_index: int
+    object_idx: int
     label: str = ""
-    bbox: BoundingBox
+    bbox_coord: BoundingBox
     confidence: int = Field(default=0, ge=0, le=100)
     attrs: dict[str, str] = Field(default_factory=dict)
     sku_candidates: list[SkuCandidate]
@@ -118,21 +119,21 @@ class DetectionResult(BaseModel):
     scene_image: SceneImageInfo
     objects: list[DetectedObject]
 
-
 class ObjectAttributes(BaseModel):
     """탐지 객체 속성입니다."""
-
+    
     color: str
     material: str
     style: str
 
 
+
 class ObjectMetadata(BaseModel):
     """확정 시점의 탐지 객체 속성입니다."""
 
-    object_index: int
+    object_idx: int
     category: str
-    sub_category: str
+    sub_category: str | None
     bbox_coord: BoundingBox
     attrs: ObjectAttributes
 
@@ -147,7 +148,7 @@ class SkuMatching(BaseModel):
      DB의 ck_result_source 조건과 같은 규칙을 따릅니다.
     """
 
-    object_index: int = Field(ge=0)
+    object_idx: int = Field(ge=0)
     sku_id: int = Field(ge=1)
     sku_image_id: int | None = None
     match_source: typing.Literal["RECOMMEND", "SEARCH"]

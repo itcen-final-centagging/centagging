@@ -182,6 +182,7 @@ class ProductImageSubmissionService:
         session: sqlalchemy_async.AsyncSession,
         settings: config.Settings,
     ) -> None:
+        """Initialize the product image submission service."""
         self.session = session
         self.settings = settings
 

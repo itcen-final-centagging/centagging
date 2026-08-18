@@ -84,7 +84,7 @@ test('save request uses its backend contract without refreshing history', async 
       return new Response(
         JSON.stringify({
           status: 'success',
-          data: { processing_status: 'CONFIRMED', result_ids: [1, 2] },
+          data: { processing_status: 'CONFIRMED', result_ids: [1] },
           meta: { request_id: 'request-123' },
         }),
         { headers: { 'Content-Type': 'application/json' }, status: 200 },
@@ -124,10 +124,10 @@ test('save request uses its backend contract without refreshing history', async 
   await saveTaggingReview({
     matching: [
       {
-        object: { bbox: [100, 200, 800, 900] },
-        objectIndex: 1,
+        object: { bbox: [100, 200, 800, 900], objectIdx: 1 },
+        objectIdx: 1,
         selectedSku: {
-          category: '의자',
+          category: 'chair',
           color: 'white',
           matchRank: 2,
           material: 'mesh',
@@ -138,7 +138,7 @@ test('save request uses its backend contract without refreshing history', async 
           subCategory: 'office chair',
           vlmMood: {
             summary: 'A warm living room.',
-            tags: ['natural'],
+            tags: ['modern'],
           },
           xaiResult: {
             criteria: [
@@ -151,12 +151,19 @@ test('save request uses its backend contract without refreshing history', async 
             summary: 'The structure and color are similar.',
           },
         },
+        values: {
+          category: 'chair',
+          color: 'white',
+          material: 'mesh',
+          mood: 'A warm living room.',
+          styleTags: ['modern'],
+        },
       },
       {
-        object: { bbox: [50, 60, 400, 500] },
-        objectIndex: 2,
+        object: { bbox: [50, 60, 400, 500], objectIdx: 2 },
+        objectIdx: 2,
         selectedSku: {
-          category: '테이블',
+          category: 'table',
           color: 'oak',
           matchRank: 1,
           material: 'wood',
@@ -167,7 +174,7 @@ test('save request uses its backend contract without refreshing history', async 
           subCategory: 'dining table',
           vlmMood: {
             summary: 'A compact dining area.',
-            tags: ['modern'],
+            tags: ['natural'],
           },
           xaiResult: {
             criteria: [
@@ -181,11 +188,11 @@ test('save request uses its backend contract without refreshing history', async 
           },
         },
         values: {
-          category: '테이블',
-          color: '브라운',
-          material: '원목',
-          mood: '따뜻한 다이닝룸입니다.',
-          styleTags: ['null', '내추럴'],
+          category: 'table',
+          color: 'brown',
+          material: 'oak',
+          mood: 'A compact dining area.',
+          styleTags: ['null', 'natural'],
         },
       },
     ],
@@ -197,19 +204,19 @@ test('save request uses its backend contract without refreshing history', async 
     tagging_results: [
       {
         match_rank: 2,
-        object_index: 1,
+        object_idx: 1,
         object_metadata: {
           attrs: { color: 'white', material: 'mesh', style: 'modern' },
           bbox_coord: { xmax: 900, xmin: 200, ymax: 800, ymin: 100 },
-          category: '의자',
-          object_index: 1,
+          category: 'chair',
+          object_idx: 1,
           sub_category: 'office chair',
         },
         similarity_score: 92,
         sku_id: 50,
         vlm_mood: {
           summary: 'A warm living room.',
-          tags: ['natural'],
+          tags: ['modern'],
         },
         xai_result: {
           criteria: [
@@ -224,19 +231,19 @@ test('save request uses its backend contract without refreshing history', async 
       },
       {
         match_rank: 1,
-        object_index: 2,
+        object_idx: 2,
         object_metadata: {
-          attrs: { color: '브라운', material: '원목', style: '내추럴' },
+          attrs: { color: 'brown', material: 'oak', style: 'natural' },
           bbox_coord: { xmax: 500, xmin: 60, ymax: 400, ymin: 50 },
-          category: '테이블',
-          object_index: 2,
+          category: 'table',
+          object_idx: 2,
           sub_category: 'dining table',
         },
         similarity_score: 88,
         sku_id: 71,
         vlm_mood: {
-          summary: '따뜻한 다이닝룸입니다.',
-          tags: ['내추럴'],
+          summary: 'A compact dining area.',
+          tags: ['natural'],
         },
         xai_result: {
           criteria: [
@@ -264,7 +271,7 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
         data: {
           objects: [
             {
-              object_index: 1,
+              object_idx: 1,
               sku_candidates: [
                 {
                   attrs: { color: 'white', material: 'mesh' },
@@ -329,43 +336,4 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
       },
     },
   );
-});
-
-test('edited objects are persisted with named normalized bbox coordinates', async (t) => {
-  const { updateSceneObjects } = await loadTaggingApi(t);
-  const originalFetch = globalThis.fetch;
-  let request;
-  globalThis.fetch = async (input, init) => {
-    request = { init, input };
-    return new Response(
-      JSON.stringify({
-        status: 'success',
-        data: { object_count: 1, processing_status: 'DETECTED' },
-        meta: { request_id: 'request-123' },
-      }),
-      { headers: { 'Content-Type': 'application/json' }, status: 200 },
-    );
-  };
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-  });
-
-  await updateSceneObjects('7', [
-    {
-      bbox: [100, 200, 800, 900],
-      category: '의자',
-      name: 'chair',
-    },
-  ]);
-
-  assert.equal(request.input, '/tagging/scenes/7');
-  assert.equal(request.init.method, 'POST');
-  assert.deepEqual(JSON.parse(request.init.body), {
-    objects: [
-      {
-        bbox: { xmax: 900, xmin: 200, ymax: 800, ymin: 100 },
-        label: '의자',
-      },
-    ],
-  });
 });

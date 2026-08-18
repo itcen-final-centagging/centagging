@@ -83,7 +83,8 @@ _LOGIN_UNAUTHORIZED_RESPONSE = {
 _SESSION_UNAUTHORIZED_RESPONSE = {
     "model": common_schema.ErrorResponse,
     "description": (
-        "Bearer 세션이 없거나 형식이 잘못되었거나 " "DB 값과 일치하지 않은 경우입니다."
+        "Bearer 세션이 없거나 형식이 잘못되었거나 "
+        "DB 값과 일치하지 않은 경우입니다."
     ),
     "content": {
         "application/json": {
@@ -148,10 +149,14 @@ def _get_bearer_session(authorization: str | None) -> str:
         fastapi.HTTPException: Bearer 세션이 없거나 형식이 잘못된 경우입니다.
     """
     if authorization is None:
-        raise fastapi.HTTPException(status_code=401, detail=_UNAUTHORIZED_DETAIL)
+        raise fastapi.HTTPException(
+            status_code=401, detail=_UNAUTHORIZED_DETAIL
+        )
     scheme, _, session = authorization.partition(" ")
     if scheme.lower() != "bearer" or not session:
-        raise fastapi.HTTPException(status_code=401, detail=_UNAUTHORIZED_DETAIL)
+        raise fastapi.HTTPException(
+            status_code=401, detail=_UNAUTHORIZED_DETAIL
+        )
     return session
 
 
@@ -181,7 +186,9 @@ async def login(
         _SELECT_LOGIN_USER,
         {
             "login_id": request.login_id,
-            "password_hash": _hash_password(request.password.get_secret_value()),
+            "password_hash": _hash_password(
+                request.password.get_secret_value()
+            ),
         },
     )
     user = result.mappings().one_or_none()
@@ -208,7 +215,9 @@ async def login(
 async def get_current_user(
     authorization: str | None = fastapi.Header(
         default=None,
-        description=("로그인 응답의 session을 `Bearer {session}` 형식으로 전달합니다."),
+        description=(
+            "로그인 응답의 session을 `Bearer {session}` 형식으로 전달합니다."
+        ),
         openapi_examples={
             "user_session": {
                 "summary": "일반 사용자 세션",
@@ -228,5 +237,7 @@ async def get_current_user(
     )
     user = result.mappings().one_or_none()
     if user is None:
-        raise fastapi.HTTPException(status_code=401, detail=_UNAUTHORIZED_DETAIL)
+        raise fastapi.HTTPException(
+            status_code=401, detail=_UNAUTHORIZED_DETAIL
+        )
     return common_schema.success_response(_to_user_response(user))

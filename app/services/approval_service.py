@@ -36,11 +36,11 @@ _SELECT_LIST = sqlalchemy.text("""
            a.requested_at,
            a.reviewed_at,
            a.scene_image_id,
-           a.object_index,
+           a.object_idx,
            si.origin_name,
            ru.user_name AS requested_by_name,
            vu.user_name AS reviewed_by_name,
-           si.object_metadata -> tr.object_index -> 'attribute' ->> 'label'
+           si.object_metadata -> tr.object_idx ->> 'category'
                AS category,
            sc.sku_code,
            sc.product_name,
@@ -62,12 +62,12 @@ _SELECT_DETAIL = sqlalchemy.text("""
            a.reviewed_at,
            a.reject_reason,
            a.scene_image_id,
-           a.object_index,
+           a.object_idx,
            ru.user_name AS requested_by_name,
            vu.user_name AS reviewed_by_name,
            si.image_url AS scene_image_url,
            si.origin_name,
-           si.object_metadata -> tr.object_index AS object_metadata,
+           si.object_metadata -> tr.object_idx AS object_metadata,
            tr.similarity_score,
            tr.xai_result,
            sc.sku_id,
@@ -89,7 +89,7 @@ _SELECT_FOR_UPDATE = sqlalchemy.text("""
            a.status,
            a.tagging_result_id,
            si.image_url AS scene_image_url,
-           si.object_metadata -> tr.object_index AS object_metadata,
+           si.object_metadata -> tr.object_idx AS object_metadata,
            sc.sku_id,
            sc.sku_code
       FROM approval a
@@ -133,6 +133,7 @@ class ApprovalService:
         session: sqlalchemy_async.AsyncSession,
         settings: config.Settings,
     ) -> None:
+        """Initialize the approval service."""
         self.session = session
         self.settings = settings
 
@@ -159,7 +160,7 @@ class ApprovalService:
                     reviewed_by_name=row["reviewed_by_name"],
                     scene_image_id=int(row["scene_image_id"]),
                     origin_name=str(row["origin_name"]),
-                    object_index=int(row["object_index"]),
+                    object_idx=int(row["object_idx"]),
                     category=row["category"],
                     sku_code=str(row["sku_code"]),
                     product_name=str(row["product_name"]),
@@ -190,7 +191,7 @@ class ApprovalService:
             raise ApprovalNotFoundError(request_id)
         object_metadata = _as_object_metadata(row["object_metadata"])
         bbox = object_metadata.get("bbox_coord", {})
-        attribute = object_metadata.get("attribute", {})
+        category = object_metadata.get("category")
         return approval_schema.ApprovalDetailResponse(
             request_id=int(row["request_id"]),
             status=typing.cast(approval_schema.ApprovalStatus, row["status"]),
@@ -205,8 +206,8 @@ class ApprovalService:
                 origin_name=str(row["origin_name"]),
             ),
             object=approval_schema.ApprovalObject(
-                object_index=int(row["object_index"]),
-                category=attribute.get("label"),
+                object_idx=int(row["object_idx"]),
+                category=category,
                 bbox=approval_schema.BoundingBox(**bbox),
             ),
             sku=approval_schema.ApprovalSku(
@@ -360,5 +361,5 @@ class ApprovalService:
 
 
 def _as_object_metadata(value: object) -> dict[str, typing.Any]:
-    """psycopg JSONB 결과를 안전한 객체 메타데이터로 변환합니다."""
+    """Psycopg JSONB 결과를 안전한 객체 메타데이터로 변환합니다."""
     return value if isinstance(value, dict) else {}
