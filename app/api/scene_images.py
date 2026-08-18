@@ -9,6 +9,14 @@ import fastapi
 import sqlalchemy
 from fastapi.concurrency import run_in_threadpool
 
+from app.api.examples import (
+    SCENE_IMAGE_DETECTION_FAILED_RESPONSE,
+    SCENE_IMAGE_INVALID_IMAGE_RESPONSE,
+    SCENE_IMAGE_TOO_LARGE_RESPONSE,
+    SCENE_IMAGE_UNSUPPORTED_TYPE_RESPONSE,
+    SCENE_IMAGE_UPLOAD_FAILED_RESPONSE,
+    SCENE_IMAGE_UPLOAD_SUCCESS_RESPONSE,
+)
 from app.core import config, database
 from app.schemas import common as common_schema
 from app.schemas.furniture_detection import (
@@ -179,10 +187,38 @@ async def _save_analysis_failure(
 @router.post(
     "/tagging",
     response_model=common_schema.SuccessResponse[FurnitureDetectionResponse],
+    summary="연출 이미지 업로드 및 가구 객체 탐지",
+    description=(
+        "multipart/form-data로 받은 연출 이미지를 검증한 뒤 원본 파일과 "
+        "메타데이터를 저장하고, VLM으로 가구 객체를 탐지해 결과를 함께 "
+        "반환합니다.\n\n"
+        "- 허용 형식: JPEG, PNG (파일의 실제 형식과 MIME 타입이 일치해야 합니다)\n"
+        "- 최대 용량: 10MB\n"
+        "- bbox_coord는 0~1000으로 정규화된 좌표입니다.\n"
+        "- 검증·저장·탐지는 보상 트랜잭션으로 처리되어, 저장 실패 시 "
+        "업로드된 파일과 DB 기록이 함께 정리됩니다."
+    ),
+    response_description=(
+        "공통 성공 응답으로 저장된 연출 이미지 정보와 탐지 객체 목록을 "
+        "반환합니다."
+    ),
+    responses={
+        200: SCENE_IMAGE_UPLOAD_SUCCESS_RESPONSE,
+        413: SCENE_IMAGE_TOO_LARGE_RESPONSE,
+        415: SCENE_IMAGE_UNSUPPORTED_TYPE_RESPONSE,
+        422: SCENE_IMAGE_INVALID_IMAGE_RESPONSE,
+        500: SCENE_IMAGE_UPLOAD_FAILED_RESPONSE,
+        502: SCENE_IMAGE_DETECTION_FAILED_RESPONSE,
+    },
 )
 # 보상 트랜잭션 상태를 유지하므로 지역 변수가 많습니다.
 async def upload_scene_image(  # pylint: disable=too-many-locals
-    file: fastapi.UploadFile = fastapi.File(...),
+    file: fastapi.UploadFile = fastapi.File(
+        ...,
+        description=(
+            "업로드할 연출 이미지 파일입니다. JPEG 또는 PNG, 10MB 이하."
+        ),
+    ),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
