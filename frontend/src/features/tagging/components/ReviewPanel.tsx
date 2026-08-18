@@ -96,7 +96,7 @@ export const ReviewPanel = () => {
   };
 
   const handleTaggingSave = (): void => {
-    void saveTagging();
+    void saveTagging(selectedObject ? { [selectedObject.id]: values } : undefined);
   };
 
   return (

@@ -25,6 +25,7 @@ import type {
   ConfirmedSkuSelection,
   FurnitureObject,
   SkuCandidate,
+  TaggingValues,
   UploadedImage,
   WorkflowStage,
 } from '../types';
@@ -49,7 +50,9 @@ type TaggingWorkflowContextValue = {
   loadSelectedObjectRecommendations: () => Promise<void>;
   redetect: (description: string) => Promise<void>;
   resetWorkflow: () => void;
-  saveTagging: () => Promise<void>;
+  saveTagging: (
+    valuesByObject?: Record<string, TaggingValues>,
+  ) => Promise<void>;
   searchCatalog: (query: string) => Promise<SkuCandidate[]>;
   selectObject: (object: FurnitureObject) => void;
   selectedObject?: FurnitureObject;
@@ -319,7 +322,9 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [],
   );
 
-  const saveTagging = useCallback(async (): Promise<void> => {
+  const saveTagging = useCallback(async (
+    valuesByObject?: Record<string, TaggingValues>,
+  ): Promise<void> => {
     if (!analysisId || confirmedSelections.length === 0) return;
     const recommendationObjects = detectedObjects.filter(
       (object) => object.candidates.length > 0,
@@ -338,8 +343,10 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       }
       await saveTaggingReview({
         matching: confirmedSelections.map(({ object, sku }) => ({
+          object,
           objectIndex: object.objectIndex,
           selectedSku: sku,
+          values: valuesByObject?.[object.id],
         })),
         sceneImageId: analysisId,
       });

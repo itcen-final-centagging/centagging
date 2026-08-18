@@ -6,10 +6,10 @@ const DEMO_SKUS: SkuCandidate[] = [
   {
     attrs: {
       color: '브라운',
-      has_armrest: true,
-      has_headrest: false,
-      has_legs: true,
-      has_stool: false,
+      has_armrest: '있음',
+      has_headrest: '없음',
+      has_legs: '있음',
+      has_stool: '없음',
       material: '패브릭',
       pattern: '무지',
       sofa_type: '소파베드',
@@ -59,10 +59,10 @@ const DEMO_SKUS: SkuCandidate[] = [
   {
     attrs: {
       color: '그레이',
-      has_armrest: true,
-      has_headrest: false,
-      has_legs: true,
-      has_stool: false,
+      has_armrest: '있음',
+      has_headrest: '없음',
+      has_legs: '있음',
+      has_stool: '없음',
       material: '패브릭',
       pattern: '무지',
       sofa_type: '소파베드',
@@ -106,10 +106,10 @@ const DEMO_SKUS: SkuCandidate[] = [
   {
     attrs: {
       color: '그린',
-      has_armrest: true,
-      has_headrest: false,
-      has_legs: true,
-      has_stool: false,
+      has_armrest: '있음',
+      has_headrest: '없음',
+      has_legs: '있음',
+      has_stool: '없음',
       material: '패브릭',
       pattern: '무지',
       sofa_type: '소파베드',
