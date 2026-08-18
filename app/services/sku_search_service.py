@@ -135,6 +135,7 @@ async def get_sku_detail(
     main_image = orm.aliased(SkuImage, name="main_image")
     stmt = (
         sqlalchemy.select(
+            SkuCatalog.sku_id,
             SkuCatalog.sku_code,
             SkuCatalog.product_name,
             SkuCatalog.brand,
@@ -143,6 +144,7 @@ async def get_sku_detail(
             SkuCatalog.sub_category,
             SkuCatalog.attributes,
             main_image.image_url,
+            main_image.sku_image_id,
         )
         .outerjoin(
             main_image,
@@ -158,6 +160,7 @@ async def get_sku_detail(
         return None
 
     return sku_search_schema.SkuDetailData(
+        sku_id=row["sku_id"],
         sku_code=row["sku_code"],
         product_name=row["product_name"],
         brand=row["brand"],
@@ -166,4 +169,5 @@ async def get_sku_detail(
         sub_category=row["sub_category"],
         attrs=row["attributes"] or {},
         image_url=_to_public_url(sku_image_storage, row["image_url"]),
+        sku_image_id=row["sku_image_id"],
     )

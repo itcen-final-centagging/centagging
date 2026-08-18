@@ -34,6 +34,7 @@ class SkuSearchResponse(BaseModel):
 class SkuDetailData(BaseModel):
     """SKU 상세 정보입니다. attrs는 카테고리별 속성을 그대로 담습니다."""
 
+    sku_id: int
     sku_code: str
     product_name: str
     brand: str | None
@@ -42,6 +43,7 @@ class SkuDetailData(BaseModel):
     sub_category: str | None
     attrs: dict[str, typing.Any]
     image_url: str | None
+    sku_image_id: int | None
 
 
 class SkuDetailResponse(BaseModel):
