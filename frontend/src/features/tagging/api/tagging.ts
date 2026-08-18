@@ -16,9 +16,23 @@ type DevDetection = {
   label: string;
 };
 
-type DevUploadResponse = {
+type AiJobAcceptedData = {
+  job_id: string;
+  scene_image_id: number;
+  status: 'PENDING';
+};
+
+type DetectionJobResult = {
   detections: DevDetection[];
   scene_image_id: number;
+};
+
+type AiJobData = {
+  error_message: string | null;
+  job_id: string;
+  result_payload: DetectionJobResult | null;
+  scene_image_id: number;
+  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 };
 
 type DevCandidate = {
@@ -101,6 +115,40 @@ const API_BASE_URL =
     /\/$/,
     '',
   ) ?? '';
+const JOB_POLL_INTERVAL_MS = 1000;
+const JOB_POLL_TIMEOUT_MS = 120_000;
+
+const sleep = async (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => {
+    globalThis.setTimeout(resolve, milliseconds);
+  });
+
+const waitForDetectionJob = async (
+  jobId: string,
+): Promise<DetectionJobResult> => {
+  const timeoutAt = Date.now() + JOB_POLL_TIMEOUT_MS;
+
+  while (Date.now() < timeoutAt) {
+    const response = await requestJson<ApiSuccessResponse<AiJobData>>(
+      `${API_BASE_URL}/ai-jobs/${encodeURIComponent(jobId)}`,
+    );
+    const job = response.data;
+
+    if (job.status === 'SUCCEEDED') {
+      if (!job.result_payload) {
+        throw new Error('AI 분석 결과를 확인하지 못했습니다.');
+      }
+      return job.result_payload;
+    }
+    if (job.status === 'FAILED') {
+      throw new Error(job.error_message ?? '가구 분석에 실패했습니다.');
+    }
+
+    await sleep(JOB_POLL_INTERVAL_MS);
+  }
+
+  throw new Error('AI 분석 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.');
+};
 
 const toBbox = (coordinates: number[]): [number, number, number, number] => [
   coordinates[0] ?? 0,
@@ -220,24 +268,25 @@ export const analyzeImage = async (
   }
 
   formData.append('file', file);
-  const response = await requestJson<ApiSuccessResponse<DevUploadResponse>>(
+  const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
     `${API_BASE_URL}/tagging`,
     {
       body: formData,
       method: 'POST',
     },
   );
+  const detectionResult = await waitForDetectionJob(accepted.data.job_id);
 
   return {
-    analysisId: String(response.data.scene_image_id),
+    analysisId: String(accepted.data.scene_image_id),
     mode: null,
-    objects: response.data.detections.map((detection, objectIndex) => ({
+    objects: detectionResult.detections.map((detection, objectIndex) => ({
       bbox: toBbox(detection.box_2d),
       candidates: [],
       category: nullableText(detection.label),
       confidence: detection.confidence,
       description: nullableText(detection.evidence),
-      id: `${response.data.scene_image_id}-${objectIndex}`,
+      id: `${accepted.data.scene_image_id}-${objectIndex}`,
       metadata: {
         attributes: {},
         category: nullableText(detection.label),

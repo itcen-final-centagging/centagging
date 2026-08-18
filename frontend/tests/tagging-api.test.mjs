@@ -47,6 +47,147 @@ test('history refresh failure does not undo a successful save', async (t) => {
   });
 });
 
+test('analysis polls its AI job until detection succeeds', async (t) => {
+  const { analyzeImage } = await loadTaggingApi(t);
+  const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
+  const requests = [];
+  let jobPollCount = 0;
+  globalThis.setTimeout = (callback) => {
+    callback();
+    return 0;
+  };
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url === '/tagging') {
+      return new Response(
+        JSON.stringify({
+          status: 'success',
+          data: {
+            job_id: 'job-123',
+            scene_image_id: 42,
+            status: 'PENDING',
+          },
+          meta: { request_id: 'request-123' },
+        }),
+        { headers: { 'Content-Type': 'application/json' }, status: 202 },
+      );
+    }
+
+    jobPollCount += 1;
+    const job =
+      jobPollCount === 1
+        ? {
+            error_message: null,
+            job_id: 'job-123',
+            result_payload: null,
+            scene_image_id: 42,
+            status: 'RUNNING',
+          }
+        : {
+            error_message: null,
+            job_id: 'job-123',
+            result_payload: {
+              detections: [
+                {
+                  box_2d: [100, 200, 700, 800],
+                  confidence: 90,
+                  evidence: 'chair shape',
+                  label: 'chair',
+                },
+              ],
+              scene_image_id: 42,
+            },
+            scene_image_id: 42,
+            status: 'SUCCEEDED',
+          };
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data: job,
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
+  });
+
+  const analysis = await analyzeImage(
+    new Blob(['image'], { type: 'image/png' }),
+  );
+
+  assert.deepEqual(requests, [
+    '/tagging',
+    '/ai-jobs/job-123',
+    '/ai-jobs/job-123',
+  ]);
+  assert.equal(analysis.analysisId, '42');
+  assert.deepEqual(analysis.objects[0], {
+    bbox: [100, 200, 700, 800],
+    candidates: [],
+    category: 'chair',
+    confidence: 90,
+    description: 'chair shape',
+    id: '42-0',
+    metadata: {
+      attributes: {},
+      category: 'chair',
+      description: 'chair shape',
+      keyFeatures: [],
+      subCategory: null,
+    },
+    name: 'chair',
+    objectIndex: 0,
+  });
+});
+
+test('analysis exposes a failed AI job message', async (t) => {
+  const { analyzeImage } = await loadTaggingApi(t);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    if (String(input) === '/tagging') {
+      return new Response(
+        JSON.stringify({
+          status: 'success',
+          data: {
+            job_id: 'job-456',
+            scene_image_id: 42,
+            status: 'PENDING',
+          },
+          meta: { request_id: 'request-123' },
+        }),
+        { headers: { 'Content-Type': 'application/json' }, status: 202 },
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data: {
+          error_message: '가구 탐지에 실패했습니다.',
+          job_id: 'job-456',
+          result_payload: null,
+          scene_image_id: 42,
+          status: 'FAILED',
+        },
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    analyzeImage(new Blob(['image'], { type: 'image/png' })),
+    /가구 탐지에 실패했습니다/,
+  );
+});
+
 test('save failure does not mark saved or refresh history', async (t) => {
   const { saveTaggingAndRefreshHistory } = await loadSaveWorkflow(t);
   const events = [];

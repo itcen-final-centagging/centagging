@@ -15,6 +15,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/ai-jobs': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       '/history/results': {
         target: 'http://localhost:8000',
         changeOrigin: true,
