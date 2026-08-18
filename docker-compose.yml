@@ -19,6 +19,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # 기존 로컬 DB에 비파괴 스키마 변경을 적용하는 일회성 컨테이너
+  db-migrate:
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    profiles: ["migration"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - ./docker/db/migrations:/migrations:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - psql
+      - --set=ON_ERROR_STOP=1
+      - --host=db
+      - --username=${POSTGRES_USER:-centagging}
+      - --dbname=${POSTGRES_DB:-centagging}
+      - --file=/migrations/create_ai_job.sql
+
   # FastAPI 백엔드 / FastAPI backend
   api:
     build:
