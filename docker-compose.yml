@@ -90,7 +90,9 @@ services:
       VERTEX_AI_LOCATION: ${VERTEX_AI_LOCATION:-global}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
       IMAGE_STORAGE_ROOT: ${IMAGE_STORAGE_ROOT:-uploads}
+      SKU_IMAGE_ROOT: ${SKU_IMAGE_ROOT:-data/images}
       POSTGRES_DB: ${POSTGRES_DB:-centagging}
       POSTGRES_USER: ${POSTGRES_USER:-centagging}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
@@ -99,6 +101,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./uploads:/app/uploads:ro
+      - ./data/images:/app/data/images:ro
     depends_on:
       db:
         condition: service_healthy

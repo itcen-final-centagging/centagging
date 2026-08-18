@@ -115,7 +115,9 @@ services:
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:?GCP_PROJECT_ID must be set}
       VERTEX_AI_LOCATION: ${VERTEX_AI_LOCATION:-global}
       GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
       IMAGE_STORAGE_ROOT: ${IMAGE_STORAGE_ROOT:-uploads}
+      SKU_IMAGE_ROOT: ${SKU_IMAGE_ROOT:-data/images}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
@@ -123,6 +125,7 @@ services:
       POSTGRES_PORT: 5432
     volumes:
       - ${GCS_MOUNT_ROOT:?GCS_MOUNT_ROOT must be set}/uploads:/app/uploads:ro
+      - ${GCS_MOUNT_ROOT:?GCS_MOUNT_ROOT must be set}/sku-images:/app/data/images:ro
     depends_on:
       cloud-sql-proxy:
         condition: service_healthy
