@@ -138,7 +138,7 @@ async def _recommend_sku(
 ) -> dict[str, object]:
     """장면의 탐지 객체에 대한 SKU 추천 결과를 작업 결과로 만듭니다."""
     object_idxs = job.input_payload.get("object_idxs")
-    if not isinstance(object_idxs, list) or not all(
+    if not isinstance(object_idxs, list) or not object_idxs or not all(
         isinstance(object_idx, int) for object_idx in object_idxs
     ):
         object_idxs = None

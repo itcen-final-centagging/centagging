@@ -322,6 +322,21 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
         )
         self.failure_mock.assert_not_awaited()
 
+    async def test_recommends_all_objects_for_empty_selection(self) -> None:
+        """빈 선택 목록은 전체 탐지 객체 추천 요청으로 처리합니다."""
+        self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
+        self.job.input_payload = {"object_idxs": []}
+        self.claim_mock.return_value = self.job
+
+        await ai_job_worker_service.process_next_job(
+            self.session, self.settings, "worker-1"
+        )
+
+        self.tagging_service.get_sku_candidates.assert_awaited_once_with(
+            42,
+            object_idxs=None,
+        )
+
     async def test_requeues_failed_sku_recommendation(self) -> None:
         """추천 실패는 장면 탐지 상태를 바꾸지 않고 작업만 재시도합니다."""
         self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
