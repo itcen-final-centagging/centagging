@@ -2,13 +2,13 @@
 # ============================================================
 # DB 덤프 스크립트 (팀원 공유용)
 # ------------------------------------------------------------
-# docker compose로 띄운 centagging DB를 UTF-8로 안전하게 덤프해서
+# docker compose로 띄운 centagging DB의 공유 시드 데이터를 UTF-8로 안전하게 덤프해서
 # docker/db/init/ 폴더에 gzip으로 압축 저장합니다.
 # postgres 공식 이미지는 컨테이너 최초 실행(볼륨이 비어있을 때)에
 # docker-entrypoint-initdb.d 안의 .sql / .sql.gz 파일들을 알파벳
 # 순서로 "자동 실행"하므로 (.sql.gz는 자동으로 gunzip 후 실행됨),
 # 이 파일을 커밋해서 공유하면 팀원은 `docker compose up -d` 만
-# 해도 DB(스키마+데이터+임베딩)가 자동으로 복원됩니다.
+# 실행해도 schema.sql 적용 후 사용자·SKU·이미지·임베딩이 자동 복원됩니다.
 #
 # 실행 위치: 프로젝트 루트 (docker compose가 떠 있는 상태)에서
 #   bash scripts/deploy/dump_db.sh
@@ -32,6 +32,7 @@ DB_PASSWORD="${POSTGRES_PASSWORD:-change-me}"
 
 OUT_DIR="docker/db/init"
 OUT_FILE="${OUT_DIR}/zz-sku-catalog-embeddings.sql.gz"
+CONTAINER_SQL="/tmp/zz-sku-catalog-embeddings.sql"
 CONTAINER_TMP="/tmp/zz-sku-catalog-embeddings.sql.gz"
 
 mkdir -p "$OUT_DIR"
@@ -43,16 +44,22 @@ if [ -z "$(docker compose ps -q db 2>/dev/null)" ]; then
 fi
 
 echo "▶ pg_dump 실행 후 컨테이너 내부에서 바로 gzip 압축 중 (UTF-8, 한글 깨짐 방지)..."
-# 중요: 콘솔로 리다이렉트(>)하지 않고 컨테이너 셸 안에서 pg_dump | gzip 을
-# 그대로 실행해 바이너리(.gz) 파일을 만듭니다. 그 다음 docker compose cp로
-# 바이트 그대로 복사해오므로, 호스트 터미널의 인코딩(특히 Windows
-# PowerShell의 기본 UTF-16 리다이렉션)으로 인한 한글 깨짐이 원천 차단됩니다.
+# 중요: SQL 생성과 gzip 압축을 컨테이너 안에서 순차 실행합니다. pg_dump가
+# 실패하면 기존 호스트 덤프를 덮어쓰지 않으며, docker compose cp는 완성된
+# 바이너리(.gz)만 바이트 그대로 복사합니다.
 docker compose exec -T -e PGPASSWORD="$DB_PASSWORD" db sh -c \
-  "pg_dump -U '$DB_USER' -d '$DB' \
+  "set -e
+  rm -f '$CONTAINER_SQL' '$CONTAINER_TMP'
+  pg_dump -U '$DB_USER' -d '$DB' \
     --encoding=UTF8 \
     --no-owner --no-privileges \
-    --clean --if-exists \
-    | gzip -9 > '$CONTAINER_TMP'"
+    --data-only \
+    --table=public.app_user \
+    --table=public.sku_catalog \
+    --table=public.sku_image \
+    > '$CONTAINER_SQL'
+  gzip -9 -n -c '$CONTAINER_SQL' > '$CONTAINER_TMP'
+  rm -f '$CONTAINER_SQL'"
 
 echo "▶ 컨테이너에서 호스트로 덤프 파일 복사 중..."
 docker compose cp "db:${CONTAINER_TMP}" "$OUT_FILE"

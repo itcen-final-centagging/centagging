@@ -79,8 +79,11 @@ export interface VlmMood {
 
 export interface SkuCandidate {
   skuId?: number;
+  skuImageId?: number | null;
   style?: string | null;
   subCategory?: string | null;
+  brand?: string | null;
+  price?: number | null;
   attrs: Record<string, unknown>;
   category: string | null;
   color: string | null;

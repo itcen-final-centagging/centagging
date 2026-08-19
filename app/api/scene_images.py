@@ -1,4 +1,4 @@
-"""연출 이미지 업로드, 저장 및 유효성 검증 API입니다."""
+"""연출 이미지 업로드와 비동기 분석 작업 접수 API입니다."""
 
 import logging
 import pathlib
@@ -6,18 +6,20 @@ import uuid
 
 import fastapi
 import sqlalchemy
-from fastapi.concurrency import run_in_threadpool
 
-from app.core import config, database
-from app.schemas import common as common_schema
-from app.schemas.furniture_detection import (
-    BoundingBoxResponse,
-    DetectedObjectResponse,
-    FurnitureDetectionResponse,
-    SceneImageResponse,
+from app.api.examples import (
+    SCENE_IMAGE_INVALID_IMAGE_RESPONSE,
+    SCENE_IMAGE_TOO_LARGE_RESPONSE,
+    SCENE_IMAGE_UNSUPPORTED_TYPE_RESPONSE,
+    SCENE_IMAGE_UPLOAD_ACCEPTED_RESPONSE,
+    SCENE_IMAGE_UPLOAD_FAILED_RESPONSE,
 )
-from app.schemas.gemini_detection import GeminiDetectionResult
-from app.services import furniture_detection_service, image_validation
+from app.core import config, database
+from app.models.ai_job import AiJobType
+from app.repositories import ai_job_repository
+from app.schemas import ai_job as ai_job_schema
+from app.schemas import common as common_schema
+from app.services import image_validation
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,23 +61,8 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
         :width_px,
         :height_px
     )
-    RETURNING scene_image_id, created_at
+    RETURNING scene_image_id
     """)
-_UPDATE_DETECTION_SUCCESS = sqlalchemy.text("""
-    UPDATE scene_image
-    SET
-        analysis_status = :analysis_status,
-        analysis_error = :analysis_error
-    WHERE scene_image_id = :scene_image_id
-""")
-
-_UPDATE_ANALYSIS_FAILURE = sqlalchemy.text("""
-    UPDATE scene_image
-    SET
-        analysis_status = :analysis_status,
-        analysis_error = :analysis_error
-    WHERE scene_image_id = :scene_image_id
-""")
 
 
 def _save_image(path: pathlib.Path, content: bytes) -> None:
@@ -103,75 +90,47 @@ async def _rollback(
         _LOGGER.exception("이미지 업로드 트랜잭션 rollback에 실패했습니다.")
 
 
-# 가구 객체 탐지 함수 선언
-def _build_detected_objects(
-    detection_result: GeminiDetectionResult,
-) -> list[DetectedObjectResponse]:
-    """내부 탐지 결과를 공개 응답 객체로 변환합니다."""
-    return [
-        DetectedObjectResponse(
-            object_idx=object_idx,
-            category=detection.category,
-            sub_category=None,
-            bbox_coord=BoundingBoxResponse(
-                xmin=round(detection.bbox_coord.xmin),
-                ymin=round(detection.bbox_coord.ymin),
-                xmax=round(detection.bbox_coord.xmax),
-                ymax=round(detection.bbox_coord.ymax),
-            ),
-            confidence=detection.confidence,
-            evidence=detection.evidence,
-        )
-        for object_idx, detection in enumerate(detection_result.detections)
-    ]
-
-
-# 분석 성공 시 성공 상태 저장
-async def _save_detection_success(
-    database_session: database.sqlalchemy_async.AsyncSession,
-    scene_image_id: int,
-) -> None:
-
-    await database_session.execute(
-        _UPDATE_DETECTION_SUCCESS,
-        {
-            "scene_image_id": scene_image_id,
-            "analysis_status": "detected",
-            "analysis_error": None,
-        },
-    )
-    await database_session.commit()
-
-
-async def _save_analysis_failure(
-    database_session: database.sqlalchemy_async.AsyncSession,
-    scene_image_id: int,
-    analysis_error: str,
-) -> None:
-    """분석 실패 상태와 오류 원인을 저장합니다."""
-    await database_session.execute(
-        _UPDATE_ANALYSIS_FAILURE,
-        {
-            "scene_image_id": scene_image_id,
-            "analysis_status": "failed",
-            "analysis_error": analysis_error,
-        },
-    )
-    await database_session.commit()
-
-
 @router.post(
     "/tagging",
-    response_model=common_schema.SuccessResponse[FurnitureDetectionResponse],
+    response_model=common_schema.SuccessResponse[
+        ai_job_schema.AiJobAcceptedResponse
+    ],
+    status_code=fastapi.status.HTTP_202_ACCEPTED,
+    summary="연출 이미지 업로드 및 가구 객체 탐지 작업 접수",
+    description=(
+        "multipart/form-data로 받은 연출 이미지를 검증한 뒤 원본 파일과 "
+        "메타데이터를 저장하고 VLM 가구 객체 탐지 작업을 대기열에 접수합니다. "
+        "탐지 결과는 즉시 반환하지 않으며, 응답의 job_id로 "
+        "GET /ai-jobs/{job_id}를 폴링해 확인합니다.\n\n"
+        "- 허용 형식: JPEG, PNG (파일의 실제 형식과 MIME 타입이 일치해야 합니다)\n"
+        "- 최대 용량: 10MB\n"
+        "- 202 Accepted는 분석 완료가 아닌 작업 접수 완료를 뜻합니다.\n"
+        "- 검증·저장 실패 시 업로드된 파일과 DB 기록은 함께 정리됩니다."
+    ),
+    response_description=(
+        "공통 성공 응답으로 연출 이미지 ID와 대기 중인 AI 작업 ID를 반환합니다."
+    ),
+    responses={
+        202: SCENE_IMAGE_UPLOAD_ACCEPTED_RESPONSE,
+        413: SCENE_IMAGE_TOO_LARGE_RESPONSE,
+        415: SCENE_IMAGE_UNSUPPORTED_TYPE_RESPONSE,
+        422: SCENE_IMAGE_INVALID_IMAGE_RESPONSE,
+        500: SCENE_IMAGE_UPLOAD_FAILED_RESPONSE,
+    },
 )
 # 보상 트랜잭션 상태를 유지하므로 지역 변수가 많습니다.
 async def upload_scene_image(  # pylint: disable=too-many-locals
-    file: fastapi.UploadFile = fastapi.File(...),
+    file: fastapi.UploadFile = fastapi.File(
+        ...,
+        description=(
+            "업로드할 연출 이미지 파일입니다. JPEG 또는 PNG, 10MB 이하."
+        ),
+    ),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
-) -> common_schema.SuccessResponse[FurnitureDetectionResponse]:
-    """이미지를 검증하고 원본 파일과 메타데이터를 함께 저장합니다.
+) -> common_schema.SuccessResponse[ai_job_schema.AiJobAcceptedResponse]:
+    """이미지를 저장하고 가구 탐지 작업을 비동기로 접수합니다.
 
     검증, 파일 저장, DB 기록과 탐지 상태 전환을 하나의 보상 트랜잭션으로
     관리하므로 지역 변수를 단계별로 유지합니다.
@@ -181,7 +140,7 @@ async def upload_scene_image(  # pylint: disable=too-many-locals
         database_session: 요청 범위에서 사용하는 PostgreSQL 세션입니다.
 
     Returns:
-        저장된 scene_image ID와 이미지 메타데이터입니다.
+        저장된 scene_image ID와 대기 작업 UUID입니다.
 
     Raises:
         fastapi.HTTPException: 이미지 검증 또는 저장에 실패한 경우입니다.
@@ -233,10 +192,13 @@ async def upload_scene_image(  # pylint: disable=too-many-locals
                 "height_px": validated.metadata.height_px,
             },
         )
-        created_scene = result.mappings().one()
-        scene_image_id = int(created_scene["scene_image_id"])
-        created_at = created_scene["created_at"]
-        await database_session.commit()
+        scene_image_id = int(result.scalar_one())
+        job = await ai_job_repository.create_job(
+            database_session,
+            scene_image_id,
+            AiJobType.DETECT_SCENE,
+            input_payload={"image_url": image_url},
+        )
     except fastapi.HTTPException:
         raise
     # 파일 시스템과 DB 오류 모두 같은 보상 정리 절차가 필요합니다.
@@ -251,47 +213,9 @@ async def upload_scene_image(  # pylint: disable=too-many-locals
     finally:
         await file.close()
 
-    try:
-        detection_result = await run_in_threadpool(
-            furniture_detection_service.detect_furniture_from_bytes,
-            validated.content,
-            settings,
-        )
-        detected_objects = _build_detected_objects(detection_result)
-
-        await _save_detection_success(database_session, scene_image_id)
-    # 탐지와 결과 저장의 외부 예외를 동일한 failed 상태로 기록합니다.
-    except Exception as error:  # pylint: disable=broad-exception-caught
-        await _rollback(database_session)
-        try:
-            await _save_analysis_failure(
-                database_session,
-                scene_image_id,
-                str(error) or error.__class__.__name__,
-            )
-        # 원래 탐지 오류를 보존하므로 상태 저장 오류는 로그로 남깁니다.
-        except Exception:  # pylint: disable=broad-exception-caught
-            await _rollback(database_session)
-            _LOGGER.exception("객체 탐지 실패 상태 저장에 실패했습니다.")
-        raise fastapi.HTTPException(
-            status_code=502, detail="가구 탐지에 실패했습니다."
-        ) from error
-
     return common_schema.success_response(
-        FurnitureDetectionResponse(
-            scene_image=SceneImageResponse(
-                scene_image_id=scene_image_id,
-                image_url=image_url,
-                origin_name=validated.metadata.origin_name,
-                mime_type=validated.metadata.mime_type,
-                file_size=validated.metadata.file_size,
-                analysis_status="detected",
-                analysis_error=None,
-                width_px=validated.metadata.width_px,
-                height_px=validated.metadata.height_px,
-                created_at=created_at,
-            ),
-            object_count=len(detected_objects),
-            objects=detected_objects,
+        ai_job_schema.AiJobAcceptedResponse(
+            scene_image_id=scene_image_id,
+            job_id=job.job_id,
         )
     )

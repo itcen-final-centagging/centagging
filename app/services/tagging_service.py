@@ -91,7 +91,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         )
 
         category_by_idx = {
-            index: item.get("category", "")
+            int(item.get("object_idx", index)): item.get("category", "")
             for index, item in enumerate(object_metadata)
         }
 

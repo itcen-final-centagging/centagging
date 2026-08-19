@@ -15,6 +15,150 @@ const loadTaggingApi = async (t) => {
   return server.ssrLoadModule('/src/features/tagging/api/tagging.ts');
 };
 
+test('analysis polls its AI job until detection succeeds', async (t) => {
+  const { analyzeImage } = await loadTaggingApi(t);
+  const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
+  const requests = [];
+  let jobPollCount = 0;
+  globalThis.setTimeout = (callback) => {
+    callback();
+    return 0;
+  };
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url === '/tagging') {
+      return new Response(
+        JSON.stringify({
+          status: 'success',
+          data: {
+            job_id: 'job-123',
+            scene_image_id: 42,
+            status: 'PENDING',
+          },
+          meta: { request_id: 'request-123' },
+        }),
+        { headers: { 'Content-Type': 'application/json' }, status: 202 },
+      );
+    }
+
+    jobPollCount += 1;
+    const job =
+      jobPollCount === 1
+        ? {
+            error_message: null,
+            job_id: 'job-123',
+            result_payload: null,
+            scene_image_id: 42,
+            status: 'RUNNING',
+          }
+        : {
+            error_message: null,
+            job_id: 'job-123',
+            result_payload: {
+              objects: [
+                {
+                  bbox_coord: { xmin: 200, ymin: 100, xmax: 800, ymax: 700 },
+                  confidence: 0.9,
+                  evidence: 'chair shape',
+                  object_idx: 0,
+                  category: 'chair',
+                  sub_category: null,
+                },
+              ],
+              scene_image_id: 42,
+            },
+            scene_image_id: 42,
+            status: 'SUCCEEDED',
+          };
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data: job,
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
+  });
+
+  const analysis = await analyzeImage(
+    new Blob(['image'], { type: 'image/png' }),
+  );
+
+  assert.deepEqual(requests, [
+    '/tagging',
+    '/ai-jobs/job-123',
+    '/ai-jobs/job-123',
+  ]);
+  assert.equal(analysis.analysisId, '42');
+  assert.deepEqual(analysis.objects[0], {
+    bbox: [100, 200, 700, 800],
+    candidates: [],
+    category: 'chair',
+    confidence: 0.9,
+    description: 'chair shape',
+    id: '42-0',
+    metadata: {
+      attributes: {},
+      category: 'chair',
+      description: 'chair shape',
+      keyFeatures: [],
+      subCategory: null,
+    },
+    name: 'chair',
+    objectIdx: 0,
+    xaiAttrs: {},
+  });
+});
+
+test('analysis exposes a failed AI job message', async (t) => {
+  const { analyzeImage } = await loadTaggingApi(t);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    if (String(input) === '/tagging') {
+      return new Response(
+        JSON.stringify({
+          status: 'success',
+          data: {
+            job_id: 'job-456',
+            scene_image_id: 42,
+            status: 'PENDING',
+          },
+          meta: { request_id: 'request-123' },
+        }),
+        { headers: { 'Content-Type': 'application/json' }, status: 202 },
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data: {
+          error_message: '가구 탐지에 실패했습니다.',
+          job_id: 'job-456',
+          result_payload: null,
+          scene_image_id: 42,
+          status: 'FAILED',
+        },
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    analyzeImage(new Blob(['image'], { type: 'image/png' })),
+    /가구 탐지에 실패했습니다/,
+  );
+});
+
 test('history results are mapped from the backend response', async (t) => {
   const { fetchTaggingHistory } = await loadTaggingApi(t);
   const originalFetch = globalThis.fetch;
@@ -220,7 +364,9 @@ test('save request uses its backend contract without refreshing history', async 
     tagging_results: [
       {
         match_rank: 2,
+        match_source: 'RECOMMEND',
         object_idx: 1,
+        object_index: 1,
         object_metadata: {
           attrs: {
             color: 'white',
@@ -235,6 +381,7 @@ test('save request uses its backend contract without refreshing history', async 
         },
         similarity_score: 92,
         sku_id: 50,
+        sku_image_id: null,
         vlm_mood: {
           summary: 'A warm living room.',
           tags: ['modern'],
@@ -253,7 +400,9 @@ test('save request uses its backend contract without refreshing history', async 
       },
       {
         match_rank: 1,
+        match_source: 'RECOMMEND',
         object_idx: 2,
+        object_index: 2,
         object_metadata: {
           attrs: {
             color: 'brown',
@@ -268,6 +417,7 @@ test('save request uses its backend contract without refreshing history', async 
         },
         similarity_score: 88,
         sku_id: 71,
+        sku_image_id: null,
         vlm_mood: {
           summary: 'A compact dining area.',
           tags: ['natural'],
@@ -289,50 +439,66 @@ test('save request uses its backend contract without refreshing history', async 
   assert.equal(requests.length, 1);
 });
 
-test('recommendation sends edited objects with the POST contract', async (t) => {
-  const { updateSceneObjects } = await loadTaggingApi(t);
+test('recommendation polls its AI job and keeps its XAI result', async (t) => {
+  const { fetchRecommendations } = await loadTaggingApi(t);
   const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
   const requests = [];
+  globalThis.setTimeout = (callback) => {
+    callback();
+    return 0;
+  };
   globalThis.fetch = async (input, init) => {
-    requests.push({ input, init });
-    return new Response(
-      JSON.stringify({
-        status: 'success',
-        data: {
-          objects: [
-            {
-              object_idx: 0,
-              sku_candidates: [
+    const url = String(input);
+    requests.push({ init, url });
+    const data =
+      url === '/tagging/scenes/7'
+        ? { job_id: 'job-789', scene_image_id: 7, status: 'PENDING' }
+        : {
+            error_message: null,
+            job_id: 'job-789',
+            result_payload: {
+              objects: [
                 {
-                  attrs: { color: 'white', material: 'mesh' },
-                  category: 'chair',
-                  matched_sku_image: { image_url: '/images/chair.png' },
-                  product_name: 'work chair',
-                  similarity_score: 92,
-                  sku_code: 'CHR-2041',
-                  sub_category: 'office chair',
-                  xai_result: {
-                    criteria: [
-                      {
-                        comment: 'The backrest structure matches.',
-                        label: 'structure',
-                        score: 29,
+                  object_idx: 1,
+                  sku_candidates: [
+                    {
+                      attrs: { color: 'white', material: 'mesh' },
+                      category: 'chair',
+                      matched_sku_image: { image_url: '/images/chair.png' },
+                      product_name: 'work chair',
+                      similarity_score: 92,
+                      sku_code: 'CHR-2041',
+                      sub_category: 'office chair',
+                      xai_result: {
+                        criteria: [
+                          {
+                            comment: 'The backrest structure matches.',
+                            label: 'structure',
+                            score: 29,
+                          },
+                        ],
+                        summary: 'The structure and color are similar.',
+                        xai_attrs: {
+                          color: 'brown',
+                        },
+                        vlm_mood: {
+                          summary: 'A warm living room.',
+                          tags: ['natural'],
+                        },
                       },
-                    ],
-                    summary: 'The structure and color are similar.',
-                    xai_attrs: {
-                      color: 'brown',
                     },
-                    vlm_mood: {
-                      summary: 'A warm living room.',
-                      tags: ['natural'],
-                    },
-                  },
+                  ],
                 },
               ],
             },
-          ],
-        },
+            scene_image_id: 7,
+            status: 'SUCCEEDED',
+          };
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data,
         meta: { request_id: 'request-123' },
       }),
       { headers: { 'Content-Type': 'application/json' }, status: 200 },
@@ -340,54 +506,37 @@ test('recommendation sends edited objects with the POST contract', async (t) => 
   };
   t.after(() => {
     globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
   });
 
-  const candidatesByObjectIdx = await updateSceneObjects('7', [
-    { bbox: [100, 200, 800, 900], category: 'chair', name: 'chair' },
+  const [candidate] = await fetchRecommendations('7', 1, [
+    {
+      bbox: [100, 200, 700, 800],
+      category: 'chair',
+      name: 'chair',
+      objectIdx: 1,
+    },
   ]);
-  const recommendation = candidatesByObjectIdx.get(0);
-  const [candidate] = recommendation.sku_candidates;
 
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0].input, '/tagging/scenes/7');
+  assert.deepEqual(
+    requests.map((request) => request.url),
+    ['/tagging/scenes/7', '/ai-jobs/job-789'],
+  );
   assert.equal(requests[0].init.method, 'POST');
-  assert.equal(requests[0].init.headers['Content-Type'], 'application/json');
   assert.deepEqual(JSON.parse(requests[0].init.body), {
     objects: [
       {
+        bbox_coord: { xmax: 800, xmin: 200, ymax: 700, ymin: 100 },
         category: 'chair',
-        bbox_coord: { xmin: 200, ymin: 100, xmax: 900, ymax: 800 },
+        object_idx: 1,
       },
     ],
   });
-
-  assert.deepEqual(
-    {
-      matchRank: candidate.matchRank,
-      score: candidate.score,
-      vlmMood: candidate.vlmMood,
-      xaiResult: candidate.xaiResult,
-    },
-    {
-      matchRank: 1,
-      score: 92,
-      vlmMood: {
-        summary: 'A warm living room.',
-        tags: ['natural'],
-      },
-      xaiResult: {
-        criteria: [
-          {
-            comment: 'The backrest structure matches.',
-            label: 'structure',
-            score: 29,
-          },
-        ],
-        summary: 'The structure and color are similar.',
-        xaiAttrs: {
-          color: 'brown',
-        },
-      },
-    },
+  assert.equal(candidate.matchRank, 1);
+  assert.equal(candidate.score, 92);
+  assert.equal(
+    candidate.xaiResult.summary,
+    'The structure and color are similar.',
   );
+  assert.deepEqual(candidate.xaiResult.xaiAttrs, { color: 'brown' });
 });

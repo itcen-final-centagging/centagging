@@ -32,6 +32,7 @@ import type {
 type TaggingWorkflowContextValue = {
   analysisMode?: 'live' | 'mock' | null;
   analysisScenario: AnalysisScenario;
+  addCatalogSkuToCandidates: (sku: SkuCandidate) => void;
   addObject: () => void;
   beginAnalysis: () => Promise<void>;
   catalogResults: SkuCandidate[];
@@ -246,10 +247,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         return;
       }
       // 편집된 객체를 임시 요청으로 전달하고 POST 응답의 추천 결과를 반영합니다.
-      const finalObjects = detectedObjects.map((object, objectIdx) => ({
-        ...object,
-        objectIdx,
-      }));
+      const finalObjects = detectedObjects.map((object) => ({ ...object }));
       const recommendationsByObjectIdx = await updateSceneObjects(
         analysisId,
         finalObjects,
@@ -336,6 +334,33 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [],
   );
 
+  const addCatalogSkuToCandidates = useCallback(
+    (sku: SkuCandidate): void => {
+      if (!selectedObject) return;
+      const targetObjectId = selectedObject.id;
+
+      const appendSku = (object: FurnitureObject): FurnitureObject => ({
+        ...object,
+        candidates: [
+          ...object.candidates.filter((candidate) => candidate.sku !== sku.sku),
+          sku,
+        ],
+      });
+
+      setDetectedObjects((objects) =>
+        objects.map((object) =>
+          object.id === targetObjectId ? appendSku(object) : object,
+        ),
+      );
+      setSelectedObject((object) =>
+        object && object.id === targetObjectId ? appendSku(object) : object,
+      );
+      selectSku(sku);
+      setStage('recommend');
+    },
+    [selectSku, selectedObject, setDetectedObjects, setSelectedObject],
+  );
+
   const saveTagging = useCallback(
     async (valuesByObject?: Record<string, TaggingValues>): Promise<void> => {
       if (!analysisId || confirmedSelections.length === 0) return;
@@ -347,6 +372,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         setStage('recommend');
         return;
       }
+
       setStage('saving');
       setWorkflowError(undefined);
       try {
@@ -395,6 +421,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     () => ({
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
       addObject,
       beginAnalysis,
       catalogResults,
@@ -433,6 +460,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
       addObject,
       beginAnalysis,
       catalogResults,
