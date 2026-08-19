@@ -6,7 +6,17 @@ import contextlib
 import fastapi
 import starlette.staticfiles
 
-from app.api import auth, history, scene_images, sku, sku_search, tagging
+from app.api import (
+    ai_jobs,
+    approval,
+    auth,
+    history,
+    product_image_submissions,
+    scene_images,
+    sku,
+    sku_search,
+    tagging,
+)
 from app.core import (
     config,
     database,
@@ -38,11 +48,14 @@ exception_handlers.register_exception_handlers(app)
 openapi.configure_common_response_openapi(app)
 
 app.include_router(auth.router)
+app.include_router(ai_jobs.router)
 app.include_router(scene_images.router)
 app.include_router(tagging.router)
 app.include_router(sku.router)
 app.include_router(sku_search.router)
 app.include_router(history.router)
+app.include_router(approval.router)
+app.include_router(product_image_submissions.router)
 
 app.mount(
     "/sku-images",

@@ -43,4 +43,6 @@ def create_client(settings: config.Settings) -> genai.Client:
     if settings.gemini_api_key:
         return genai.Client(api_key=settings.gemini_api_key)
 
-    raise ValueError("VERTEX_API_KEY, GCP_PROJECT_ID 또는 GEMINI_API_KEY가 필요합니다.")
+    raise ValueError(
+        "VERTEX_API_KEY, GCP_PROJECT_ID 또는 GEMINI_API_KEY가 필요합니다."
+    )

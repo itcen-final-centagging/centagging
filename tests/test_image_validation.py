@@ -1,23 +1,22 @@
 """이미지 업로드 유효성 검증 서비스 테스트입니다."""
 
+import collections.abc
 import io
-import json
 import pathlib
 import tempfile
 import unittest
 import unittest.mock
+import uuid
 
 import fastapi
+import httpx
 import PIL.Image
 import starlette.datastructures
 import starlette.testclient
 
 from app.api import scene_images
 from app.core import config, database, exception_handlers, request_context
-from app.schemas.gemini_detection import (
-    GeminiDetectionResult,
-    GeminiRawDetection,
-)
+from app.models.ai_job import AiJob, AiJobStatus, AiJobType
 from app.services import image_validation
 
 
@@ -121,18 +120,18 @@ class ValidateImageTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.status_code, 413)
 
 
-class _FakeInsertResult:
+class _FakeInsertResult:  # pylint: disable=too-few-public-methods
     """업로드 API 테스트용 INSERT 결과입니다."""
 
     def __init__(self, scene_image_id: int = 42) -> None:
         self.scene_image_id = scene_image_id
 
     def scalar_one(self) -> int:
-        """저장된 이미지 ID를 반환합니다."""
+        """INSERT RETURNING 결과의 이미지 ID를 반환합니다."""
         return self.scene_image_id
 
 
-class _FakeUserLookupResult:
+class _FakeUserLookupResult:  # pylint: disable=too-few-public-methods
     """고정 사용자 조회 결과입니다."""
 
     def __init__(self, user_id: int | None = 7) -> None:
@@ -143,7 +142,7 @@ class _FakeUserLookupResult:
         return self.user_id
 
 
-class _FakeSession:
+class _FakeSession:  # pylint: disable=too-many-instance-attributes
     """업로드 API 테스트용 비동기 DB 세션입니다."""
 
     def __init__(
@@ -156,8 +155,8 @@ class _FakeSession:
         self.commit_error = commit_error
         self.user_id = user_id
         self.execute_parameters: dict[str, object] | None = None
-        self.analysis_update_parameters: dict[str, object] | None = None
         self.user_lookup_parameters: dict[str, object] | None = None
+        self.added_job: AiJob | None = None
         self.rollback_called = False
         self.commit_count = 0
 
@@ -168,13 +167,14 @@ class _FakeSession:
         if "SELECT user_id" in str(_statement):
             self.user_lookup_parameters = parameters
             return _FakeUserLookupResult(user_id=self.user_id)
-        if "UPDATE scene_image" in str(_statement):
-            self.analysis_update_parameters = parameters
-            return _FakeInsertResult()
         self.execute_parameters = parameters
         if self.execute_error is not None:
             raise self.execute_error
         return _FakeInsertResult()
+
+    def add(self, job: AiJob) -> None:
+        """같은 트랜잭션에 추가된 AI 작업을 기록합니다."""
+        self.added_job = job
 
     async def commit(self) -> None:
         """commit을 수행하거나 설정된 커밋 오류를 발생시킵니다."""
@@ -192,14 +192,16 @@ class UploadSceneImageApiTest(unittest.TestCase):
 
     def setUp(self) -> None:
         """격리된 저장소와 테스트용 DB 세션을 준비합니다."""
-        self.storage_directory = tempfile.TemporaryDirectory()
+        self.storage_directory = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         self.session = _FakeSession()
         self.app = fastapi.FastAPI()
         self.app.add_middleware(request_context.RequestIdMiddleware)
         exception_handlers.register_exception_handlers(self.app)
         self.app.include_router(scene_images.router)
 
-        async def override_database_session():
+        async def override_database_session() -> collections.abc.AsyncIterator[
+            _FakeSession
+        ]:
             yield self.session
 
         self.app.dependency_overrides[database.get_database_session] = (
@@ -225,32 +227,14 @@ class UploadSceneImageApiTest(unittest.TestCase):
             config, "get_settings", return_value=settings
         )
         self.settings_patch.start()
-        detection_result = GeminiDetectionResult(
-            detections=[
-                GeminiRawDetection(
-                    label="chair",
-                    box_2d=[100, 200, 700, 800],
-                    evidence="chair shape",
-                    confidence=0.9,
-                )
-            ],
-            processing_time_ms=10,
-        )
-        self.detection_patch = unittest.mock.patch.object(
-            scene_images.furniture_detection_service,
-            "detect_furniture_from_bytes",
-            return_value=detection_result,
-        )
-        self.detection_mock = self.detection_patch.start()
         self.client = starlette.testclient.TestClient(self.app)
 
     def tearDown(self) -> None:
         """테스트용 저장소와 설정 패치를 정리합니다."""
-        self.detection_patch.stop()
         self.settings_patch.stop()
         self.storage_directory.cleanup()
 
-    def _post_valid_image(self) -> object:
+    def _post_valid_image(self) -> httpx.Response:
         """유효한 이미지만 업로드합니다."""
         return self.client.post(
             "/tagging",
@@ -263,19 +247,22 @@ class UploadSceneImageApiTest(unittest.TestCase):
             },
         )
 
-    def test_returns_metadata_for_valid_multipart_upload(self) -> None:
-        """유효한 multipart 업로드에 검증 결과를 반환합니다."""
+    def test_accepts_valid_upload_and_enqueues_detection_job(self) -> None:
+        """업로드를 저장하고 가구 탐지 작업 UUID를 즉시 반환합니다."""
         response = self._post_valid_image()
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json()["status"], "success")
-        self.assertEqual(
-            response.json()["data"]["image"]["mime_type"], "image/png"
-        )
         self.assertEqual(response.json()["data"]["scene_image_id"], 42)
+        self.assertEqual(response.json()["data"]["status"], "PENDING")
+        assert self.session.added_job is not None
         self.assertEqual(
-            response.json()["meta"]["request_id"],
-            response.headers["X-Request-ID"],
+            response.json()["data"]["job_id"],
+            str(self.session.added_job.job_id),
+        )
+        self.assertEqual(
+            set(response.json()["data"]),
+            {"scene_image_id", "job_id", "status"},
         )
         assert self.session.execute_parameters is not None
         self.assertEqual(
@@ -301,50 +288,24 @@ class UploadSceneImageApiTest(unittest.TestCase):
             self.session.execute_parameters["analysis_status"], "pending"
         )
         self.assertIsNone(self.session.execute_parameters["analysis_error"])
-        assert self.session.analysis_update_parameters is not None
+        self.assertIsInstance(self.session.added_job.job_id, uuid.UUID)
         self.assertEqual(
-            json.loads(
-                str(self.session.analysis_update_parameters["object_metadata"])
-            ),
-            [
-                {
-                    "object_idx": 0,
-                    "bbox_coord": {
-                        "xmin": 200,
-                        "ymin": 100,
-                        "xmax": 800,
-                        "ymax": 700,
-                    },
-                    "attribute": {"label": "chair"},
-                }
-            ],
+            self.session.added_job.scene_image_id,
+            42,
         )
         self.assertEqual(
-            self.session.analysis_update_parameters["analysis_status"],
-            "detected",
+            self.session.added_job.job_type,
+            AiJobType.DETECT_SCENE.value,
         )
-        self.assertIsNone(
-            self.session.analysis_update_parameters["analysis_error"]
-        )
-        self.assertEqual(self.session.commit_count, 2)
-
-    def test_marks_failed_when_detection_fails(self) -> None:
-        """객체 탐지 오류가 발생하면 failed 상태와 원인을 저장합니다."""
-        self.detection_mock.side_effect = RuntimeError("detection failed")
-
-        response = self._post_valid_image()
-
-        self.assertEqual(response.status_code, 502)
-        assert self.session.analysis_update_parameters is not None
         self.assertEqual(
-            self.session.analysis_update_parameters,
-            {
-                "scene_image_id": 42,
-                "analysis_status": "failed",
-                "analysis_error": "detection failed",
-            },
+            self.session.added_job.status,
+            AiJobStatus.PENDING.value,
         )
-        self.assertEqual(self.session.commit_count, 2)
+        self.assertEqual(
+            self.session.added_job.input_payload,
+            {"image_url": image_url},
+        )
+        self.assertEqual(self.session.commit_count, 1)
 
     def test_returns_validation_error_for_invalid_upload(self) -> None:
         """디코딩할 수 없는 multipart 업로드를 거부합니다."""

@@ -33,11 +33,12 @@ frontend/dist/
 frontend/.eslintcache
 
 data/images
+data/review
 resource
-data/images
 
 # IDE 및 운영체제 파일 / IDE and operating system files
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+/zz-sku-catalog-embeddings.sql

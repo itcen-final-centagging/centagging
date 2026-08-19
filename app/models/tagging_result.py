@@ -18,7 +18,7 @@ class TaggingResult(Base):  # pylint: disable=too-few-public-methods
     __tablename__ = "tagging_result"
     __table_args__ = (
         sqlalchemy.UniqueConstraint(
-            "scene_image_id", "object_index", name="uq_result_scene_object"
+            "scene_image_id", "object_idx", name="uq_result_scene_object"
         ),
     )
 
@@ -30,7 +30,7 @@ class TaggingResult(Base):  # pylint: disable=too-few-public-methods
         sqlalchemy.ForeignKey("scene_image.scene_image_id"),
         nullable=False,
     )
-    object_index: orm.Mapped[int] = orm.mapped_column(
+    object_idx: orm.Mapped[int] = orm.mapped_column(
         sqlalchemy.SmallInteger, nullable=False
     )
     sku_id: orm.Mapped[int] = orm.mapped_column(
@@ -48,6 +48,13 @@ class TaggingResult(Base):  # pylint: disable=too-few-public-methods
     match_rank: orm.Mapped[typing.Optional[int]] = orm.mapped_column(
         sqlalchemy.SmallInteger
     )
+    status: orm.Mapped[typing.Literal["PENDING", "ACTIVE", "DEACTIVE"]] = (
+        orm.mapped_column(
+            sqlalchemy.String(20),
+            nullable=False,
+            server_default=sqlalchemy.text("'PENDING'"),
+        )
+    )
     similarity_score: orm.Mapped[typing.Optional[decimal.Decimal]] = (
         orm.mapped_column(sqlalchemy.Numeric(6, 4))
     )
@@ -55,10 +62,18 @@ class TaggingResult(Base):  # pylint: disable=too-few-public-methods
         sqlalchemy.CHAR(1)
     )
     xai_result: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
-        orm.mapped_column(mutable.MutableDict.as_mutable(postgresql.JSONB))
+        orm.mapped_column(
+            mutable.MutableDict.as_mutable(
+                postgresql.JSONB(none_as_null=True)
+            )
+        )
     )
     vlm_mood: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
-        orm.mapped_column(mutable.MutableDict.as_mutable(postgresql.JSONB))
+        orm.mapped_column(
+            mutable.MutableDict.as_mutable(
+                postgresql.JSONB(none_as_null=True)
+            )
+        )
     )
     created_by: orm.Mapped[int] = orm.mapped_column(
         sqlalchemy.BigInteger,

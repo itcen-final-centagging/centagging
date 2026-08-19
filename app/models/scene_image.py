@@ -8,10 +8,12 @@ from sqlalchemy import orm
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext import mutable
 
+from app.models.app_user import AppUser
 from app.models.sku import Base
 
 
-class SceneImage(Base):
+# SQLAlchemy 매핑 전용 클래스입니다.
+class SceneImage(Base):  # pylint: disable=too-few-public-methods
     """업로드된 연출 이미지입니다 (``schema.sql``의 ``scene_image``)."""
 
     __tablename__ = "scene_image"
@@ -24,6 +26,7 @@ class SceneImage(Base):
         sqlalchemy.ForeignKey("app_user.user_id"),
         nullable=False,
     )
+    user: orm.Mapped[AppUser] = orm.relationship()
     image_url: orm.Mapped[str] = orm.mapped_column(
         sqlalchemy.Text, nullable=False
     )

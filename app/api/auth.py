@@ -7,23 +7,23 @@ import fastapi
 import sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
-from app.core import database, error_codes
+from app.core import database
 from app.schemas import auth as auth_schema
 from app.schemas import common as common_schema
+from app.api.examples import (
+    LOGIN_SUCCESS_RESPONSE,
+    LOGIN_UNAUTHORIZED_RESPONSE,
+    LOGIN_VALIDATION_ERROR_RESPONSE,
+    ME_SUCCESS_RESPONSE,
+    SESSION_UNAUTHORIZED_RESPONSE,
+    UNAUTHORIZED_DETAIL,
+    INVALID_CREDENTIALS_DETAIL
+)
 
 router = fastapi.APIRouter(
     prefix="/auth",
     tags=["인증"],
 )
-
-_INVALID_CREDENTIALS_DETAIL = {
-    "code": error_codes.ErrorCode.AUTH_CREDENTIALS_INVALID.value,
-    "message": "아이디 또는 비밀번호가 올바르지 않습니다.",
-}
-_UNAUTHORIZED_DETAIL = {
-    "code": error_codes.ErrorCode.AUTH_SESSION_INVALID.value,
-    "message": "인증 세션이 유효하지 않습니다.",
-}
 
 _SELECT_LOGIN_USER = sqlalchemy.text("""
     SELECT user_id, login_id, user_name, role, session
@@ -39,90 +39,6 @@ _SELECT_SESSION_USER = sqlalchemy.text("""
     WHERE session = :session
       AND is_active = TRUE
     """)
-
-_SUCCESS_RESPONSE_EXAMPLE = {
-    "status": "success",
-    "data": {
-        "user_id": 1,
-        "login_id": "user",
-        "user_name": "일반 사용자",
-        "role": "USER",
-        "session": "centagging-poc-user-session",
-    },
-    "meta": {"request_id": "f4a2c15c-2d9e-4b4f-90e6-3ad7c1c93bf0"},
-}
-
-_LOGIN_SUCCESS_RESPONSE = {
-    "description": "공통 성공 응답으로 사용자 정보와 고정 세션을 반환합니다.",
-    "content": {"application/json": {"example": _SUCCESS_RESPONSE_EXAMPLE}},
-}
-
-_ME_SUCCESS_RESPONSE = {
-    "description": "공통 성공 응답으로 현재 사용자 정보를 반환합니다.",
-    "content": {"application/json": {"example": _SUCCESS_RESPONSE_EXAMPLE}},
-}
-
-_LOGIN_UNAUTHORIZED_RESPONSE = {
-    "model": common_schema.ErrorResponse,
-    "description": "아이디 또는 비밀번호가 일치하지 않은 경우입니다.",
-    "content": {
-        "application/json": {
-            "example": {
-                "status": "error",
-                "error": {
-                    "code": "AUTH_CREDENTIALS_INVALID",
-                    "message": "아이디 또는 비밀번호가 올바르지 않습니다.",
-                    "details": [],
-                },
-                "meta": {"request_id": "f4a2c15c-2d9e-4b4f-90e6-3ad7c1c93bf0"},
-            }
-        }
-    },
-}
-
-_SESSION_UNAUTHORIZED_RESPONSE = {
-    "model": common_schema.ErrorResponse,
-    "description": (
-        "Bearer 세션이 없거나 형식이 잘못되었거나 " "DB 값과 일치하지 않은 경우입니다."
-    ),
-    "content": {
-        "application/json": {
-            "example": {
-                "status": "error",
-                "error": {
-                    "code": "AUTH_SESSION_INVALID",
-                    "message": "인증 세션이 유효하지 않습니다.",
-                    "details": [],
-                },
-                "meta": {"request_id": "f4a2c15c-2d9e-4b4f-90e6-3ad7c1c93bf0"},
-            }
-        }
-    },
-}
-
-_LOGIN_VALIDATION_ERROR_RESPONSE = {
-    "model": common_schema.ErrorResponse,
-    "description": "아이디 또는 비밀번호가 없거나 형식이 올바르지 않은 경우입니다.",
-    "content": {
-        "application/json": {
-            "example": {
-                "status": "error",
-                "error": {
-                    "code": "VALIDATION_ERROR",
-                    "message": "요청 값을 확인해 주세요.",
-                    "details": [
-                        {
-                            "field": "login_id",
-                            "reason": "min_length",
-                            "message": "입력값이 너무 짧습니다.",
-                        }
-                    ],
-                },
-                "meta": {"request_id": "f4a2c15c-2d9e-4b4f-90e6-3ad7c1c93bf0"},
-            }
-        }
-    },
-}
 
 
 def _hash_password(password: str) -> str:
@@ -148,10 +64,14 @@ def _get_bearer_session(authorization: str | None) -> str:
         fastapi.HTTPException: Bearer 세션이 없거나 형식이 잘못된 경우입니다.
     """
     if authorization is None:
-        raise fastapi.HTTPException(status_code=401, detail=_UNAUTHORIZED_DETAIL)
+        raise fastapi.HTTPException(
+            status_code=401, detail=UNAUTHORIZED_DETAIL
+        )
     scheme, _, session = authorization.partition(" ")
     if scheme.lower() != "bearer" or not session:
-        raise fastapi.HTTPException(status_code=401, detail=_UNAUTHORIZED_DETAIL)
+        raise fastapi.HTTPException(
+            status_code=401, detail=UNAUTHORIZED_DETAIL
+        )
     return session
 
 
@@ -165,9 +85,9 @@ def _get_bearer_session(authorization: str | None) -> str:
     ),
     response_description="공통 성공 응답으로 사용자 정보와 고정 세션을 반환합니다.",
     responses={
-        200: _LOGIN_SUCCESS_RESPONSE,
-        401: _LOGIN_UNAUTHORIZED_RESPONSE,
-        422: _LOGIN_VALIDATION_ERROR_RESPONSE,
+        200: LOGIN_SUCCESS_RESPONSE,
+        401: LOGIN_UNAUTHORIZED_RESPONSE,
+        422: LOGIN_VALIDATION_ERROR_RESPONSE,
     },
 )
 async def login(
@@ -181,14 +101,16 @@ async def login(
         _SELECT_LOGIN_USER,
         {
             "login_id": request.login_id,
-            "password_hash": _hash_password(request.password.get_secret_value()),
+            "password_hash": _hash_password(
+                request.password.get_secret_value()
+            ),
         },
     )
     user = result.mappings().one_or_none()
     if user is None:
         raise fastapi.HTTPException(
             status_code=401,
-            detail=_INVALID_CREDENTIALS_DETAIL,
+            detail=INVALID_CREDENTIALS_DETAIL,
         )
     return common_schema.success_response(_to_user_response(user))
 
@@ -203,12 +125,15 @@ async def login(
         "헤더는 필수이며, 누락하거나 형식 또는 값이 맞지 않으면 401을 반환합니다."
     ),
     response_description="공통 성공 응답으로 현재 사용자 정보를 반환합니다.",
-    responses={200: _ME_SUCCESS_RESPONSE, 401: _SESSION_UNAUTHORIZED_RESPONSE},
+    responses={200: ME_SUCCESS_RESPONSE,
+               401: SESSION_UNAUTHORIZED_RESPONSE},
 )
 async def get_current_user(
     authorization: str | None = fastapi.Header(
         default=None,
-        description=("로그인 응답의 session을 `Bearer {session}` 형식으로 전달합니다."),
+        description=(
+            "로그인 응답의 session을 `Bearer {session}` 형식으로 전달합니다."
+        ),
         openapi_examples={
             "user_session": {
                 "summary": "일반 사용자 세션",
@@ -228,5 +153,7 @@ async def get_current_user(
     )
     user = result.mappings().one_or_none()
     if user is None:
-        raise fastapi.HTTPException(status_code=401, detail=_UNAUTHORIZED_DETAIL)
+        raise fastapi.HTTPException(
+            status_code=401, detail=UNAUTHORIZED_DETAIL
+        )
     return common_schema.success_response(_to_user_response(user))

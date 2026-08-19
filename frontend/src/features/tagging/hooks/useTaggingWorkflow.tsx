@@ -8,21 +8,24 @@ import {
   type PropsWithChildren,
 } from 'react';
 
+import { useSkuSelections } from './useSkuSelections';
+import { useTaggingObjectEditor } from './useTaggingObjectEditor';
 import {
   analyzeImage,
-  fetchRecommendations,
-  fetchTaggingHistory,
+  fetchObjectRecommendations,
   saveTaggingReview,
   searchCatalogItems,
+  updateSceneObjects,
 } from '../api/tagging';
-import { saveTaggingAndRefreshHistory } from '../services/save-tagging-workflow';
+import { DEMO_IMAGE_URL, DEMO_OBJECTS } from '../constants/demoScenario';
 import { validateImage } from '../utils/image';
 
 import type {
   AnalysisScenario,
+  ConfirmedSkuSelection,
   FurnitureObject,
   SkuCandidate,
-  TaggingHistory,
+  TaggingValues,
   UploadedImage,
   WorkflowStage,
 } from '../types';
@@ -30,25 +33,41 @@ import type {
 type TaggingWorkflowContextValue = {
   analysisMode?: 'live' | 'mock' | null;
   analysisScenario: AnalysisScenario;
+  addCatalogSkuToCandidates: (sku: SkuCandidate) => void;
+  addObject: () => void;
   beginAnalysis: () => Promise<void>;
   catalogResults: SkuCandidate[];
   changeStage: (stage: WorkflowStage) => void;
+  clearSelectedSku: () => void;
+  confirmedSelections: ConfirmedSkuSelection[];
   clearUploadError: () => void;
   detectedObjects: FurnitureObject[];
-  history: TaggingHistory[];
-  historyError?: string;
+  deleteObject: (objectId: string) => void;
+  finishEditing: () => void;
+  focusObjectForEditing: (object: FurnitureObject) => void;
   isRecommendationLoading: boolean;
+  isEditing: boolean;
+  loadDemoWorkflow: () => Promise<void>;
   loadSelectedObjectRecommendations: () => Promise<void>;
   redetect: (description: string) => Promise<void>;
   resetWorkflow: () => void;
-  saveTagging: () => Promise<void>;
+  saveTagging: (
+    valuesByObject?: Record<string, TaggingValues>,
+  ) => Promise<void>;
   searchCatalog: (query: string) => Promise<SkuCandidate[]>;
   selectObject: (object: FurnitureObject) => void;
   selectedObject?: FurnitureObject;
+  selectedObjectIds: string[];
   selectedSku?: SkuCandidate;
   selectSku: (sku: SkuCandidate) => void;
   setAnalysisScenario: (scenario: AnalysisScenario) => void;
   stage: WorkflowStage;
+  startEditing: () => void;
+  toggleObjectSelection: (object: FurnitureObject) => void;
+  updateObjectBboxes: (
+    updates: Array<Pick<FurnitureObject, 'bbox' | 'id'>>,
+  ) => void;
+  updateObjectCategory: (objectId: string, category: string) => void;
   uploadError?: string;
   uploadedImage?: UploadedImage;
   uploadImage: (file: File) => Promise<void>;
@@ -65,38 +84,45 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
   const [workflowError, setWorkflowError] = useState<string>();
   const [analysisId, setAnalysisId] = useState<string>();
   const [analysisMode, setAnalysisMode] = useState<'live' | 'mock' | null>();
-  const [detectedObjects, setDetectedObjects] = useState<FurnitureObject[]>([]);
-  const [selectedObject, setSelectedObject] = useState<FurnitureObject>();
-  const [selectedSku, setSelectedSku] = useState<SkuCandidate>();
   const [catalogResults, setCatalogResults] = useState<SkuCandidate[]>([]);
   const [analysisScenario, setAnalysisScenario] =
     useState<AnalysisScenario>('detected');
-  const [history, setHistory] = useState<TaggingHistory[]>([]);
-  const [historyError, setHistoryError] = useState<string>();
   const [isRecommendationLoading, setIsRecommendationLoading] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    void fetchTaggingHistory()
-      .then((nextHistory) => {
-        if (isMounted) {
-          setHistory(nextHistory);
-          setHistoryError(undefined);
-        }
-      })
-      .catch((error: unknown) => {
-        if (isMounted) {
-          setHistoryError(
-            error instanceof Error
-              ? error.message
-              : '이력을 불러오지 못했습니다.',
-          );
-        }
-      });
-    return () => {
-      isMounted = false;
-    };
+  const handleMinimumObjectError = useCallback(() => {
+    setWorkflowError('최소 한 개의 탐지 객체는 남겨야 합니다.');
   }, []);
+  const {
+    addObject,
+    deleteObject: deleteDetectedObject,
+    detectedObjects,
+    finishEditing,
+    focusObjectForEditing,
+    isEditing,
+    resetObjectEditor,
+    selectedObject,
+    selectedObjectIds,
+    setDetectedObjects,
+    setSelectedObject,
+    startEditing: startObjectEditing,
+    toggleObjectSelection,
+    updateObjectBboxes,
+    updateObjectCategory,
+  } = useTaggingObjectEditor({
+    onMinimumObjectError: handleMinimumObjectError,
+  });
+  const {
+    clearSelectedSku,
+    confirmedSelections,
+    removeSkuSelection,
+    resetSkuSelections,
+    selectObjectForSku,
+    selectedSku,
+    selectSku,
+  } = useSkuSelections({
+    detectedObjects,
+    selectedObject,
+    setSelectedObject,
+  });
 
   useEffect(
     () => () => {
@@ -105,28 +131,30 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [uploadedImage],
   );
 
-  const uploadImage = useCallback(async (file: File): Promise<void> => {
-    setUploadError(undefined);
-    try {
-      const nextImage = await validateImage(file);
-      setUploadedImage((currentImage) => {
-        if (currentImage) URL.revokeObjectURL(currentImage.previewUrl);
-        return nextImage;
-      });
-      setWorkflowError(undefined);
-      setAnalysisId(undefined);
-      setAnalysisMode(undefined);
-      setDetectedObjects([]);
-      setSelectedObject(undefined);
-      setSelectedSku(undefined);
-    } catch (error) {
-      setUploadError(
-        error instanceof Error
-          ? error.message
-          : '이미지를 읽을 수 없습니다. 다른 파일을 선택해 주세요.',
-      );
-    }
-  }, []);
+  const uploadImage = useCallback(
+    async (file: File): Promise<void> => {
+      setUploadError(undefined);
+      try {
+        const nextImage = await validateImage(file);
+        setUploadedImage((currentImage) => {
+          if (currentImage) URL.revokeObjectURL(currentImage.previewUrl);
+          return nextImage;
+        });
+        setWorkflowError(undefined);
+        setAnalysisId(undefined);
+        setAnalysisMode(undefined);
+        resetObjectEditor();
+        resetSkuSelections();
+      } catch (error) {
+        setUploadError(
+          error instanceof Error
+            ? error.message
+            : '이미지를 읽을 수 없습니다. 다른 파일을 선택해 주세요.',
+        );
+      }
+    },
+    [resetObjectEditor, resetSkuSelections],
+  );
 
   const runAnalysis = useCallback(
     async (targetDescription?: string): Promise<void> => {
@@ -140,9 +168,8 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         const analysis = await analyzeImage(uploadedImage.file, description);
         setAnalysisId(analysis.analysisId);
         setAnalysisMode(analysis.mode);
-        setDetectedObjects(analysis.objects);
-        setSelectedObject(undefined);
-        setSelectedSku(undefined);
+        resetObjectEditor(analysis.objects);
+        resetSkuSelections();
         setStage(analysis.objects.length > 0 ? 'detect' : 'not-found');
       } catch (error) {
         setWorkflowError(
@@ -153,7 +180,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         setStage('failed');
       }
     },
-    [analysisScenario, uploadedImage],
+    [analysisScenario, resetObjectEditor, resetSkuSelections, uploadedImage],
   );
 
   const beginAnalysis = useCallback(async (): Promise<void> => {
@@ -161,6 +188,39 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     setStage('analyzing');
     await runAnalysis();
   }, [runAnalysis, uploadedImage]);
+
+  const loadDemoWorkflow = useCallback(async (): Promise<void> => {
+    setUploadError(undefined);
+    setWorkflowError(undefined);
+    try {
+      const response = await fetch(DEMO_IMAGE_URL);
+      if (!response.ok) {
+        throw new Error('데모 이미지를 불러오지 못했습니다.');
+      }
+      const blob = await response.blob();
+      const file = new File([blob], 'demo-sofa-bed.png', {
+        type: blob.type || 'image/png',
+      });
+      const nextImage = await validateImage(file);
+      setUploadedImage((currentImage) => {
+        if (currentImage) URL.revokeObjectURL(currentImage.previewUrl);
+        return nextImage;
+      });
+      setAnalysisId('demo-sofa-bed');
+      setAnalysisMode('mock');
+      resetObjectEditor(DEMO_OBJECTS);
+      resetSkuSelections();
+      setCatalogResults([]);
+      setStage('detect');
+    } catch (error) {
+      setWorkflowError(
+        error instanceof Error
+          ? error.message
+          : '데모 작업을 시작하지 못했습니다.',
+      );
+      setStage('failed');
+    }
+  }, [resetObjectEditor, resetSkuSelections]);
 
   const redetect = useCallback(
     async (description: string): Promise<void> => {
@@ -171,25 +231,45 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
   );
 
   const loadSelectedObjectRecommendations = useCallback(async () => {
-    if (!analysisId || !selectedObject) return;
+    if (!analysisId || detectedObjects.length === 0 || isEditing) return;
     setIsRecommendationLoading(true);
     setWorkflowError(undefined);
     try {
-      const candidates = await fetchRecommendations(
-        analysisId,
-        selectedObject.objectIndex,
-      );
-      if (candidates.length === 0) {
+      if (analysisMode === 'mock') {
+        const firstCandidateObject = detectedObjects.find(
+          (object) => object.candidates.length > 0,
+        );
+        if (!firstCandidateObject) {
+          throw new Error('데모 SKU 후보가 없습니다.');
+        }
+        setSelectedObject(firstCandidateObject);
+        resetSkuSelections();
+        setStage('recommend');
+        return;
+      }
+      // 삭제·추가 이후 서버의 object_metadata 배열 순서와 인덱스를 맞춥니다.
+      const finalObjects = detectedObjects.map((object, objectIdx) => ({
+        ...object,
+        objectIdx,
+      }));
+      await updateSceneObjects(analysisId, finalObjects);
+      const candidatesByObjectIdx =
+        await fetchObjectRecommendations(analysisId);
+      const objectsWithCandidates = finalObjects.map((object) => ({
+        ...object,
+        candidates: candidatesByObjectIdx.get(object.objectIdx) ?? [],
+      }));
+      if (
+        objectsWithCandidates.every((object) => object.candidates.length === 0)
+      ) {
         throw new Error('추천된 SKU가 없습니다.');
       }
-      const updatedObject = { ...selectedObject, candidates };
-      setDetectedObjects((objects) =>
-        objects.map((object) =>
-          object.id === updatedObject.id ? updatedObject : object,
-        ),
+      const firstCandidateObject = objectsWithCandidates.find(
+        (object) => object.candidates.length > 0,
       );
-      setSelectedObject(updatedObject);
-      setSelectedSku(undefined);
+      setDetectedObjects(objectsWithCandidates);
+      setSelectedObject(firstCandidateObject);
+      resetSkuSelections();
       setStage('recommend');
     } catch (error) {
       setWorkflowError(
@@ -201,7 +281,27 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     } finally {
       setIsRecommendationLoading(false);
     }
-  }, [analysisId, selectedObject]);
+  }, [
+    analysisId,
+    analysisMode,
+    detectedObjects,
+    isEditing,
+    resetSkuSelections,
+    setDetectedObjects,
+    setSelectedObject,
+  ]);
+
+  const startEditing = useCallback(() => {
+    setWorkflowError(undefined);
+    startObjectEditing();
+  }, [startObjectEditing]);
+
+  const deleteObject = useCallback(
+    (objectId: string) => {
+      if (deleteDetectedObject(objectId)) removeSkuSelection(objectId);
+    },
+    [deleteDetectedObject, removeSkuSelection],
+  );
 
   const searchCatalog = useCallback(
     async (query: string): Promise<SkuCandidate[]> => {
@@ -223,26 +323,67 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [],
   );
 
-  const saveTagging = useCallback(async (): Promise<void> => {
-    if (!analysisId || !selectedObject || !selectedSku) return;
+  /**
+   * 전체 카탈로그 검색에서 직접 고른 SKU를 현재 선택된 객체의 추천 후보
+   * 목록 맨 뒤에 추가하고 확정한 뒤, 추천 화면으로 돌아갑니다. 같은
+   * SKU가 이미 후보에 있으면 중복으로 추가하지 않고 그 자리를 갱신합니다.
+   */
+  const addCatalogSkuToCandidates = useCallback(
+    (sku: SkuCandidate): void => {
+      if (!selectedObject) return;
+      const targetObjectId = selectedObject.id;
+
+      const appendSku = (object: FurnitureObject): FurnitureObject => ({
+        ...object,
+        candidates: [
+          ...object.candidates.filter((candidate) => candidate.sku !== sku.sku),
+          sku,
+        ],
+      });
+
+      setDetectedObjects((objects) =>
+        objects.map((object) =>
+          object.id === targetObjectId ? appendSku(object) : object,
+        ),
+      );
+      setSelectedObject((object) =>
+        object && object.id === targetObjectId ? appendSku(object) : object,
+      );
+      selectSku(sku);
+      setStage('recommend');
+    },
+    [selectSku, selectedObject, setDetectedObjects, setSelectedObject],
+  );
+
+  const saveTagging = useCallback(async (
+    valuesByObject?: Record<string, TaggingValues>,
+  ): Promise<void> => {
+    if (!analysisId || confirmedSelections.length === 0) return;
+    const recommendationObjects = detectedObjects.filter(
+      (object) => object.candidates.length > 0,
+    );
+    if (confirmedSelections.length < recommendationObjects.length) {
+      setWorkflowError('모든 탐지 객체의 SKU를 확정한 뒤 검수해 주세요.');
+      setStage('recommend');
+      return;
+    }
     setStage('saving');
     setWorkflowError(undefined);
     try {
-      const result = await saveTaggingAndRefreshHistory({
-        onSaved: () => {
-          setStage('saved');
-          setHistoryError(undefined);
-        },
-        refreshHistory: fetchTaggingHistory,
-        save: () =>
-          saveTaggingReview({
-            objectIndex: selectedObject.objectIndex,
-            sceneImageId: analysisId,
-            selectedSku,
-          }),
+      if (analysisMode === 'mock') {
+        setStage('saved');
+        return;
+      }
+      await saveTaggingReview({
+        matching: confirmedSelections.map(({ object, sku }) => ({
+          object,
+          objectIdx: object.objectIdx,
+          selectedSku: sku,
+          values: valuesByObject?.[object.id],
+        })),
+        sceneImageId: analysisId,
       });
-      if (result.history) setHistory(result.history);
-      setHistoryError(result.historyError);
+      setStage('saved');
     } catch (error) {
       setWorkflowError(
         error instanceof Error
@@ -251,7 +392,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       );
       setStage('failed');
     }
-  }, [analysisId, selectedObject, selectedSku]);
+  }, [analysisId, analysisMode, confirmedSelections, detectedObjects]);
 
   const resetWorkflow = useCallback((): void => {
     setStage('upload');
@@ -263,35 +404,46 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     setWorkflowError(undefined);
     setAnalysisId(undefined);
     setAnalysisMode(undefined);
-    setDetectedObjects([]);
-    setSelectedObject(undefined);
-    setSelectedSku(undefined);
+    resetObjectEditor();
+    resetSkuSelections();
     setCatalogResults([]);
-  }, []);
+  }, [resetObjectEditor, resetSkuSelections]);
 
   const value = useMemo<TaggingWorkflowContextValue>(
     () => ({
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
+      addObject,
       beginAnalysis,
       catalogResults,
       changeStage: setStage,
+      clearSelectedSku,
+      confirmedSelections,
       clearUploadError: () => setUploadError(undefined),
       detectedObjects,
-      history,
-      historyError,
+      deleteObject,
+      finishEditing,
+      focusObjectForEditing,
       isRecommendationLoading,
+      isEditing,
+      loadDemoWorkflow,
       loadSelectedObjectRecommendations,
       redetect,
       resetWorkflow,
       saveTagging,
       searchCatalog,
-      selectObject: setSelectedObject,
+      selectObject: selectObjectForSku,
       selectedObject,
+      selectedObjectIds,
       selectedSku,
-      selectSku: setSelectedSku,
+      selectSku,
       setAnalysisScenario,
       stage,
+      startEditing,
+      toggleObjectSelection,
+      updateObjectBboxes,
+      updateObjectCategory,
       uploadError,
       uploadedImage,
       uploadImage,
@@ -300,20 +452,34 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
+      addObject,
       beginAnalysis,
       catalogResults,
+      clearSelectedSku,
+      confirmedSelections,
       detectedObjects,
-      history,
-      historyError,
+      deleteObject,
+      finishEditing,
+      focusObjectForEditing,
       isRecommendationLoading,
+      isEditing,
+      loadDemoWorkflow,
       loadSelectedObjectRecommendations,
       redetect,
       resetWorkflow,
       saveTagging,
       searchCatalog,
       selectedObject,
+      selectedObjectIds,
       selectedSku,
+      selectObjectForSku,
+      selectSku,
       stage,
+      startEditing,
+      toggleObjectSelection,
+      updateObjectBboxes,
+      updateObjectCategory,
       uploadError,
       uploadedImage,
       uploadImage,

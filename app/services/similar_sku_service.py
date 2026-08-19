@@ -109,8 +109,8 @@ class SimilarSkuService:
             similar_skus = await self._find_skus_for_crop(crop, embedding)
             detected_objects.append(
                 DetectedObject(
-                    object_index=crop.crop_index,
-                    bbox=crop.bbox,
+                    object_idx=crop.crop_index,
+                    bbox_coord=crop.bbox,
                     sku_candidates=[
                         self._to_sku_candidate(sku) for sku in similar_skus
                     ],
@@ -178,6 +178,7 @@ class SimilarSkuService:
             XAI 결과가 비어 있는 SKU 후보입니다.
         """
         return SkuCandidate(
+            sku_id=sku.sku_id,
             sku_code=sku.sku_code,
             product_name=sku.product_name,
             category=sku.category or "",

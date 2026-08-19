@@ -83,7 +83,7 @@ export const NoDetectionPanel = () => {
 };
 
 export const SavedPanel = () => {
-  const { historyError, resetWorkflow, selectedSku, uploadedImage } =
+  const { confirmedSelections, resetWorkflow, uploadedImage } =
     useTaggingWorkflow();
 
   return (
@@ -95,19 +95,10 @@ export const SavedPanel = () => {
         태깅 결과가 저장되었습니다
       </h2>
       <p className="mt-2 text-sm leading-6 text-neutral-500">
-        {uploadedImage?.name} · {selectedSku?.name}
+        {uploadedImage?.name} · {confirmedSelections.length}개 객체
         <br />
         저장한 결과는 검수 이력에서 다시 확인할 수 있습니다.
       </p>
-      {historyError ? (
-        <p
-          className="mt-4 rounded-md border border-warning-200 bg-warning-50 px-4 py-3 text-sm font-semibold text-warning-700"
-          role="alert"
-        >
-          태깅 결과는 저장되었지만 최신 이력을 불러오지 못했습니다.{' '}
-          {historyError}
-        </p>
-      ) : null}
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <Link
           className="inline-flex h-10 items-center justify-center rounded-md border border-neutral-200 bg-white px-4 text-sm font-bold text-neutral-700 transition-colors hover:bg-neutral-50 hover:text-neutral-800"
