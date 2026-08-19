@@ -56,6 +56,15 @@ compose() {
     "$@"
 }
 
+compose_migration() {
+  docker compose \
+    --profile migration \
+    --env-file "${ENV_FILE}" \
+    --env-file "${SECRET_ENV_FILE}" \
+    -f "${COMPOSE_FILE}" \
+    "$@"
+}
+
 previous_api_image=""
 previous_frontend_image=""
 
@@ -81,7 +90,37 @@ gcloud auth configure-docker \
   --quiet > /dev/null
 
 compose config --quiet
-compose pull cloud-sql-proxy api frontend
+compose_migration config --quiet
+compose pull cloud-sql-proxy api ai-worker frontend
+compose_migration pull db-migrate
+
+compose up -d --no-build cloud-sql-proxy
+
+cloud_sql_proxy_ready=false
+for _ in $(seq 1 30); do
+  if compose exec -T cloud-sql-proxy \
+    /cloud-sql-proxy wait \
+      --http-address=127.0.0.1 \
+      --http-port=9090 \
+      --max=2s > /dev/null 2>&1; then
+    cloud_sql_proxy_ready=true
+    break
+  fi
+
+  sleep 2
+done
+
+if [[ "${cloud_sql_proxy_ready}" != "true" ]]; then
+  echo "Cloud SQL Proxy did not become ready for migration." >&2
+  compose logs --tail=100 cloud-sql-proxy >&2 || true
+  exit 1
+fi
+
+if ! compose_migration run --rm --no-deps db-migrate; then
+  echo "Database migration failed." >&2
+  compose logs --tail=100 cloud-sql-proxy >&2 || true
+  exit 1
+fi
 
 rollback() {
   if [[ -z "${previous_api_image}" || -z "${previous_frontend_image}" ]]; then
@@ -100,6 +139,14 @@ if ! compose up -d --no-build --remove-orphans; then
   exit 1
 fi
 
+worker_container_id="$(compose ps -q ai-worker 2>/dev/null || true)"
+if [[ -z "${worker_container_id}" ]]; then
+  echo "AI worker container did not start." >&2
+  compose logs --tail=100 ai-worker >&2 || true
+  rollback
+  exit 1
+fi
+
 health_check_passed=false
 
 for _ in $(seq 1 30); do
@@ -114,7 +161,7 @@ for _ in $(seq 1 30); do
 done
 
 if [[ "${health_check_passed}" != "true" ]]; then
-  compose logs --tail=100 api frontend >&2 || true
+  compose logs --tail=100 api ai-worker frontend >&2 || true
   rollback
   exit 1
 fi

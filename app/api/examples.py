@@ -229,6 +229,23 @@ SCENE_IMAGE_UPLOAD_SUCCESS_RESPONSE = {
     },
 }
 
+# 비동기 작업 큐 도입 이후 업로드 API는 탐지 결과 대신 작업 접수 정보를
+# 즉시 반환합니다. 실제 탐지 결과는 GET /ai-jobs/{job_id}로 조회합니다.
+SCENE_IMAGE_UPLOAD_ACCEPTED_RESPONSE = {
+    "description": "연출 이미지를 저장하고 가구 탐지 작업을 접수했습니다.",
+    "content": {
+        "application/json": {
+            "example": _success_example(
+                {
+                    "scene_image_id": 101,
+                    "job_id": "f3d4a95c-0e40-4cbb-a8ed-f0b1b2098f12",
+                    "status": "PENDING",
+                }
+            )
+        }
+    },
+}
+
 SCENE_IMAGE_TOO_LARGE_RESPONSE = _error_response(
     "이미지 파일 용량이 10MB를 초과한 경우입니다.",
     error_codes.ErrorCode.BAD_REQUEST.value,
@@ -406,6 +423,67 @@ SKU_RECOMMENDATION_SUCCESS_RESPONSE = {
         }
     },
 }
+
+SKU_RECOMMENDATION_ACCEPTED_RESPONSE = {
+    "description": "SKU 추천 작업을 접수했습니다. 작업 상태와 결과는 AI 작업 조회 API로 확인합니다.",
+    "content": {
+        "application/json": {
+            "example": _success_example(
+                {
+                    "scene_image_id": 101,
+                    "job_id": "ab862f06-46df-40b2-898e-cb155bc35faa",
+                    "status": "PENDING",
+                }
+            )
+        }
+    },
+}
+
+AI_JOB_NOT_READY_RESPONSE = _error_response(
+    "가구 탐지가 아직 완료되지 않아 SKU 추천 작업을 접수할 수 없는 경우입니다.",
+    error_codes.ErrorCode.RESOURCE_CONFLICT.value,
+    "가구 탐지가 완료된 이미지에 대해서만 SKU 추천을 요청할 수 있습니다.",
+)
+
+ACTIVE_AI_JOB_EXISTS_RESPONSE = _error_response(
+    "같은 이미지에 대해 같은 종류의 AI 작업이 이미 진행 중인 경우입니다.",
+    error_codes.ErrorCode.RESOURCE_CONFLICT.value,
+    "이미 진행 중인 SKU 추천 작업이 있습니다.",
+)
+
+AI_JOB_STATUS_RESPONSE = {
+    "description": "AI 작업의 현재 상태와 완료된 경우 결과 payload를 반환합니다.",
+    "content": {
+        "application/json": {
+            "example": _success_example(
+                {
+                    "job_id": "f3d4a95c-0e40-4cbb-a8ed-f0b1b2098f12",
+                    "scene_image_id": 101,
+                    "job_type": "DETECT_SCENE",
+                    "status": "SUCCEEDED",
+                    "attempt_count": 1,
+                    "max_attempts": 3,
+                    "result_payload": {
+                        "object_count": 2,
+                        "objects": [],
+                    },
+                    "error_code": None,
+                    "error_message": None,
+                    "created_at": "2026-08-19T10:24:31+09:00",
+                    "started_at": "2026-08-19T10:24:32+09:00",
+                    "finished_at": "2026-08-19T10:24:38+09:00",
+                    "updated_at": "2026-08-19T10:24:38+09:00",
+                }
+            )
+        }
+    },
+}
+
+AI_JOB_NOT_FOUND_RESPONSE = _error_response(
+    "존재하지 않는 AI 작업 ID로 조회한 경우입니다.",
+    error_codes.ErrorCode.RESOURCE_NOT_FOUND.value,
+    "AI 분석 작업을 찾을 수 없습니다.",
+)
 
 SKU_MATCHING_REQUEST_EXAMPLE = {
     "tagging_results": [
