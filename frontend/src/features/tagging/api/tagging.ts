@@ -26,21 +26,23 @@ type DevDetection = {
   label: string;
 };
 
-type DevUploadResponse = {
-  scene_image: {
-    scene_image_id: number;
-    image_url: string;
-    origin_name: string;
-    mime_type: string;
-    file_size: number;
-    analysis_status: string;
-    analysis_error: string | null;
-    width_px: number;
-    height_px: number;
-    created_at: string;
-  };
-  object_count: number;
+type AiJobAcceptedData = {
+  job_id: string;
+  scene_image_id: number;
+  status: 'PENDING';
+};
+
+type DetectionJobResult = {
   objects: DevDetection[];
+  scene_image_id: number;
+};
+
+type AiJobData<ResultPayload> = {
+  error_message: string | null;
+  job_id: string;
+  result_payload: ResultPayload | null;
+  scene_image_id: number;
+  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 };
 
 type DevCandidate = {
@@ -116,6 +118,40 @@ const API_BASE_URL =
     /\/$/,
     '',
   ) ?? '';
+const JOB_POLL_INTERVAL_MS = 1000;
+const JOB_POLL_TIMEOUT_MS = 120_000;
+
+const sleep = async (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => {
+    globalThis.setTimeout(resolve, milliseconds);
+  });
+
+const waitForAiJob = async <ResultPayload>(
+  jobId: string,
+): Promise<ResultPayload> => {
+  const timeoutAt = Date.now() + JOB_POLL_TIMEOUT_MS;
+
+  while (Date.now() < timeoutAt) {
+    const response = await requestJson<
+      ApiSuccessResponse<AiJobData<ResultPayload>>
+    >(`${API_BASE_URL}/ai-jobs/${encodeURIComponent(jobId)}`);
+    const job = response.data;
+
+    if (job.status === 'SUCCEEDED') {
+      if (!job.result_payload) {
+        throw new Error('AI 분석 결과를 확인하지 못했습니다.');
+      }
+      return job.result_payload;
+    }
+    if (job.status === 'FAILED') {
+      throw new Error(job.error_message ?? '가구 분석에 실패했습니다.');
+    }
+
+    await sleep(JOB_POLL_INTERVAL_MS);
+  }
+
+  throw new Error('AI 분석 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.');
+};
 
 const toBbox = (bbox: ApiBoundingBox): [number, number, number, number] => [
   bbox.ymin,
@@ -324,25 +360,27 @@ export const analyzeImage = async (
   }
 
   formData.append('file', file);
-  const response = await requestJson<ApiSuccessResponse<DevUploadResponse>>(
+  const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
     `${API_BASE_URL}/tagging`,
     {
       body: formData,
       method: 'POST',
     },
   );
-  const sceneImageId = response.data.scene_image.scene_image_id;
+  const detectionResult = await waitForAiJob<DetectionJobResult>(
+    accepted.data.job_id,
+  );
 
   return {
-    analysisId: String(sceneImageId),
+    analysisId: String(accepted.data.scene_image_id),
     mode: null,
-    objects: response.data.objects.map((detection) => ({
+    objects: detectionResult.objects.map((detection) => ({
       bbox: toBbox(detection.bbox_coord),
       candidates: [],
       category: nullableText(detection.category),
       confidence: detection.confidence,
       description: detection.evidence,
-      id: `${sceneImageId}-${detection.object_idx}`,
+      id: `${accepted.data.scene_image_id}-${detection.object_idx}`,
       metadata: {
         attributes: {},
         category: nullableText(detection.category),
@@ -360,27 +398,25 @@ export const fetchRecommendations = async (
   sceneImageId: string,
   objectIdx: number,
 ): Promise<SkuCandidate[]> => {
-  const query = new URLSearchParams();
-  query.append('object_idxs', String(objectIdx));
-  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
-  );
-  const object = response.data.objects.find(
-    (item) => item.object_idx === objectIdx,
-  );
-  return object?.sku_candidates.map(toDevCandidate) ?? [];
+  const candidatesByObjectIndex =
+    await fetchObjectRecommendations(sceneImageId);
+  return candidatesByObjectIndex.get(objectIdx) ?? [];
 };
 
 /** 수정 완료된 장면의 모든 객체에 대한 SKU 후보를 한 번에 불러옵니다. */
 export const fetchObjectRecommendations = async (
   sceneImageId: string,
 ): Promise<Map<number, SkuCandidate[]>> => {
-  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
+  const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}/recommendations`,
+    { method: 'POST' },
+  );
+  const recommendationResult = await waitForAiJob<DevRecommendationData>(
+    accepted.data.job_id,
   );
 
   return new Map(
-    response.data.objects.map((object) => [
+    recommendationResult.objects.map((object) => [
       object.object_idx,
       object.sku_candidates.map(toDevCandidate),
     ]),
