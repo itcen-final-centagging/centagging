@@ -4,6 +4,14 @@ import fastapi
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 import app.schemas.sku_search as sku_search_schema
+from app.api.examples import (
+    SKU_DETAIL_SUCCESS_RESPONSE,
+    SKU_NOT_FOUND_RESPONSE,
+    SKU_SEARCH_INVALID_QUERY_RESPONSE,
+    SKU_SEARCH_SUCCESS_RESPONSE,
+    SKU_SEARCH_UNAVAILABLE_RESPONSE,
+    SKU_SEARCH_UPSTREAM_ERROR_RESPONSE,
+)
 from app.core import database
 from app.core.error_codes import ErrorCode
 from app.dependencies import get_gemini_service, get_sku_image_storage
@@ -18,9 +26,38 @@ from app.services.sku_image_storage import SkuImageStorage
 router = fastapi.APIRouter(prefix="/search", tags=["search"])
 
 
-@router.get("/skus", response_model=sku_search_schema.SkuSearchResponse)
+@router.get(
+    "/skus",
+    response_model=sku_search_schema.SkuSearchResponse,
+    summary="검색어와 유사한 SKU 목록 검색",
+    description=(
+        "검색어를 텍스트 임베딩으로 변환해 의미적으로 가장 유사한 SKU를 "
+        "최대 5건까지 유사도 내림차순으로 조회합니다. "
+        "similarity_score는 응답에 포함되지만 화면에는 노출하지 않는 값입니다."
+    ),
+    response_description="유사도 순으로 정렬된 SKU 검색 결과입니다.",
+    responses={
+        200: SKU_SEARCH_SUCCESS_RESPONSE,
+        400: SKU_SEARCH_INVALID_QUERY_RESPONSE,
+        502: SKU_SEARCH_UPSTREAM_ERROR_RESPONSE,
+        503: SKU_SEARCH_UNAVAILABLE_RESPONSE,
+    },
+)
 async def search_skus(
-    q: str = fastapi.Query(default="", description="검색 프롬프트입니다."),
+    q: str = fastapi.Query(
+        default="",
+        description="검색 프롬프트입니다. 공백만 입력하면 400을 반환합니다.",
+        openapi_examples={
+            "keyword": {
+                "summary": "카테고리 키워드",
+                "value": "베이지 린넨 3인용 소파",
+            },
+            "mood": {
+                "summary": "분위기 중심 검색어",
+                "value": "따뜻한 내추럴 거실 가구",
+            },
+        },
+    ),
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
@@ -82,10 +119,26 @@ async def search_skus(
 
 
 @router.get(
-    "/skus/{sku_code}", response_model=sku_search_schema.SkuDetailResponse
+    "/skus/{sku_code}",
+    response_model=sku_search_schema.SkuDetailResponse,
+    summary="SKU 코드로 상세 정보 조회",
+    description=(
+        "SKU 코드로 상품 기본 정보와 카테고리별 속성(attrs)을 조회합니다. "
+        "image_url에는 MAIN 타입 대표 이미지만 포함됩니다."
+    ),
+    response_description="카테고리별 속성이 포함된 SKU 상세 정보입니다.",
+    responses={
+        200: SKU_DETAIL_SUCCESS_RESPONSE,
+        404: SKU_NOT_FOUND_RESPONSE,
+    },
 )
 async def sku_code_detail(
-    sku_code: str,
+    sku_code: str = fastapi.Path(
+        description="조회할 SKU 코드입니다.",
+        openapi_examples={
+            "sofa": {"summary": "소파 SKU", "value": "SKU-1001"},
+        },
+    ),
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),

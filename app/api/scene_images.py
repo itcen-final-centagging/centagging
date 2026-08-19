@@ -7,6 +7,13 @@ import uuid
 import fastapi
 import sqlalchemy
 
+from app.api.examples import (
+    SCENE_IMAGE_INVALID_IMAGE_RESPONSE,
+    SCENE_IMAGE_TOO_LARGE_RESPONSE,
+    SCENE_IMAGE_UNSUPPORTED_TYPE_RESPONSE,
+    SCENE_IMAGE_UPLOAD_FAILED_RESPONSE,
+    SCENE_IMAGE_UPLOAD_ACCEPTED_RESPONSE,
+)
 from app.core import config, database
 from app.models.ai_job import AiJobType
 from app.repositories import ai_job_repository
@@ -89,10 +96,36 @@ async def _rollback(
         ai_job_schema.AiJobAcceptedResponse
     ],
     status_code=fastapi.status.HTTP_202_ACCEPTED,
+    summary="연출 이미지 업로드 및 가구 객체 탐지 작업 접수",
+    description=(
+        "multipart/form-data로 받은 연출 이미지를 검증한 뒤 원본 파일과 "
+        "메타데이터를 저장하고 VLM 가구 객체 탐지 작업을 대기열에 접수합니다. "
+        "탐지 결과는 즉시 반환하지 않으며, 응답의 job_id로 "
+        "GET /ai-jobs/{job_id}를 폴링해 확인합니다.\n\n"
+        "- 허용 형식: JPEG, PNG (파일의 실제 형식과 MIME 타입이 일치해야 합니다)\n"
+        "- 최대 용량: 10MB\n"
+        "- 202 Accepted는 분석 완료가 아닌 작업 접수 완료를 뜻합니다.\n"
+        "- 검증·저장 실패 시 업로드된 파일과 DB 기록은 함께 정리됩니다."
+    ),
+    response_description=(
+        "공통 성공 응답으로 연출 이미지 ID와 대기 중인 AI 작업 ID를 반환합니다."
+    ),
+    responses={
+        202: SCENE_IMAGE_UPLOAD_ACCEPTED_RESPONSE,
+        413: SCENE_IMAGE_TOO_LARGE_RESPONSE,
+        415: SCENE_IMAGE_UNSUPPORTED_TYPE_RESPONSE,
+        422: SCENE_IMAGE_INVALID_IMAGE_RESPONSE,
+        500: SCENE_IMAGE_UPLOAD_FAILED_RESPONSE,
+    },
 )
 # 보상 트랜잭션 상태를 유지하므로 지역 변수가 많습니다.
 async def upload_scene_image(  # pylint: disable=too-many-locals
-    file: fastapi.UploadFile = fastapi.File(...),
+    file: fastapi.UploadFile = fastapi.File(
+        ...,
+        description=(
+            "업로드할 연출 이미지 파일입니다. JPEG 또는 PNG, 10MB 이하."
+        ),
+    ),
     database_session: database.sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),

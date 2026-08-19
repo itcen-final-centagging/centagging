@@ -1,7 +1,20 @@
 """장면 이미지 태깅(유사 SKU 추천) API입니다."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 
+from app.api.examples import (
+    ACTIVE_AI_JOB_EXISTS_RESPONSE,
+    AI_JOB_NOT_READY_RESPONSE,
+    SCENE_IMAGE_NOT_FOUND_RESPONSE,
+    SCENE_OBJECT_UPDATE_REQUEST_EXAMPLE,
+    SCENE_OBJECT_UPDATE_SUCCESS_RESPONSE,
+    SKU_MATCHING_REQUEST_EXAMPLE,
+    SKU_RECOMMENDATION_ACCEPTED_RESPONSE,
+    TAGGING_RESULT_SAVE_SUCCESS_RESPONSE,
+    TAGGING_RESULT_UNPROCESSABLE_RESPONSE,
+    TAGGING_TARGET_NOT_FOUND_RESPONSE,
+    VALIDATION_ERROR_RESPONSE,
+)
 from app.core import database
 from app.dependencies import get_sku_match_service
 from app.models.ai_job import AiJobType
@@ -25,10 +38,38 @@ _RECOMMENDATION_NOT_READY_MESSAGE = (
 )
 
 
-@router.post("/scenes/{scene_id}")
+@router.post(
+    "/scenes/{scene_id}",
+    response_model=common_schema.SuccessResponse[SceneObjectUpdateResult],
+    summary="편집한 탐지 객체 저장",
+    description=(
+        "사용자가 화면에서 수정한 바운딩 박스와 카테고리를 "
+        "유사 SKU 추천 이전에 연출 이미지에 저장합니다. "
+        "bbox_coord는 0~1000으로 정규화된 좌표이며 "
+        "xmin < xmax, ymin < ymax를 만족해야 합니다."
+    ),
+    response_description=(
+        "공통 성공 응답으로 저장된 객체 개수와 처리 상태를 반환합니다."
+    ),
+    responses={
+        200: SCENE_OBJECT_UPDATE_SUCCESS_RESPONSE,
+        404: SCENE_IMAGE_NOT_FOUND_RESPONSE,
+        422: VALIDATION_ERROR_RESPONSE,
+    },
+)
 async def update_scene_objects(
-    scene_id: int,
-    update_request: SceneObjectUpdateRequest,
+    scene_id: int = Path(
+        description="편집 결과를 저장할 연출 이미지 ID입니다.",
+        openapi_examples={"scene": {"summary": "연출 이미지", "value": 101}},
+    ),
+    update_request: SceneObjectUpdateRequest = Body(
+        openapi_examples={
+            "edited_objects": {
+                "summary": "소파와 테이블 2건을 편집한 경우",
+                "value": SCENE_OBJECT_UPDATE_REQUEST_EXAMPLE,
+            }
+        },
+    ),
     database_session: database.sqlalchemy_async.AsyncSession = Depends(
         database.get_database_session
     ),
@@ -54,12 +95,52 @@ async def update_scene_objects(
         ai_job_schema.AiJobAcceptedResponse
     ],
     status_code=202,
+    summary="탐지 객체별 SKU 추천 작업 접수",
+    description=(
+        "가구 탐지가 완료된 연출 이미지의 객체에 대해 유사 SKU 추천 작업을 "
+        "대기열에 접수합니다. 추천 결과는 즉시 반환하지 않으며, 응답의 "
+        "job_id로 GET /ai-jobs/{job_id}를 폴링해 확인합니다. "
+        "object_idxs를 생략하면 장면의 모든 탐지 객체를 처리합니다."
+    ),
+    response_description=(
+        "공통 성공 응답으로 연출 이미지 ID와 대기 중인 AI 작업 ID를 반환합니다."
+    ),
+    responses={
+        202: SKU_RECOMMENDATION_ACCEPTED_RESPONSE,
+        404: SCENE_IMAGE_NOT_FOUND_RESPONSE,
+        409: {
+            "description": "가구 탐지가 완료되지 않았거나 같은 추천 작업이 진행 중입니다.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "detection_not_ready": AI_JOB_NOT_READY_RESPONSE[
+                            "content"
+                        ]["application/json"]["example"],
+                        "active_recommendation_job": ACTIVE_AI_JOB_EXISTS_RESPONSE[
+                            "content"
+                        ]["application/json"]["example"],
+                    }
+                }
+            },
+        },
+        422: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def enqueue_sku_recommendation(
-    scene_id: int,
+    scene_id: int = Path(
+        description="SKU 추천 작업을 접수할 연출 이미지 ID입니다.",
+        openapi_examples={"scene": {"summary": "연출 이미지", "value": 101}},
+    ),
     object_idxs: list[int] | None = Query(
         default=None,
-        description="추천할 탐지 객체 인덱스 목록입니다. 비우면 전체 객체를 처리합니다.",
+        description=(
+            "추천할 탐지 객체 인덱스 목록입니다. "
+            "생략하면 장면의 모든 객체를 처리합니다."
+        ),
+        openapi_examples={
+            "all": {"summary": "전체 객체 추천", "value": None},
+            "selected": {"summary": "0번, 1번 객체만 추천", "value": [0, 1]},
+        },
     ),
     database_session: database.sqlalchemy_async.AsyncSession = Depends(
         database.get_database_session
@@ -104,10 +185,37 @@ async def enqueue_sku_recommendation(
     )
 
 
-@router.post("/scenes/{scene_id}/results")
+@router.post(
+    "/scenes/{scene_id}/results",
+    response_model=common_schema.SuccessResponse[SkuMatchingResult],
+    summary="선택한 SKU를 태깅 결과로 확정 저장",
+    description=(
+        "탐지 객체별로 사용자가 최종 선택한 SKU를 태깅 결과로 확정합니다. "
+        "저장과 동시에 승인 대기(PENDING) 상태의 검수 건이 생성되며, "
+        "같은 객체를 다시 확정하면 기존 결과를 갱신합니다."
+    ),
+    response_description=(
+        "공통 성공 응답으로 확정 상태와 저장된 결과 ID 목록을 반환합니다."
+    ),
+    responses={
+        200: TAGGING_RESULT_SAVE_SUCCESS_RESPONSE,
+        404: TAGGING_TARGET_NOT_FOUND_RESPONSE,
+        422: TAGGING_RESULT_UNPROCESSABLE_RESPONSE,
+    },
+)
 async def save_tagging_results(
-    scene_id: int,
-    match_request: SkuMatchingRequest,
+    scene_id: int = Path(
+        description="확정할 연출 이미지 ID입니다.",
+        openapi_examples={"scene": {"summary": "연출 이미지", "value": 101}},
+    ),
+    match_request: SkuMatchingRequest = Body(
+        openapi_examples={
+            "confirm_sofa": {
+                "summary": "소파 객체의 1순위 후보를 확정하는 경우",
+                "value": SKU_MATCHING_REQUEST_EXAMPLE,
+            }
+        },
+    ),
     match_service: sku_match.SkuMatchService = Depends(get_sku_match_service),
 ) -> common_schema.SuccessResponse[SkuMatchingResult]:
     """탐지 객체별로 선택한 SKU를 최종 확정해 저장합니다."""

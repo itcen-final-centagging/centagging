@@ -16,7 +16,6 @@ class CommonOpenApiTest(unittest.TestCase):
             ("/tagging", "post"),
             ("/tagging/scenes/{scene_id}", "post"),
             ("/tagging/scenes/{scene_id}/recommendations", "post"),
-            ("/tagging/scenes/{scene_id}", "put"),
             ("/history/results/{result_id}", "get"),
             ("/approvals", "get"),
             ("/product-image-submissions", "get"),
