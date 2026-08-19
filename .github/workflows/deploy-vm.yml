@@ -113,6 +113,7 @@ jobs:
 
           tar -czf "${release_path}" \
             docker-compose.prod.yml \
+            docker/db/migrations \
             scripts/deploy \
             data/catalog
 
