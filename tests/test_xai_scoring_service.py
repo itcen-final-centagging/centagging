@@ -1,5 +1,6 @@
 """XAI 채점 실패 시 공개 폴백 계약을 검증합니다."""
 
+import json
 import pathlib
 import tempfile
 import types
@@ -12,7 +13,7 @@ from PIL import Image
 
 from app.core import config
 from app.schemas import tagging
-from app.services import gemini_service, xai_scoring_service
+from app.services import gemini_service, tagging_service, xai_scoring_service
 from app.services.image_processing_service import CroppedObject
 
 
@@ -57,12 +58,18 @@ class _SuccessfulScoringService(xai_scoring_service.XaiScoringService):
             crops=[
                 xai_scoring_service.CropScore(
                     crop_index=crops[0].crop_index,
+                    object_attrs=[
+                        xai_scoring_service.ObjectAttribute(
+                            key="material",
+                            value="가죽",
+                        )
+                    ],
                     evaluations=[
                         xai_scoring_service.SkuEvaluation(
                             sku_id=crops[0].candidates[0].sku_code,
                             status="Matched",
                             total_score=93,
-                            xai_result=tagging.XaiResult(
+                            xai_result=xai_scoring_service.GeminiXaiResult(
                                 summary="구조와 색상이 유사합니다."
                             ),
                         )
@@ -178,6 +185,12 @@ class XaiScoringServiceTest(unittest.TestCase):
         with self.assertRaises(gemini_service.GeminiRateLimitError):
             service.score_all(crops)
 
+    def test_gemini_response_schema_excludes_dynamic_xai_attrs(self) -> None:
+        """Gemini Developer API에 동적 딕셔너리 스키마를 전달하지 않습니다."""
+        schema = xai_scoring_service.RubricScoreResult.model_json_schema()
+
+        self.assertNotIn("xai_attrs", json.dumps(schema))
+
 
 class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
     """XAI 실패 시에도 추천 후보를 유지하는지 검증합니다."""
@@ -189,10 +202,13 @@ class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             settings, crop, detected = _build_xai_request(temp_dir)
             service = _RateLimitedScoringService(settings)
-            objects = await service.enrich_detected_objects([crop], [detected])
+            xai_results = await service.score_detected_objects(
+                [crop], [detected]
+            )
 
-        self.assertEqual(len(objects[0].sku_candidates), 1)
-        self.assertEqual(objects[0].sku_candidates[0].similarity_score, 91)
+        self.assertEqual(xai_results, {})
+        self.assertEqual(len(detected.sku_candidates), 1)
+        self.assertEqual(detected.sku_candidates[0].similarity_score, 91)
 
     async def test_success_applies_xai_score(self) -> None:
         """0이 아닌 객체 인덱스에도 XAI 점수를 반영합니다."""
@@ -203,12 +219,26 @@ class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
             )
             service = _SuccessfulScoringService(settings)
 
-            objects = await service.enrich_detected_objects([crop], [detected])
+            xai_results = await service.score_detected_objects(
+                [crop], [detected]
+            )
 
-        candidate = objects[0].sku_candidates[0]
-        self.assertEqual(objects[0].object_idx, 5)
+        tagging_service.TaggingService._apply_xai_results(
+            [detected],
+            xai_results,
+        )
+
+        candidate = detected.sku_candidates[0]
+        self.assertEqual(detected.object_idx, 5)
+        self.assertEqual(detected.xai_attrs, {"material": "가죽"})
         self.assertEqual(candidate.similarity_score, 93)
-        self.assertEqual(candidate.xai_result.summary, "구조와 색상이 유사합니다.")
+        self.assertEqual(
+            candidate.xai_result.summary, "구조와 색상이 유사합니다."
+        )
+        self.assertEqual(
+            candidate.xai_result.xai_attrs,
+            {"material": "가죽"},
+        )
 
 
 if __name__ == "__main__":

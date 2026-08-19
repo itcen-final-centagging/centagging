@@ -7,7 +7,7 @@ import type {
   TaggingHistory,
   TaggingValues,
   VlmMood,
-  XaiResult,
+  XaiCriterion,
 } from '../types';
 
 type ApiBoundingBox = {
@@ -54,14 +54,31 @@ type DevCandidate = {
   similarity_score: number;
   sku_code: string;
   sub_category: string | null;
-  xai_result: XaiResult & { vlm_mood: VlmMood };
+  xai_result: {
+    criteria: XaiCriterion[];
+    summary: string;
+    vlm_mood: VlmMood;
+    xai_attrs?: Record<string, string>;
+  };
+};
+
+type DevRecommendationObject = {
+  object_idx: number;
+  category: string;
+  sub_category: string | null;
+  bbox_coord: ApiBoundingBox;
+  confidence: number;
+  attrs: Record<string, string>;
+  xai_attrs?: Record<string, string>;
+  sku_candidates: DevCandidate[];
+};
+
+type RecommendationObject = Omit<DevRecommendationObject, 'sku_candidates'> & {
+  sku_candidates: SkuCandidate[];
 };
 
 type DevRecommendationData = {
-  objects: Array<{
-    object_idx: number;
-    sku_candidates: DevCandidate[];
-  }>;
+  objects: DevRecommendationObject[];
 };
 
 type EditedSceneObject = Pick<FurnitureObject, 'bbox' | 'category' | 'name'>;
@@ -140,8 +157,7 @@ const NULL_TAG_VALUE = 'null';
 const reviewedText = (
   value: string | undefined,
   fallback: string | null | undefined,
-): string =>
-  value && value !== NULL_TAG_VALUE ? value : (fallback ?? '');
+): string => (value && value !== NULL_TAG_VALUE ? value : (fallback ?? ''));
 
 const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
   tags?.filter((tag) => tag !== NULL_TAG_VALUE);
@@ -192,6 +208,7 @@ const toDevCandidate = (
   xaiResult: {
     criteria: candidate.xai_result.criteria,
     summary: candidate.xai_result.summary,
+    xaiAttrs: candidate.xai_result.xai_attrs ?? {},
   },
 });
 
@@ -285,39 +302,9 @@ export const analyzeImage = async (
       },
       name: detection.category,
       objectIdx: detection.object_idx,
+      xaiAttrs: {},
     })),
   };
-};
-
-export const fetchRecommendations = async (
-  sceneImageId: string,
-  objectIdx: number,
-): Promise<SkuCandidate[]> => {
-  const query = new URLSearchParams();
-  query.append('object_idxs', String(objectIdx));
-  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}?${query.toString()}`,
-  );
-  const object = response.data.objects.find(
-    (item) => item.object_idx === objectIdx,
-  );
-  return object?.sku_candidates.map(toDevCandidate) ?? [];
-};
-
-/** 수정 완료된 장면의 모든 객체에 대한 SKU 후보를 한 번에 불러옵니다. */
-export const fetchObjectRecommendations = async (
-  sceneImageId: string,
-): Promise<Map<number, SkuCandidate[]>> => {
-  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
-  );
-
-  return new Map(
-    response.data.objects.map((object) => [
-      object.object_idx,
-      object.sku_candidates.map(toDevCandidate),
-    ]),
-  );
 };
 
 /**
@@ -327,8 +314,8 @@ export const fetchObjectRecommendations = async (
 export const updateSceneObjects = async (
   sceneImageId: string,
   objects: EditedSceneObject[],
-): Promise<void> => {
-  await requestJson(
+): Promise<Map<number, RecommendationObject>> => {
+  const response = await requestJson<ApiSuccessResponse<DevRecommendationData>>(
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
     {
       body: JSON.stringify({
@@ -343,6 +330,16 @@ export const updateSceneObjects = async (
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     },
+  );
+
+  return new Map<number, RecommendationObject>(
+    response.data.objects.map((object) => [
+      object.object_idx,
+      {
+        ...object,
+        sku_candidates: object.sku_candidates.map(toDevCandidate),
+      },
+    ]),
   );
 };
 
@@ -406,6 +403,7 @@ export const saveTaggingReview = async (
               object_idx: objectIdx,
               object_metadata: {
                 attrs: {
+                  ...object.metadata.attributes,
                   color: reviewedText(values?.color, selectedSku.color),
                   material: reviewedText(
                     values?.material,
@@ -416,7 +414,7 @@ export const saveTaggingReview = async (
                 bbox_coord: { xmax, xmin, ymax, ymin },
                 category: reviewedText(values?.category, selectedSku.category),
                 object_idx: objectIdx,
-                sub_category: selectedSku.subCategory ?? '',
+                sub_category: object.metadata.subCategory ?? '',
               },
               similarity_score: Math.round(selectedSku.score ?? 0),
               sku_id: selectedSku.skuId,
@@ -429,7 +427,12 @@ export const saveTaggingReview = async (
                   ? styleTags
                   : (selectedSku.vlmMood?.tags ?? []),
               },
-              xai_result: selectedSku.xaiResult,
+              xai_result: {
+                criteria: selectedSku.xaiResult?.criteria ?? [],
+                summary: selectedSku.xaiResult?.summary ?? '',
+                xai_attrs:
+                  object.xaiAttrs ?? selectedSku.xaiResult?.xaiAttrs ?? {},
+              },
             };
           },
         ),

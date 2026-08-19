@@ -1,4 +1,4 @@
-"""편집된 탐지 객체 저장 API의 계약을 검증합니다."""
+"""Tests for the transient scene-object recommendation request."""
 
 import unittest
 from unittest import mock
@@ -9,10 +9,11 @@ import starlette.testclient
 from app.api import tagging
 from app.core import exception_handlers, request_context
 from app.repositories.scene_image_repository import SceneImageNotFoundError
+from app.schemas.tagging import DetectionResult, SceneImageInfo
 
 
 class SceneObjectUpdateApiTest(unittest.TestCase):
-    """바운딩 박스·카테고리 편집 저장 API를 검증합니다."""
+    """Validate the existing POST route without persisting object metadata."""
 
     def setUp(self) -> None:
         self.app = fastapi.FastAPI()
@@ -21,45 +22,75 @@ class SceneObjectUpdateApiTest(unittest.TestCase):
         self.app.include_router(tagging.router)
         self.client = starlette.testclient.TestClient(self.app)
 
-    def test_persists_reindexed_objects(self) -> None:
-        """프론트의 최종 객체 목록을 그대로 저장 레이어에 전달합니다."""
-        with mock.patch(
-            "app.api.tagging.scene_image_repository.update_scene_object_metadata",
-            new_callable=mock.AsyncMock,
-        ) as update_objects:
-            response = self.client.post(
-                "/tagging/scenes/7",
-                json={
-                    "objects": [
-                        {
-                            "category": "의자",
-                            "bbox_coord": {
-                                "xmin": 120,
-                                "ymin": 100,
-                                "xmax": 600,
-                                "ymax": 900,
-                            },
-                        }
-                    ]
-                },
+        self.tagging_service = mock.Mock()
+        self.tagging_service.get_sku_candidates = mock.AsyncMock(
+            return_value=DetectionResult(
+                processing_status="DETECTED",
+                scene_image=SceneImageInfo(
+                    scene_image_id=7,
+                    image_url="/uploads/scene-images/scene.png",
+                    origin_name="scene.png",
+                    mime_type="image/png",
+                    file_size=1024,
+                    width_px=512,
+                    height_px=512,
+                ),
+                objects=[],
             )
+        )
+        self.app.dependency_overrides[tagging.get_tagging_service] = (
+            lambda: self.tagging_service
+        )
+
+    def test_returns_recommendations_without_persisting_objects(self) -> None:
+        """Pass edited objects to the service and return its transient result."""
+        response = self.client.post(
+            "/tagging/scenes/7",
+            json={
+                "objects": [
+                    {
+                        "category": "의자",
+                        "bbox_coord": {
+                            "xmin": 120,
+                            "ymin": 100,
+                            "xmax": 600,
+                            "ymax": 900,
+                        },
+                    }
+                ]
+            },
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json()["data"],
             {
-                "object_count": 1,
                 "processing_status": "DETECTED",
+                "scene_image": {
+                    "scene_image_id": 7,
+                    "image_url": "/uploads/scene-images/scene.png",
+                    "origin_name": "scene.png",
+                    "mime_type": "image/png",
+                    "file_size": 1024,
+                    "width_px": 512,
+                    "height_px": 512,
+                },
+                "objects": [],
             },
         )
-        update_objects.assert_awaited_once()
-        self.assertEqual(update_objects.await_args.args[1], 7)
+        self.tagging_service.get_sku_candidates.assert_awaited_once()
         self.assertEqual(
-            update_objects.await_args.args[2][0]["category"], "의자"
+            self.tagging_service.get_sku_candidates.await_args.args[0],
+            7,
         )
+        request_objects = (
+            self.tagging_service.get_sku_candidates.await_args.kwargs["objects"]
+        )
+        self.assertEqual(request_objects[0].category, "의자")
+        self.assertEqual(request_objects[0].bbox_coord.xmin, 120)
 
     def test_rejects_an_invalid_bounding_box(self) -> None:
-        """크롭할 수 없는 역방향 좌표는 공통 422 오류로 반환합니다."""
+        """Reject an invalid bounding box through the common 422 response."""
         response = self.client.post(
             "/tagging/scenes/7",
             json={
@@ -81,28 +112,26 @@ class SceneObjectUpdateApiTest(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "VALIDATION_ERROR")
 
     def test_returns_404_for_an_unknown_scene(self) -> None:
-        """존재하지 않는 장면 이미지는 404로 구분합니다."""
-        with mock.patch(
-            "app.api.tagging.scene_image_repository.update_scene_object_metadata",
-            new_callable=mock.AsyncMock,
-            side_effect=SceneImageNotFoundError(999),
-        ):
-            response = self.client.post(
-                "/tagging/scenes/999",
-                json={
-                    "objects": [
-                        {
-                            "category": "의자",
-                            "bbox_coord": {
-                                "xmin": 100,
-                                "ymin": 100,
-                                "xmax": 300,
-                                "ymax": 300,
-                            },
-                        }
-                    ]
-                },
-            )
+        """Map a missing scene raised by the transient recommendation service."""
+        self.tagging_service.get_sku_candidates.side_effect = (
+            SceneImageNotFoundError(999)
+        )
+        response = self.client.post(
+            "/tagging/scenes/999",
+            json={
+                "objects": [
+                    {
+                        "category": "의자",
+                        "bbox_coord": {
+                            "xmin": 100,
+                            "ymin": 100,
+                            "xmax": 300,
+                            "ymax": 300,
+                        },
+                    }
+                ]
+            },
+        )
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["error"]["code"], "RESOURCE_NOT_FOUND")

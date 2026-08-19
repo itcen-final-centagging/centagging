@@ -124,7 +124,15 @@ test('save request uses its backend contract without refreshing history', async 
   await saveTaggingReview({
     matching: [
       {
-        object: { bbox: [100, 200, 800, 900], objectIdx: 1 },
+        object: {
+          bbox: [100, 200, 800, 900],
+          metadata: {
+            attributes: { has_backrest: 'yes' },
+            subCategory: 'office chair',
+          },
+          objectIdx: 1,
+          xaiAttrs: { material: 'mesh' },
+        },
         objectIdx: 1,
         selectedSku: {
           category: 'chair',
@@ -160,7 +168,15 @@ test('save request uses its backend contract without refreshing history', async 
         },
       },
       {
-        object: { bbox: [50, 60, 400, 500], objectIdx: 2 },
+        object: {
+          bbox: [50, 60, 400, 500],
+          metadata: {
+            attributes: { leg_type: 'four legs' },
+            subCategory: 'dining table',
+          },
+          objectIdx: 2,
+          xaiAttrs: { material: 'oak' },
+        },
         objectIdx: 2,
         selectedSku: {
           category: 'table',
@@ -206,7 +222,12 @@ test('save request uses its backend contract without refreshing history', async 
         match_rank: 2,
         object_idx: 1,
         object_metadata: {
-          attrs: { color: 'white', material: 'mesh', style: 'modern' },
+          attrs: {
+            color: 'white',
+            has_backrest: 'yes',
+            material: 'mesh',
+            style: 'modern',
+          },
           bbox_coord: { xmax: 900, xmin: 200, ymax: 800, ymin: 100 },
           category: 'chair',
           object_idx: 1,
@@ -227,13 +248,19 @@ test('save request uses its backend contract without refreshing history', async 
             },
           ],
           summary: 'The structure and color are similar.',
+          xai_attrs: { material: 'mesh' },
         },
       },
       {
         match_rank: 1,
         object_idx: 2,
         object_metadata: {
-          attrs: { color: 'brown', material: 'oak', style: 'natural' },
+          attrs: {
+            color: 'brown',
+            leg_type: 'four legs',
+            material: 'oak',
+            style: 'natural',
+          },
           bbox_coord: { xmax: 500, xmin: 60, ymax: 400, ymin: 50 },
           category: 'table',
           object_idx: 2,
@@ -254,6 +281,7 @@ test('save request uses its backend contract without refreshing history', async 
             },
           ],
           summary: 'The table shape is a close match.',
+          xai_attrs: { material: 'oak' },
         },
       },
     ],
@@ -261,17 +289,19 @@ test('save request uses its backend contract without refreshing history', async 
   assert.equal(requests.length, 1);
 });
 
-test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
-  const { fetchRecommendations } = await loadTaggingApi(t);
+test('recommendation sends edited objects with the POST contract', async (t) => {
+  const { updateSceneObjects } = await loadTaggingApi(t);
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () =>
-    new Response(
+  const requests = [];
+  globalThis.fetch = async (input, init) => {
+    requests.push({ input, init });
+    return new Response(
       JSON.stringify({
         status: 'success',
         data: {
           objects: [
             {
-              object_idx: 1,
+              object_idx: 0,
               sku_candidates: [
                 {
                   attrs: { color: 'white', material: 'mesh' },
@@ -290,6 +320,9 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
                       },
                     ],
                     summary: 'The structure and color are similar.',
+                    xai_attrs: {
+                      color: 'brown',
+                    },
                     vlm_mood: {
                       summary: 'A warm living room.',
                       tags: ['natural'],
@@ -304,11 +337,29 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
       }),
       { headers: { 'Content-Type': 'application/json' }, status: 200 },
     );
+  };
   t.after(() => {
     globalThis.fetch = originalFetch;
   });
 
-  const [candidate] = await fetchRecommendations('7', 1);
+  const candidatesByObjectIdx = await updateSceneObjects('7', [
+    { bbox: [100, 200, 800, 900], category: 'chair', name: 'chair' },
+  ]);
+  const recommendation = candidatesByObjectIdx.get(0);
+  const [candidate] = recommendation.sku_candidates;
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].input, '/tagging/scenes/7');
+  assert.equal(requests[0].init.method, 'POST');
+  assert.equal(requests[0].init.headers['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(requests[0].init.body), {
+    objects: [
+      {
+        category: 'chair',
+        bbox_coord: { xmin: 200, ymin: 100, xmax: 900, ymax: 800 },
+      },
+    ],
+  });
 
   assert.deepEqual(
     {
@@ -333,6 +384,9 @@ test('recommendation keeps its rank, full XAI, and VLM mood', async (t) => {
           },
         ],
         summary: 'The structure and color are similar.',
+        xaiAttrs: {
+          color: 'brown',
+        },
       },
     },
   );

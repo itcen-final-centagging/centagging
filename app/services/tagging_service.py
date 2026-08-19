@@ -8,10 +8,20 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 from app.core.config import Settings
 from app.models.scene_image import SceneImage
 from app.repositories.scene_image_repository import get_scene_image
-from app.schemas.tagging import DetectionResult, SceneImageInfo
-from app.services.image_processing_service import crop_scene_objects
+from app.schemas.furniture_attribute import FurnitureAttributeResult
+from app.schemas.tagging import (
+    DetectedObject,
+    DetectionResult,
+    EditedSceneObject,
+    SceneImageInfo,
+)
+from app.services.gemini_service import GeminiService
+from app.services.image_processing_service import (
+    CroppedObject,
+    crop_scene_objects,
+)
 from app.services.similar_sku_service import SimilarSkuService
-from app.services.xai_scoring_service import XaiScoringService
+from app.services.xai_scoring_service import XaiObjectResult, XaiScoringService
 
 DETECTED_STATUS = "DETECTED"
 
@@ -24,6 +34,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         self,
         session: sqlalchemy_async.AsyncSession,
         settings: Settings,
+        gemini_service: GeminiService,
         similar_sku_service: SimilarSkuService,
         xai_scoring_service: XaiScoringService,
     ) -> None:
@@ -32,11 +43,13 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         Args:
             session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
             settings: 이미지 저장소 경로가 담긴 애플리케이션 설정입니다.
+            gemini_service: 객체 속성 추출과 Gemini API 호출을 담당하는 서비스입니다.
             similar_sku_service: 임베딩과 유사 SKU 탐색 담당 서비스입니다.
             xai_scoring_service: XAI 근거 산출 담당 서비스입니다.
         """
         self.session = session
         self.settings = settings
+        self.gemini_service = gemini_service
         self.similar_sku_service = similar_sku_service
         self.xai_scoring_service = xai_scoring_service
 
@@ -44,6 +57,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         self,
         scene_image_id: int,
         object_idxs: list[int] | None = None,
+        objects: list[EditedSceneObject] | None = None,
     ) -> DetectionResult:
         """장면 이미지 1건의 유사 SKU 추천 결과를 만듭니다.
 
@@ -69,11 +83,23 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             objects=[],
         )
 
+        # 0) 프론트에서 전달한 객체 목록 배열
+        object_metadata = (
+            [item.model_dump() for item in objects]
+            if objects is not None
+            else list(scene.object_metadata)
+        )
+
+        category_by_idx = {
+            index: item.get("category", "")
+            for index, item in enumerate(object_metadata)
+        }
+
         # 1) 연출 이미지 crop
         crops = await asyncio.to_thread(
             crop_scene_objects,
             self._resolve_image_path(scene),
-            list(scene.object_metadata),
+            object_metadata,
         )
         if object_idxs is not None:
             requested_idxs = set(object_idxs)
@@ -81,17 +107,90 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 crop for crop in crops if crop.crop_index in requested_idxs
             ]
 
+        attributes_by_idx = await self._extract_attributes(
+            crops,
+            category_by_idx,
+        )
+
         # 2) 임베딩 및 유사 SKU 탐색
         result.objects = await self.similar_sku_service.build_detected_objects(
             crops
         )
 
         # 3) XAI 근거 산출
-        result.objects = await self.xai_scoring_service.enrich_detected_objects(
+        xai_results = await self.xai_scoring_service.score_detected_objects(
             crops, result.objects
         )
+        self._apply_xai_results(result.objects, xai_results)
+
+        # 4) 추출 속성 매핑
+        for detected in result.objects:
+            detected.category = category_by_idx.get(
+                detected.object_idx,
+                detected.category,
+            )
+
+            attribute_result = attributes_by_idx.get(detected.object_idx)
+
+            detected.sub_category = (
+                attribute_result.sub_category
+                if attribute_result is not None
+                else None
+            )
+
+            if attribute_result is not None:
+                detected.attrs = attribute_result.attributes
 
         return result
+
+    async def _extract_attributes(
+        self,
+        crops: list[CroppedObject],
+        category_by_idx: dict[int, str],
+    ) -> dict[int, FurnitureAttributeResult | None]:
+        """크롭별 카테고리 규격에 맞춰 속성을 추출합니다."""
+        attributes_by_idx: dict[int, FurnitureAttributeResult | None] = {}
+        for crop in crops:
+            category = category_by_idx.get(crop.crop_index, "")
+            if not category:
+                attributes_by_idx[crop.crop_index] = None
+                continue
+
+            attributes_by_idx[crop.crop_index] = await asyncio.to_thread(
+                self.gemini_service.extract_furniture_attributes,
+                crop.image,
+                category,
+            )
+        return attributes_by_idx
+
+    @staticmethod
+    def _apply_xai_results(
+        detected_objects: list[DetectedObject],
+        xai_results: dict[int, XaiObjectResult],
+    ) -> None:
+        """XAI 결과 중 XAI 속성과 후보 평가만 탐지 객체에 반영합니다."""
+        for detected in detected_objects:
+            xai_result = xai_results.get(detected.object_idx)
+            if xai_result is None:
+                continue
+
+            detected.xai_attrs = xai_result.xai_attrs
+            evaluations = {
+                evaluation.sku_id: evaluation
+                for evaluation in xai_result.evaluations
+            }
+
+            for candidate in detected.sku_candidates:
+                evaluation = evaluations.get(candidate.sku_code)
+                if evaluation is None:
+                    continue
+                candidate.similarity_score = evaluation.total_score
+                candidate.xai_result = evaluation.xai_result
+
+            detected.sku_candidates.sort(
+                key=lambda candidate: candidate.similarity_score,
+                reverse=True,
+            )
 
     def _resolve_image_path(self, scene: SceneImage) -> pathlib.Path:
         """``scene_image.image_url``을 실제 저장소 경로로 변환합니다.

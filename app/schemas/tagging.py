@@ -34,6 +34,7 @@ class XaiResult(BaseModel):
     summary: str
     criteria: list[XaiCriterion] = Field(default_factory=list)
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
+    xai_attrs: dict[str, str] = Field(default_factory=dict)
 
 
 class SkuCandidate(BaseModel):
@@ -104,10 +105,17 @@ class DetectedObject(BaseModel):
     """탐지된 가구 객체의 속성과 SKU 후보 목록입니다."""
 
     object_idx: int
-    label: str = ""
+    category: str = ""
+    sub_category: str | None = None
     bbox_coord: BoundingBox
     confidence: int = Field(default=0, ge=0, le=100)
+
+    # furniture attribute extraction 결과
     attrs: dict[str, str] = Field(default_factory=dict)
+
+    # XAI가 관찰한 객체 속성
+    xai_attrs: dict[str, str] = Field(default_factory=dict)
+
     sku_candidates: list[SkuCandidate]
 
 
@@ -118,12 +126,14 @@ class DetectionResult(BaseModel):
     scene_image: SceneImageInfo
     objects: list[DetectedObject]
 
+
 class ObjectAttributes(BaseModel):
     """탐지 객체 속성입니다."""
 
     color: str
     material: str
     style: str
+
 
 class ObjectMetadata(BaseModel):
     """확정 시점의 탐지 객체 속성입니다."""
@@ -132,7 +142,8 @@ class ObjectMetadata(BaseModel):
     category: str
     sub_category: str | None
     bbox_coord: BoundingBox
-    attrs: ObjectAttributes
+    attrs: dict[str, str]
+
 
 class SkuMatching(BaseModel):
     """확정할 객체-SKU 매핑 1건입니다.

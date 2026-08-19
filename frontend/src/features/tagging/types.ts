@@ -37,6 +37,7 @@ export interface FurnitureObject {
   metadata: ExtractedMetadata;
   name: string;
   objectIdx: number;
+  xaiAttrs?: Record<string, string>;
 }
 
 export interface ExtractedMetadata {
@@ -68,6 +69,7 @@ export interface XaiCriterion {
 export interface XaiResult {
   criteria: XaiCriterion[];
   summary: string;
+  xaiAttrs?: Record<string, string>;
 }
 
 export interface VlmMood {

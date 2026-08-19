@@ -2,7 +2,6 @@
 
 import datetime
 import io
-import json
 import pathlib
 import tempfile
 import unittest
@@ -347,22 +346,9 @@ class UploadSceneImageApiTest(unittest.TestCase):
         )
         self.assertIsNone(self.session.execute_parameters["analysis_error"])
         assert self.session.analysis_update_parameters is not None
-        self.assertEqual(
-            json.loads(
-                str(self.session.analysis_update_parameters["object_metadata"])
-            ),
-            [
-                {
-                    "object_idx": 0,
-                    "bbox_coord": {
-                        "xmin": 200,
-                        "ymin": 100,
-                        "xmax": 800,
-                        "ymax": 700,
-                    },
-                    "category": "의자",
-                }
-            ],
+        self.assertNotIn(
+            "object_metadata",
+            self.session.analysis_update_parameters,
         )
         self.assertEqual(
             self.session.analysis_update_parameters["analysis_status"],

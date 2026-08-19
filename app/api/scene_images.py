@@ -1,6 +1,5 @@
 """연출 이미지 업로드, 저장 및 유효성 검증 API입니다."""
 
-import json
 import logging
 import pathlib
 import uuid
@@ -65,7 +64,6 @@ _INSERT_SCENE_IMAGE = sqlalchemy.text("""
 _UPDATE_DETECTION_SUCCESS = sqlalchemy.text("""
     UPDATE scene_image
     SET
-        object_metadata = CAST(:object_metadata AS jsonb),
         analysis_status = :analysis_status,
         analysis_error = :analysis_error
     WHERE scene_image_id = :scene_image_id
@@ -132,17 +130,7 @@ def _build_detected_objects(
 async def _save_detection_success(
     database_session: database.sqlalchemy_async.AsyncSession,
     scene_image_id: int,
-    detected_objects: list[DetectedObjectResponse],
 ) -> None:
-    """탐지 결과와 성공 상태를 저장합니다."""
-    object_metadata = [
-        {
-            "object_idx": detected_object.object_idx,
-            "category": detected_object.category,
-            "bbox_coord": detected_object.bbox_coord.model_dump(),
-        }
-        for detected_object in detected_objects
-    ]
 
     await database_session.execute(
         _UPDATE_DETECTION_SUCCESS,
@@ -150,10 +138,6 @@ async def _save_detection_success(
             "scene_image_id": scene_image_id,
             "analysis_status": "detected",
             "analysis_error": None,
-            "object_metadata": json.dumps(
-                object_metadata,
-                ensure_ascii=False,
-            ),
         },
     )
     await database_session.commit()
@@ -275,11 +259,7 @@ async def upload_scene_image(  # pylint: disable=too-many-locals
         )
         detected_objects = _build_detected_objects(detection_result)
 
-        await _save_detection_success(
-            database_session,
-            scene_image_id,
-            detected_objects,
-        )
+        await _save_detection_success(database_session, scene_image_id)
     # 탐지와 결과 저장의 외부 예외를 동일한 failed 상태로 기록합니다.
     except Exception as error:  # pylint: disable=broad-exception-caught
         await _rollback(database_session)

@@ -2,15 +2,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core import database
 from app.dependencies import get_sku_match_service, get_tagging_service
-from app.repositories import scene_image_repository
 from app.repositories.scene_image_repository import SceneImageNotFoundError
 from app.schemas import common as common_schema
 from app.schemas.tagging import (
     DetectionResult,
     SceneObjectUpdateRequest,
-    SceneObjectUpdateResult,
     SkuMatchingRequest,
     SkuMatchingResult,
 )
@@ -24,23 +21,17 @@ router = APIRouter(prefix="/tagging", tags=["tagging"])
 async def update_scene_objects(
     scene_id: int,
     update_request: SceneObjectUpdateRequest,
-    database_session: database.sqlalchemy_async.AsyncSession = Depends(
-        database.get_database_session
-    ),
-) -> common_schema.SuccessResponse[SceneObjectUpdateResult]:
-    """사용자가 편집한 바운딩 박스와 카테고리를 추천 전에 저장합니다."""
+    tagging_service: TaggingService = Depends(get_tagging_service),
+) -> common_schema.SuccessResponse[DetectionResult]:
+    """사용자가 편집한 바운딩 박스와 카테고리를 임시 입력으로 받아 SKU를 추천합니다."""
     try:
-        await scene_image_repository.update_scene_object_metadata(
-            database_session,
+        result = await tagging_service.get_sku_candidates(
             scene_id,
-            [object.model_dump() for object in update_request.objects],
+            objects=update_request.objects,
         )
     except SceneImageNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-
-    return common_schema.success_response(
-        SceneObjectUpdateResult(object_count=len(update_request.objects))
-    )
+    return common_schema.success_response(result)
 
 
 @router.get("/scenes/{scene_id}")
@@ -49,14 +40,14 @@ async def get_recommendation_sku(
     object_idxs: list[int] | None = Query(
         default=None, description="탐지 객체 인덱스 목록입니다. "
     ),
-    taggin_service: TaggingService = Depends(get_tagging_service),
+    tagging_service: TaggingService = Depends(get_tagging_service),
 ) -> common_schema.SuccessResponse[DetectionResult]:
     """장면 이미지에서 탐지된 객체들의 유사 SKU를 추천합니다.
 
     Args:
         scene_id: 조회할 장면 이미지 ID입니다.
         object_idxs: 조회할 탐지 객체의 인덱스 목록입니다.
-        taggin_service: 유사 SKU 조회 및 XAI 근거 산출 서비스입니다.
+        tagging_service: 유사 SKU 조회 및 XAI 근거 산출 서비스입니다.
 
     Returns:
         탐지된 객체 별 유사 SKU 후보 정보 목록을 반환합니다.
@@ -66,10 +57,10 @@ async def get_recommendation_sku(
             404를 반환합니다.
     """
     # NOTE: 기존 클라이언트의 선택 인덱스 쿼리 호환성은 유지합니다.
-    # 추천 서비스가 현재 장면의 모든 객체를 처리하므로 아직 필터링하지 않습니다.
-    _ = object_idxs
+    # 기존 클라이언트의 object_idx 필터링 요청을 서비스에 전달합니다.
+
     try:
-        result = await taggin_service.get_sku_candidates(
+        result = await tagging_service.get_sku_candidates(
             scene_id,
             object_idxs=object_idxs,
         )
