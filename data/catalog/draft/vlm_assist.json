@@ -1,0 +1,4538 @@
+{
+  "1000245": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:18:52.159279+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "프레임이 바닥까지 연장되어 지지하는 4개의 다리가 명확히 보입니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "다리 끝부분에 바퀴가 장착되어 있지 않습니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "서랍이 없는 2단 오픈 선반 형태의 제품입니다."
+      }
+    }
+  },
+  "1030260": {
+    "asked": [
+      "installation_type",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:18:59.894273+00:00",
+    "attributes": {
+      "installation_type": {
+        "value": "스탠드형",
+        "confidence": 0.85,
+        "reason": "거울이 벽에 걸리거나 부착되지 않고 바닥에 스스로 서 있는 스탠드형 제품입니다."
+      },
+      "has_frame": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "거울의 상단 아치형 테두리 부분을 보면 별도의 프레임(테두리) 없이 거울 유리면이 그대로 노출되어 있습니다."
+      }
+    }
+  },
+  "1030323": {
+    "asked": [
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:19:06.755682+00:00",
+    "attributes": {
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리를 둘러싸고 있는 얇은 금속 느낌의 테두리(프레임)가 명확하게 보입니다."
+      }
+    }
+  },
+  "1037098": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:19:19.931543+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "바닥면에 놓이는 단일 몸체 구조의 1단 저상형 거실장입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거실장 하단에 본체를 지탱하는 흰색 다리가 명확히 확인됩니다."
+      }
+    }
+  },
+  "1047816": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:19:28.031198+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 바닥면 모서리 아래에 아주 낮게 지지해 주는 다리(글라이더)가 존재합니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파의 좌우 측면에 팔걸이가 보이지 않는 형태입니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이 상단에 별도의 헤드레스트 구조물이 확인되지 않습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지에 별도의 스툴이나 오토만이 포함되어 있지 않습니다."
+      }
+    }
+  },
+  "1050728": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:19:33.906682+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "발받침대 다리 하단에 고정형 미끄럼 방지 패드만 있고 바퀴는 없습니다."
+      },
+      "has_backrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이가 없는 평평한 사각형 쿠션 형태의 발받침대입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "팔걸이 구조가 존재하지 않는 발받침대입니다."
+      }
+    }
+  },
+  "1065728": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:19:40.124244+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 중앙 부분에 직사각형 모양의 거울이 설치되어 있음을 확인할 수 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "화장대 상판 하단 및 우측 수납장의 서랍과 거울 우측의 오픈형 선반 수납공간이 함께 구성되어 있습니다."
+      }
+    }
+  },
+  "1095953": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:19:48.886100+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "수평으로 배열된 한 층 구조의 서랍장으로 구성되어 있어 1단으로 판단됩니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "개별적인 가구 다리 구조가 없으며, 안쪽으로 들어간 평평한 하부 받침대(플린스) 구조로 되어 있습니다."
+      }
+    }
+  },
+  "1115480": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:19:55.204924+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "2단",
+        "confidence": 0.85,
+        "reason": "상단의 수납장 부분과 하단의 개방형 선반층으로 구성된 2단 구조입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거실장 본체를 지탱하며 바닥 공간을 띄워주는 검은색 다리가 명확하게 확인됩니다."
+      }
+    }
+  },
+  "1125176": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:20:04.683537+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "단일 수평 레이어로 구성된 1단 구조의 거실장입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거실장 몸체 아래에 바닥면과 닿아있는 다리가 명확하게 보입니다."
+      }
+    }
+  },
+  "1143187": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:20:12.719893+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "빈백과 스툴이 바닥에 직접 닿아 있으며 바퀴가 관찰되지 않습니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "사용자가 등을 기대고 앉아 있는 높게 솟은 등받이 부분이 명확하게 보입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "양옆에 팔을 올려놓을 수 있는 별도의 팔걸이 형태나 구조가 확인되지 않습니다."
+      }
+    }
+  },
+  "1148571": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:20:22.446981+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "테이블 상판을 지지하는 슬림한 형태의 다리 4개가 각각 모서리에 위치해 있습니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 서랍이나 선반 등의 별도 수납 공간이 존재하지 않습니다."
+      }
+    }
+  },
+  "1183787": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:20:29.084910+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "한쪽 벽면에 일자로 곧게 설치된 ㅡ자형 배치를 보여줍니다."
+      }
+    }
+  },
+  "1190139": {
+    "asked": [
+      "sofa_type",
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:20:38.815163+00:00",
+    "attributes": {
+      "sofa_type": {
+        "value": "기본형(일자형)",
+        "confidence": 0.85,
+        "reason": "1인용의 일자형(기본형) 형태를 가진 리클라이너 소파입니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파의 본체가 바닥면에 거의 밀착되어 있는 형태이며 별도의 높이가 있는 소파 다리가 노출되어 있지 않습니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 좌우측에 두툼하게 쿠션 처리된 팔걸이가 명확히 확인됩니다."
+      },
+      "has_headrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "등받이 상단부에 머리를 받칠 수 있도록 볼륨감 있게 구분된 헤드레스트 영역이 존재합니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "일체형 리클라이너 발받침 기능은 작동하고 있으나 별도의 독립된 스툴은 포함되어 있지 않습니다."
+      }
+    }
+  },
+  "1190526": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:20:46.524690+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "벽면을 따라 일자(ㅡ) 형태로 길게 설치되어 있는 형태입니다."
+      }
+    }
+  },
+  "121821": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:01.357765+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㄱ자형",
+        "confidence": 0.85,
+        "reason": "우측 코너를 돌아 연결되는 구조를 가진 ㄱ자형 레이아웃입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "천장과 바닥에 기둥을 단단히 세워 고정하는 시스템 행거 구조입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "별도의 문이 없이 옷과 선반이 외부로 노출되어 있는 오픈형 구조입니다."
+      },
+      "storage_features": {
+        "value": "서랍 포함",
+        "confidence": 0.85,
+        "reason": "하단에 3단 및 4단 서랍 서랍장이 포함되어 있습니다."
+      }
+    }
+  },
+  "1226533": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:11.546533+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 하단에 바퀴가 없으며, 곡선 모양의 원목 흔들 받침대가 적용되어 있습니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "사용자의 등을 받쳐줄 수 있는 높은 등받이와 쿠션이 명확히 확인됩니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 시트 좌우가 완만한 곡선을 그리며 높게 솟아올라 팔을 얹을 수 있는 일체형 팔걸이 구조로 되어 있습니다."
+      }
+    }
+  },
+  "125529": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:19.239617+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 상단 덮개 안쪽에 사각형 거울이 부착되어 열려 있는 모습을 확인할 수 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "상단의 화장품을 수납할 수 있는 선반 공간과 하단의 인출식 서랍이 함께 구성되어 있습니다."
+      }
+    }
+  },
+  "1259188": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:31.211007+00:00",
+    "attributes": {}
+  },
+  "1264592": {
+    "asked": [
+      "chair_type",
+      "has_wheels",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:38.737383+00:00",
+    "attributes": {
+      "chair_type": {
+        "value": "좌식의자",
+        "confidence": 0.85,
+        "reason": "다리나 프레임 없이 바닥에 바로 두고 사용하는 형태의 좌식의자입니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥에 바로 닿는 구조로 바퀴가 존재하지 않습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "좌판과 등받이만 있으며 팔걸이가 보이지 않습니다."
+      }
+    }
+  },
+  "1275704": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:42.302390+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "도어가 전혀 없고 살대와 선반으로만 이루어진 완전히 개방된 구조입니다."
+      }
+    }
+  },
+  "1297048": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:48.633885+00:00",
+    "attributes": {
+      "shelf_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "이미지에 벽에 설치된 각각의 선반들은 하나의 가로 판으로 이루어진 독립적인 1단 선반입니다."
+      }
+    }
+  },
+  "1305311": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:21:55.561853+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "잡지를 거치하는 수납 공간에 문이 없이 완전히 개방된 오픈형 구조입니다."
+      }
+    }
+  },
+  "1308776": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:22:02.852356+00:00",
+    "attributes": {
+      "shelf_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "이미지상에서 단일한 하나의 선반 판으로 구성된 1단 벽선반임이 명확히 확인됩니다."
+      }
+    }
+  },
+  "13147": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:22:09.430604+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "제품의 하단 프레임 아래쪽에 바닥과 닿는 다리가 명확하게 확인됩니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "하단에 다리만 있고 바퀴는 장착되어 있지 않습니다."
+      }
+    }
+  },
+  "1325388": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:22:19.506681+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "여닫이형",
+        "confidence": 0.85,
+        "reason": "수납장 상단과 하단에 좌우로 개폐되는 대칭형 여닫이 도어가 확인됩니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "수납장 본체 하단에 바닥과 맞닿아 지지하는 짧은 검은색 다리가 노출되어 있습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바퀴가 없는 고정형 다리 형태의 가구입니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "여닫이 도어와 가전제품용 오픈 수납 공간(인출식 선반)으로만 구성되어 있으며 서랍은 보이지 않습니다."
+      }
+    }
+  },
+  "1335073": {
+    "asked": [
+      "installation_type",
+      "shape"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:22:31.668140+00:00",
+    "attributes": {
+      "shape": {
+        "value": "유니크형",
+        "confidence": 0.85,
+        "reason": "정형화된 원형이나 사각형이 아닌 곡선 형태의 비정형(물결 모양) 실루엣을 띄고 있습니다."
+      }
+    }
+  },
+  "138320": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:24:40.813163+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파가 바닥에 밀착되어 있는 좌식 형태로, 별도의 다리가 없습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 좌우 측면에 팔걸이 구조가 확인되지 않습니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이 외에 머리를 받쳐주는 별도의 헤드레스트 장치가 구성되어 있지 않습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 본체 외에 독립된 스툴(발받침)이 포함되어 있지 않습니다."
+      }
+    }
+  },
+  "1416021": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:24:48.069099+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "테이블의 각 모서리 방향으로 곧게 뻗은 4개의 독립된 다리가 확인됩니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래나 프레임에 서랍, 선반 등의 수납 구조가 보이지 않습니다."
+      },
+      "seating_capacity": {
+        "value": "4인",
+        "confidence": 0.85,
+        "reason": "테이블 주변에 총 4개의 의자가 배치되어 있는 형태로 연출되어 있습니다."
+      }
+    }
+  },
+  "1420977": {
+    "asked": [
+      "storage_type",
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:24:59.310780+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "진열장",
+        "confidence": 0.85,
+        "reason": "내부에 조명이 탑재되어 있어 물건을 돋보이게 전시할 수 있는 진열장 구조입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.8,
+        "reason": "전면에 도어나 차단 유리 등이 확인되지 않고 완전히 개방된 형태입니다."
+      }
+    }
+  },
+  "1426757": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:05.040871+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "수평으로 길게 구성된 단층 구조의 1단 거실장입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거실장 본체 하단에 바닥과 지탱하는 다리가 명확하게 노출되어 있습니다."
+      }
+    }
+  },
+  "1502238": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:13.965885+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 하단 모서리 부분에 바닥과 닿는 작은 검은색 다리(받침)가 관찰됩니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파의 좌측과 우측 끝단에 두툼한 형태의 팔걸이가 존재합니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이 쿠션 외에 별도의 헤드레스트 기능이나 구조물은 확인되지 않습니다."
+      },
+      "has_stool": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 우측에 사람이 다리를 뻗고 누워있는 형태의 대형 스툴(오토만) 모듈이 배치되어 있습니다."
+      }
+    }
+  },
+  "1502243": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:22.745888+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "스툴 하단 네 모퉁이에 바닥을 지지하는 짧고 어두운 색상의 다리(글라이드)가 관찰됩니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지 속 스툴은 등받이나 팔걸이가 없는 평평한 쿠션 형태입니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "머리를 받치는 헤드레스트 구성이 존재하지 않는 기본 스툴 형태입니다."
+      },
+      "has_stool": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "이미지의 메인 상품 자체가 스툴 제품으로 명확하게 노출되어 있습니다."
+      }
+    }
+  },
+  "152591": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:28.528290+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 상단 덮개 안쪽에 거울이 부착되어 있는 모습이 명확히 보입니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "하단의 서랍 수납 공간과 상단의 오픈형 선반 수납 공간이 함께 구성되어 있습니다."
+      }
+    }
+  },
+  "153888": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:34.755983+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "여닫이형",
+        "confidence": 0.85,
+        "reason": "양쪽으로 열고 닫는 형태의 문이 전면에 확인됩니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바퀴가 없고 고정식 다리만 존재합니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "외관에 서랍이 보이지 않고 문만 존재합니다."
+      }
+    }
+  },
+  "1604262": {
+    "asked": [
+      "chair_type",
+      "has_wheels",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:39.238731+00:00",
+    "attributes": {
+      "chair_type": {
+        "value": "좌식의자",
+        "confidence": 0.85,
+        "reason": "바닥에 직접 닿는 구조로 등받이가 있는 형태의 좌식 의자임을 확인할 수 있습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥에 직접 놓고 사용하는 구조로 바퀴가 존재하지 않습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 좌우에 팔을 지지할 수 있는 팔걸이가 없습니다."
+      }
+    }
+  },
+  "1611728": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:46.471418+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "검은색 좌식 소파가 바닥에 직접 닿아 있으며 별도의 다리가 확인되지 않습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 측면에 팔을 지지하기 위한 별도의 팔걸이 구조가 없습니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이 상단에 머리를 받치는 별도의 헤드레스트 장치가 확인되지 않습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 세트로 함께 구성된 스툴이나 발받침대가 이미지상에 보이지 않습니다."
+      }
+    }
+  },
+  "1635346": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:25:54.535937+00:00",
+    "attributes": {
+      "shape": {
+        "value": "사각형",
+        "confidence": 0.85,
+        "reason": "테이블 상판이 직사각형 형태를 띠고 있습니다."
+      },
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "테이블 모서리에 각각 1개씩 총 4개의 다리가 있는 구조입니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 서랍이나 선반 등의 수납 공간이 존재하지 않습니다."
+      }
+    }
+  },
+  "1640711": {
+    "asked": [
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:01.003044+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "화장대 하단에 손잡이가 달린 서랍 공간들과 상단에 물건을 진열할 수 있는 선반 구조가 함께 구성되어 있어 복합형으로 판단됩니다."
+      }
+    }
+  },
+  "1643796": {
+    "asked": [
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:04.802301+00:00",
+    "attributes": {
+      "has_frame": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리에 별도의 프레임이나 테두리가 없이 유리 단면이 그대로 드러나 있어 프레임이 없는 것으로 확인됩니다."
+      }
+    }
+  },
+  "1695911": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:14.491037+00:00",
+    "attributes": {
+      "shape": {
+        "value": "기타",
+        "confidence": 0.85,
+        "reason": "상판이 대칭형 타원형이 아니라 한쪽이 오목하게 들어간 비정형 곡선(조약돌 또는 강낭콩 형태) 구조입니다."
+      },
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "상판을 지지하는 얇은 철제 프레임 다리가 네 군데에 위치해 있습니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 밑이나 주변에 서랍, 수납 그물, 선반 등 수납 기능을 하는 부분이 확인되지 않습니다."
+      }
+    }
+  },
+  "1697840": {
+    "asked": [
+      "installation_type",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:23.808350+00:00",
+    "attributes": {
+      "installation_type": {
+        "value": "스탠드형",
+        "confidence": 0.85,
+        "reason": "거울 하단에 받침대가 있어 테이블 위에 스스로 서 있는 형태입니다."
+      },
+      "has_frame": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "거울 외곽 테두리에 별도의 프레임이 없이 거울 유리 단면이 노출되어 있습니다."
+      }
+    }
+  },
+  "170039": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:32.793334+00:00",
+    "attributes": {
+      "shape": {
+        "value": "사각형",
+        "confidence": 0.85,
+        "reason": "모서리가 둥글게 마감되어 있으나 전체적인 형태가 사각형인 상판입니다."
+      },
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "테이블 모서리 마다 배치된 원통형의 4개 다리 구조가 확인됩니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "책상 자체에 결합된 일체형 서랍이나 선반 등의 수납 공간이 없습니다."
+      }
+    }
+  },
+  "1700676": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:39.534934+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "개별적인 다리 없이 바닥에 밀착되는 납작한 원형 받침대로 지지하는 형태이므로 다리가 없습니다."
+      }
+    }
+  },
+  "1721273": {
+    "asked": [
+      "has_wheels",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:45.685539+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "빈백 본체가 바닥에 직접 닿아 있는 구조로 바퀴가 존재하지 않습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "양옆에 별도로 분리되거나 돌출된 팔걸이 구조가 확인되지 않습니다."
+      }
+    }
+  },
+  "1748771": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:50.687541+00:00",
+    "attributes": {
+      "shelf_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "이미지상에서 서로 연결되지 않고 독립적으로 벽에 부착되어 있는 각각 1단 형태의 무지주 선반들이 확인됩니다."
+      }
+    }
+  },
+  "1781446": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:26:54.357631+00:00",
+    "attributes": {
+      "shelf_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "벽에 부착된 하나의 평평한 선반 표면만 확인되므로 1단 구조입니다."
+      }
+    }
+  },
+  "1785765": {
+    "asked": [
+      "bed_type",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:27:06.276550+00:00",
+    "attributes": {
+      "head_type": {
+        "value": "수납형",
+        "confidence": 0.85,
+        "reason": "헤드보드에 물건을 올려놓을 수 있는 선반 형태의 수납 공간이 있습니다."
+      }
+    }
+  },
+  "1786951": {
+    "asked": [
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:27:16.925880+00:00",
+    "attributes": {
+      "has_headboard": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "침대 머리맡에 별도의 헤드보드가 없는 무헤드형 프레임입니다."
+      },
+      "frame_type": {
+        "value": "하단수납형",
+        "confidence": 0.85,
+        "reason": "프레임 하단에 서랍장과 위로 열리는 벙커형 수납 공간이 설계되어 있습니다."
+      },
+      "base_type": {
+        "value": "통깔판",
+        "confidence": 0.85,
+        "reason": "매트리스가 놓이는 상판 부위가 틈새가 없는 평평한 판(통판) 구조로 되어 있습니다."
+      }
+    }
+  },
+  "1792066": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:27:26.681967+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "서랍장 몸통 하단이 바닥에 밀착되어 있어 다리가 없는 형태입니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥면에 바퀴가 없는 구조입니다."
+      }
+    }
+  },
+  "181457": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:27:35.192187+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "테이블 상판 아래로 철제 hairpin 형태의 다리가 총 4개 있는 것이 명확하게 보입니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 서랍이나 선반 등 어떠한 수납 공간도 확인되지 않습니다."
+      }
+    }
+  },
+  "1833851": {
+    "asked": [
+      "installation_type",
+      "shape",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:27:41.545112+00:00",
+    "attributes": {
+      "installation_type": {
+        "value": "스탠드형",
+        "confidence": 0.85,
+        "reason": "테이블 위에 세워둘 수 있는 원형 받침대와 지지대가 있는 스탠드 형태입니다."
+      },
+      "shape": {
+        "value": "원형",
+        "confidence": 0.85,
+        "reason": "거울의 형태가 동그란 원형입니다."
+      },
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울 테두리를 감싸고 있는 금속 재질의 프레임이 명확히 보입니다."
+      }
+    }
+  },
+  "1883916": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:29:13.268806+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "일자 형태로 곧게 뻗은 일체형 옷장입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "바퀴 없이 바닥에 고정되어 있는 형태입니다."
+      }
+    }
+  },
+  "1894006": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:29:25.224297+00:00",
+    "attributes": {
+      "has_headboard": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "이미지에서 매트리스 뒤쪽에 배치된 나무 재질의 헤드보드가 명확히 확인됩니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "헤드보드의 색상이 밝은 원목/우드 색상입니다."
+      },
+      "head_type": {
+        "value": "수납형",
+        "confidence": 0.85,
+        "reason": "헤드보드 윗부분에 책, 화병, 화장품 등의 물건을 올려놓을 수 있는 선반형 수납 공간이 있습니다."
+      }
+    }
+  },
+  "1916412": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:29:36.021871+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 다리 끝이 바퀴 없이 바닥에 고정되는 형태입니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "등을 받쳐주는 곡선형 등받이가 명확하게 보입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "팔을 걸칠 수 있는 팔걸이 구조가 없습니다."
+      }
+    }
+  },
+  "1923496": {
+    "asked": [
+      "installation_type",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:30:00.960324+00:00",
+    "attributes": {
+      "installation_type": {
+        "value": "벽걸이형",
+        "confidence": 0.85,
+        "reason": "거울이 세면대 위쪽 벽면에 부착되어 걸려 있는 형태입니다."
+      },
+      "has_frame": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리에 별도의 테두리(프레임)가 없이 유리 단면과 후면 LED 조명만 노출되어 있습니다."
+      }
+    }
+  },
+  "1955548": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:30:12.632491+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "바닥에 닿아 제품을 지지하는 Y자 모양의 금속 다리 프레임이 명확히 보입니다."
+      }
+    }
+  },
+  "2004298": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:30:22.820689+00:00",
+    "attributes": {
+      "wardrobe_type": {
+        "value": "짧은 옷장",
+        "confidence": 0.85,
+        "reason": "옷장 내부 중간에 가로 분할 선반이 있어 옷을 걸 수 있는 높이가 제한된 짧은 옷장 형태가 확인됩니다."
+      },
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "옷장이 일자 형태로 나란히 배치되어 있습니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "바닥에 바퀴 없이 고정되어 설치되는 형태입니다."
+      },
+      "storage_features": {
+        "value": "선반 포함",
+        "confidence": 0.85,
+        "reason": "내부에 공간을 위아래로 나누는 중간 선반이 설치되어 있습니다."
+      }
+    }
+  },
+  "2093235": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:30:33.929209+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.85,
+        "reason": "1인용 매트리스 크기와 주변 소품 배치로 보아 성인용 프레임으로 판단됩니다."
+      },
+      "has_headboard": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "헤드보드가 존재하지 않는 무헤드 평상형 프레임입니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "내추럴하고 밝은 느낌의 목재 톤을 띠고 있습니다."
+      },
+      "base_type": {
+        "value": "통깔판",
+        "confidence": 0.85,
+        "reason": "매트리스가 놓이는 바닥판이 평평하고 두꺼운 나무 판재(통깔판) 형태로 노출되어 있습니다."
+      }
+    }
+  },
+  "2114043": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:30:39.208227+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 하단에 바퀴가 달린 오발형 다리가 명확하게 보입니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 후면에 메쉬 소재와 흰색 프레임으로 구성된 등받이가 명확하게 보입니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 측면에 곡선 형태의 팔걸이가 장착되어 있습니다."
+      }
+    }
+  },
+  "2116660": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:30:43.555273+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "철제 와이어 프레임 구조로 문이 없이 완전히 개방된 형태입니다."
+      }
+    }
+  },
+  "2217916": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:30:50.727744+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "수평으로 길게 설계된 단일 층 구조의 1단 거실장입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "제품 하단에 바닥으로부터 본체를 띄워주는 원둥형 다리가 명확하게 노출되어 있습니다."
+      }
+    }
+  },
+  "2256302": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:32:27.433283+00:00",
+    "attributes": {
+      "has_headboard": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "침대 옆 또는 머리맡에 조명과 수납 기능이 있는 침대 헤드보드(패널)가 설치되어 있는 것을 확인할 수 있습니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "설치된 침대 부속 패널의 목재 색상이 밝은 우드톤인 것을 확인할 수 있습니다."
+      },
+      "head_type": {
+        "value": "패널형",
+        "confidence": 0.85,
+        "reason": "벽면에 평평하게 밀착되는 형태의 수납 및 조명 기능이 있는 패널 형태의 헤드보드입니다."
+      }
+    }
+  },
+  "2259033": {
+    "asked": [
+      "installation_type",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:32:36.203335+00:00",
+    "attributes": {
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리를 따라 볼륨감 있는 흰색 천 소재의 프레임이 둘러져 있는 것이 명확하게 확인됩니다."
+      }
+    }
+  },
+  "2267092": {
+    "asked": [
+      "sofa_type",
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:32:43.135901+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "스툴 하단에 네 개의 원목 다리가 명확하게 보입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "팔걸이가 없는 평평한 스툴 형태입니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "헤드레스트가 없는 평평한 스툴 형태입니다."
+      },
+      "has_stool": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "이미지의 메인 상품 자체가 스툴입니다."
+      }
+    }
+  },
+  "2271760": {
+    "asked": [
+      "shape",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:32:47.989667+00:00",
+    "attributes": {
+      "shape": {
+        "value": "유니크형",
+        "confidence": 0.85,
+        "reason": "완전한 원형이나 대칭적인 타원형이 아닌, 비정형의 부드러운 조약돌 형태로 디자인되어 있어 유니크형에 해당합니다."
+      },
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리를 따라 두꺼운 초록색의 테두리(프레임)가 명확하게 존재합니다."
+      }
+    }
+  },
+  "2278028": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:01.418116+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "가구가 바닥에 직접 닿아 있는 형태로 별도의 다리가 확인되지 않습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥면에 바퀴가 보이지 않습니다."
+      },
+      "has_drawer": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "우측 중간과 하단에 가로로 긴 형태의 서랍 구조(슬롯형 손잡이가 있는 전면부)가 확인됩니다."
+      }
+    }
+  },
+  "2312042": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:10.792514+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "캐비닛 본체 하단에 바퀴가 달린 다리 프레임이 존재합니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지에서 서랍을 확인할 수 없으며, 선반과 타공판으로 구성된 오픈형 제품입니다."
+      }
+    }
+  },
+  "2326220": {
+    "asked": [
+      "drawer_count",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:19.608999+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "가구의 하단 판재가 바닥에 직접 닿는 구조로 별도의 다리가 보이지 않습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥에 직접 닿아 고정된 형태이며 바퀴가 없습니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "서랍 없이 2단 개방형 선반으로만 구성되어 있습니다."
+      }
+    }
+  },
+  "2352818": {
+    "asked": [
+      "bed_type",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:29.186179+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.85,
+        "reason": "성인이 사용하는 크기의 더블/퀸 사이즈 침대로 보입니다."
+      },
+      "frame_type": {
+        "value": "하단밀폐형",
+        "confidence": 0.85,
+        "reason": "침대 하부 프레임이 바닥에 빈 공간 없이 밀착되어 있는 밀폐형 구조입니다."
+      },
+      "head_type": {
+        "value": "곡선형",
+        "confidence": 0.85,
+        "reason": "헤드보드의 모서리가 둥글게 마감된 곡선형 디자인입니다."
+      }
+    }
+  },
+  "2377528": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:39.766341+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "여닫이형",
+        "confidence": 0.85,
+        "reason": "하단 수납장에 세로 분할선이 있어 양쪽으로 열리는 여닫이형 도어로 보입니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "본체가 바닥에 거의 밀착되어 있으며, 돋보이는 가구 다리가 없습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "하단에 바퀴가 확인되지 않습니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "가전용 수납 선반과 하단 여닫이 도어만 있고 서랍은 보이지 않습니다."
+      }
+    }
+  },
+  "2408965": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:44.837568+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "철제 와이어 프레임 구조로 별도의 도어 없이 사방이 완전히 개방된 오픈형 형태입니다."
+      }
+    }
+  },
+  "2418357": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:51.453065+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 다리 끝에 바퀴가 없고 바닥에 직접 닿아 있습니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "시트 뒤쪽에 몸을 받치거나 잡을 수 있는 둥근 등받이 프레임이 있습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "시트 양옆에 팔을 올려놓을 수 있는 팔걸이가 없습니다."
+      }
+    }
+  },
+  "2456112": {
+    "asked": [
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:33:55.704263+00:00",
+    "attributes": {
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리를 따라 얇고 하얀색의 프레임이 둘러져 있는 것이 명확하게 보입니다."
+      }
+    }
+  },
+  "2460509": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:34:02.601534+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "2단",
+        "confidence": 0.85,
+        "reason": "상단의 가로 서랍장 영역과 하단의 세로 스트라이프 무늬 수납 영역으로 구분되는 2단 구조입니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "가구 하단에 별도의 다리가 없으며 바닥에 닿는 걸레받이(평평한 받침) 형태로 되어 있습니다."
+      }
+    }
+  },
+  "2462887": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:34:11.735186+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "개별적인 다리 구조가 아닌 원형 평판 받침대로 지지하는 형태이므로 다리가 없습니다."
+      }
+    }
+  },
+  "2472954": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:34:27.795275+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "여러 옷장 모듈이 일렬로 나란히 배치되어 있는 ㅡ자형 구조입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "바퀴가 없이 바닥에 안정적으로 설치된 고정식 형태입니다."
+      },
+      "storage_features": {
+        "value": "서랍 포함",
+        "confidence": 0.85,
+        "reason": "우측 옷장 하단부에 3단 외부 서랍이 명확하게 보입니다."
+      }
+    }
+  },
+  "247739": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:34:37.059859+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 상판을 들어 올렸을 때 안쪽에 거울이 부착되어 있는 것이 명확하게 보입니다."
+      },
+      "storage_type": {
+        "value": "서랍형",
+        "confidence": 0.85,
+        "reason": "화장대 우측에 서랍장 형태의 수납 공간이 구성되어 있는 것이 보입니다."
+      }
+    }
+  },
+  "2506187": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:34:46.852352+00:00",
+    "attributes": {
+      "shape": {
+        "value": "타원형",
+        "confidence": 0.85,
+        "reason": "상판이 양끝이 둥글고 길쭉한 타원형 모양입니다."
+      },
+      "leg_type": {
+        "value": "원형베이스",
+        "confidence": 0.85,
+        "reason": "바닥면에 밀착되는 평평한 판(원형/타원형 베이스) 형태의 다리 구조를 가지고 있습니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 추가적인 수납 선반이나 서랍이 존재하지 않습니다."
+      }
+    }
+  },
+  "2568445": {
+    "asked": [
+      "has_wheels",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:34:50.826683+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지에 보이는 모든 의자의 다리 끝부분에 바퀴가 없이 바닥에 고정되어 있는 형태입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이는 있으나 양옆에 팔을 지지하는 팔걸이 구조가 존재하지 않습니다."
+      }
+    }
+  },
+  "2640943": {
+    "asked": [
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:34:56.201522+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "TV 스탠드 하단에 바퀴가 달린 형태의 금속 프레임 다리가 명확히 관찰됩니다."
+      }
+    }
+  },
+  "2661086": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:35:01.918287+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "이미지 중앙에 타원형 모양의 거울이 부착되어 있는 것을 명확히 확인할 수 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "상단의 선반 수납 공간과 하단의 서랍 수납 공간이 함께 존재하는 복합형 구조입니다."
+      }
+    }
+  },
+  "2675123": {
+    "asked": [
+      "wardrobe_type",
+      "mobility_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:35:14.548396+00:00",
+    "attributes": {
+      "wardrobe_type": {
+        "value": "선반 옷장",
+        "confidence": 0.85,
+        "reason": "행거와 함께 좌측에 4단 선반 및 하단 선반들이 결합된 형태의 드레스룸 행거입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "바퀴가 없고 바닥에 고정하는 다릿발 형태로 설치되어 있습니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "문이 없는 완전 개방형 행거 구조입니다."
+      },
+      "storage_features": {
+        "value": "선반 포함",
+        "confidence": 0.85,
+        "reason": "좌측에 4단 선반 수납 공간 및 행거 프레임 내에 다수의 선반이 포함되어 있습니다."
+      }
+    }
+  },
+  "2689542": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:35:24.020786+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.85,
+        "reason": "일반적인 침실 환경에 배치된 표준 크기와 높이의 성인용 침대 프레임입니다."
+      },
+      "has_headboard": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "헤드보드가 없는 평평한 디자인의 프레임입니다."
+      },
+      "frame_type": {
+        "value": "하단오픈형",
+        "confidence": 0.85,
+        "reason": "침대 아래쪽이 다리로만 지지되어 있어 하부가 완전히 개방된 형태입니다."
+      }
+    }
+  },
+  "2708569": {
+    "asked": [
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:35:28.166796+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "가구 하단에 바닥과 가구 본체 사이에 공간을 띄워주는 금속 재질의 다리가 명확하게 보입니다."
+      }
+    }
+  },
+  "2720406": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:35:36.900711+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 하단 모서리 부분에 바닥과 닿는 짧은 다리가 보입니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 좌측 측면에 두툼한 형태의 팔걸이가 확인됩니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "별도의 머리 받침대(헤드레스트) 없이 등받이 쿠션만 있는 형태입니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "카우치(또는 롱 체어) 모듈이 결합된 형태의 소파이며, 독립된 별도의 스툴은 확인되지 않습니다."
+      }
+    }
+  },
+  "2723591": {
+    "asked": [
+      "storage_type",
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:36:57.084503+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "장식장",
+        "confidence": 0.85,
+        "reason": "유리 선반과 유리 도어 내부에 그릇, 찻잔 등의 식기류가 진열되어 있는 장식장 형태입니다."
+      },
+      "door_type": {
+        "value": "유리도어",
+        "confidence": 0.85,
+        "reason": "상단 수납공간에 내부가 투명하게 보이는 유리 도어가 장착되어 있습니다."
+      }
+    }
+  },
+  "2755192": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:37:11.210627+00:00",
+    "attributes": {
+      "shape": {
+        "value": "타원형",
+        "confidence": 0.85,
+        "reason": "상판의 모양이 둥글고 길쭉한 타원형 형태를 띠고 있습니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 서랍, 선반 등의 추가적인 수납 공간이 존재하지 않습니다."
+      },
+      "wood_tone": {
+        "value": "중간 우드톤",
+        "confidence": 0.85,
+        "reason": "다리 프레임의 원목 색상이 너무 밝거나 어둡지 않은 중간 정도의 브라운 톤을 띠고 있습니다."
+      }
+    }
+  },
+  "2787690": {
+    "asked": [
+      "storage_type",
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:37:22.786229+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "진열장",
+        "confidence": 0.8,
+        "reason": "상단에 스피커를 거치하고 LP 음반을 전면에 보이게 배치하거나 세워두는 진열 목적의 수납장입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "별도의 도어 없이 전면이 완전히 개방되어 있는 형태입니다."
+      }
+    }
+  },
+  "2803294": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:37:34.166803+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.85,
+        "reason": "성인 여성이 사용 중인 일반적인 크기의 성인용 침대입니다."
+      },
+      "has_headboard": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "침대 머리맡에 둥근 형태의 헤드보드가 존재합니다."
+      },
+      "frame_type": {
+        "value": "하단밀폐형",
+        "confidence": 0.85,
+        "reason": "침대 하단 프레임이 바닥면까지 밀폐되어 막혀 있는 형태입니다."
+      },
+      "head_type": {
+        "value": "쿠션형",
+        "confidence": 0.85,
+        "reason": "헤드보드가 부드러운 패브릭 및 쿠션 형태로 마감되어 있습니다."
+      },
+      "product_type": {
+        "value": "프레임+매트리스",
+        "confidence": 0.85,
+        "reason": "하단 프레임 위에 매트리스가 결합되어 사용 중인 모습이 명확히 보입니다."
+      }
+    }
+  },
+  "2816334": {
+    "asked": [
+      "storage_type",
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:37:41.331965+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "진열장",
+        "confidence": 0.85,
+        "reason": "3단 선반 형태로 소품과 도서를 올려놓아 진열할 수 있는 개방형 수납공간을 제공하므로 진열장에 가장 가깝습니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "별도의 도어(문)가 장착되어 있지 않고 모든 면이 뚫려 있어 오픈형 구조를 띠고 있습니다."
+      }
+    }
+  },
+  "2817507": {
+    "asked": [
+      "installation_type",
+      "shape",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:37:52.055033+00:00",
+    "attributes": {
+      "shape": {
+        "value": "직사각형",
+        "confidence": 0.85,
+        "reason": "거울의 외곽선이 세로로 긴 직사각형 형태를 띠고 있습니다."
+      },
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리를 따라 두꺼운 검은색 프레임이 명확하게 보입니다."
+      }
+    }
+  },
+  "2835122": {
+    "asked": [
+      "installation_type",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:38:04.295174+00:00",
+    "attributes": {
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울의 팔각형 테두리를 감싸고 있는 은색 프레임이 명확하게 관찰됩니다."
+      }
+    }
+  },
+  "2839700": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:38:12.384562+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "밀폐형",
+        "confidence": 0.85,
+        "reason": "책장의 하단에 내부가 전혀 보이지 않는 불투명한 수납 도어가 적용되어 있습니다."
+      }
+    }
+  },
+  "2890981": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:39:26.191371+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 좌측에 아치형 전신 거울이 부착되어 있는 것을 명확하게 확인할 수 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "우측 부분에 오픈된 선반 공간과 하단에 닫혀 있는 서랍/수납함 구조가 함께 배치되어 있는 복합형 구조입니다."
+      }
+    }
+  },
+  "2891037": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:39:30.691787+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "이미지 좌측에 아치형 전신 거울이 부착되어 있는 것을 명확하게 확인할 수 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "우측 수납공간에 오픈형 선반과 3단 서랍이 함께 구성되어 있는 복합형 구조입니다."
+      }
+    }
+  },
+  "2896711": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:39:37.860367+00:00",
+    "attributes": {
+      "drawer_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "제품 하단에 손잡이가 달린 서랍 1단이 구성되어 있습니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "프레임이 연장된 형태의 얇은 스틸 다리가 바닥을 지지하고 있는 것이 확인됩니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "다리 끝부분에 바퀴가 아닌 고정식 글라이더(발받침)가 설치되어 있습니다."
+      }
+    }
+  },
+  "2919184": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:40:00.403961+00:00",
+    "attributes": {
+      "wardrobe_type": {
+        "value": "짧은 옷장",
+        "confidence": 0.8,
+        "reason": "상하단에 옷걸이 봉이 있어 짧은 상의나 하의를 수납할 수 있는 짧은 옷장 형태의 모듈이 포함되어 있습니다."
+      },
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "여러 모듈이 일렬로 나란히 배치되어 있는 ㅡ자형 구조입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "바닥에 바퀴 없이 평평하게 고정되어 설치된 형태입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "옷을 수납하는 공간 대부분이 문 없이 완전히 개방된 오픈형 행거 구조입니다."
+      },
+      "storage_features": {
+        "value": "서랍 포함",
+        "confidence": 0.85,
+        "reason": "화장대 모듈 하단에 3단 서랍장이 명확하게 확인됩니다."
+      }
+    }
+  },
+  "3033801": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:41:08.999936+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "일자(ㅡ자) 형태로 구성되어 벽면에 나란히 배치하는 형태입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "하단 다리 끝부분에 바퀴가 없고 바닥에 지지하는 고정형 마개가 확인됩니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "문이나 가림막 커튼 등이 없이 전면이 개방된 오픈형 구조입니다."
+      },
+      "storage_features": {
+        "value": "선반 포함",
+        "confidence": 0.85,
+        "reason": "행거 최상단과 최하단에 물건을 적치할 수 있는 선반(천 시트) 공간이 존재합니다."
+      }
+    }
+  },
+  "3068052": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:41:20.387998+00:00",
+    "attributes": {}
+  },
+  "3095270": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:41:42.787282+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 우측 상단에 아치 형태의 거울이 설치되어 있는 것이 명확히 보입니다."
+      },
+      "storage_type": {
+        "value": "서랍형",
+        "confidence": 0.85,
+        "reason": "화장대 하부에 3단 2열 형태의 총 6개 서랍으로 이루어진 서랍장 수납 구조가 확인됩니다."
+      }
+    }
+  },
+  "310649": {
+    "asked": [
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:42:04.281493+00:00",
+    "attributes": {
+      "frame_type": {
+        "value": "하단수납형",
+        "confidence": 0.85,
+        "reason": "침대 하단 측면에 서랍 수납 공간이 있어 직접 물건을 수납하는 모습을 확인할 수 있습니다."
+      },
+      "head_type": {
+        "value": "수납형",
+        "confidence": 0.85,
+        "reason": "헤드보드 부분에 안경, 소품, 시계 등을 올려둘 수 있는 선반과 수납 공간이 마련되어 있습니다."
+      }
+    }
+  },
+  "314751": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:42:10.488795+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "이미지에 보이는 책장들이 전면에 문이 없이 수납 공간이 완전히 노출된 개방형 구조입니다."
+      }
+    }
+  },
+  "3153754": {
+    "asked": [
+      "storage_type",
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:42:37.226348+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "매거진랙",
+        "confidence": 0.85,
+        "reason": "제품 중간에 책이나 잡지를 전면으로 보여주며 거치할 수 있는 경사형 선반이 포함되어 있어 매거진랙으로 판단됩니다."
+      },
+      "door_type": {
+        "value": "밀폐형",
+        "confidence": 0.85,
+        "reason": "하부 수납장에 내부가 보이지 않는 불투명한 흰색 판재 도어가 장착되어 있어 밀폐형에 해당합니다."
+      }
+    }
+  },
+  "3157817": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:42:43.050333+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "제품 하단에 바닥면과 닿아 지탱해 주는 다리가 존재합니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바퀴가 없으며 다리 형태로 고정되어 있는 것을 볼 수 있습니다."
+      }
+    }
+  },
+  "316140": {
+    "asked": [
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:42:54.075134+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "진열장",
+        "confidence": 0.85,
+        "reason": "철제 프레임에 오픈된 형태의 선반이 단별로 구성되어 있으며, 소품, 액자, 책 등을 올려두어 노출시키는 진열장(오픈형 수납 선반) 구조입니다."
+      }
+    }
+  },
+  "3170476": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:43:09.412618+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "원형베이스",
+        "confidence": 0.85,
+        "reason": "하단 다리가 프레임 형태나 4다리가 아닌, 하나의 넓은 원통형 베이스로 지지되는 구조입니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "테이블 상판 아래나 내부, 측면에 별도의 선반, 서랍 등 수납 공간이 존재하지 않는 기본 형태입니다."
+      },
+      "wood_tone": {
+        "value": "중간 우드톤",
+        "confidence": 0.85,
+        "reason": "앞쪽에 위치한 나무 재질의 테이블이 너무 밝거나 어둡지 않은 중간 정도의 브라운 우드 톤을 나타내고 있습니다."
+      }
+    }
+  },
+  "3172530": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:43:20.791529+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "원형 상판 아래에 일자로 뻗어 있는 4개의 철제 다리가 명확히 관찰됩니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 서랍이나 선반 등의 수납 공간이 존재하지 않습니다."
+      }
+    }
+  },
+  "3205595": {
+    "asked": [
+      "shape",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:44:01.522987+00:00",
+    "attributes": {
+      "shape": {
+        "value": "유니크형",
+        "confidence": 0.85,
+        "reason": "거울의 형태가 대칭적이지 않고 비정형적인 곡선 모양을 띠고 있습니다."
+      },
+      "has_frame": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "거울 테두리에 별도의 프레임이 없이 거울 가장자리가 그대로 노출된 형태입니다."
+      }
+    }
+  },
+  "3215125": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:44:51.202428+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "옷장과 일체형 화장대가 일렬로 곧게 배치된 ㅡ자형 구조입니다."
+      },
+      "door_type": {
+        "value": "여닫이",
+        "confidence": 0.85,
+        "reason": "도어 간의 수직 분할선이 평평하게 맞닿아 있는 형태에서 여닫이 도어임을 확인할 수 있습니다."
+      },
+      "storage_features": {
+        "value": "선반 포함",
+        "confidence": 0.85,
+        "reason": "일체형으로 구성된 왼쪽 화장대 내부 수납 공간에 선반들이 명확히 보입니다."
+      }
+    }
+  },
+  "3270657": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:45:00.625351+00:00",
+    "attributes": {
+      "shape": {
+        "value": "사각형",
+        "confidence": 0.85,
+        "reason": "책상 상판의 형태가 일직선의 직사각형 모양입니다."
+      }
+    }
+  },
+  "327680": {
+    "asked": [
+      "bed_type",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:45:14.235430+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "수납침대",
+        "confidence": 0.85,
+        "reason": "프레임 하단에 서랍과 벙커 형태의 수납 공간이 명확하게 확인됩니다."
+      },
+      "frame_type": {
+        "value": "하단수납형",
+        "confidence": 0.85,
+        "reason": "침대 하부 프레임 내부에 서랍과 덮개식 수납함이 내장되어 있습니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "전체적으로 연한 베이지/내추럴 계열의 밝은 나무 색상입니다."
+      },
+      "base_type": {
+        "value": "통깔판",
+        "confidence": 0.85,
+        "reason": "수납 공간 위를 덮고 있는 평평한 판 형태의 깔판 구조가 확인됩니다."
+      }
+    }
+  },
+  "3288309": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:45:30.922405+00:00",
+    "attributes": {
+      "drawer_count": {
+        "value": "2단",
+        "confidence": 0.85,
+        "reason": "수납 공간이 세로로 2단 레이어로 구성되어 있습니다."
+      },
+      "door_type": {
+        "value": "플랩형",
+        "confidence": 0.8,
+        "reason": "상단 중앙에 회전형 손잡이가 부착된 모듈형 플랩 도어 구조입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "프레임 하단에 바닥을 지탱하는 미세 조정 발받침 형태의 다리가 식별됩니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바퀴가 없는 고정 다리 형태입니다."
+      }
+    }
+  },
+  "3300210": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:45:57.549714+00:00",
+    "attributes": {
+      "shape": {
+        "value": "사각형",
+        "confidence": 0.85,
+        "reason": "상판이 모서리가 약간 둥근 직사각형 형태입니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 서랍이나 선반 등의 수납 공간이 존재하지 않습니다."
+      },
+      "seating_capacity": {
+        "value": "6인",
+        "confidence": 0.85,
+        "reason": "테이블 상판 위에 6 세트의 식기와 유리잔이 세팅되어 있어 6인용 크기임을 확인할 수 있습니다."
+      }
+    }
+  },
+  "3317042": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:46:10.569172+00:00",
+    "attributes": {
+      "shape": {
+        "value": "기타",
+        "confidence": 0.85,
+        "reason": "상판이 단순 사각형이 아니라 안쪽으로 꺾인 L자형 또는 라운드 컷아웃이 들어간 형태이므로 기타로 판정됩니다."
+      },
+      "leg_type": {
+        "value": "X자형",
+        "confidence": 0.8,
+        "reason": "다리 프레임이 사선으로 교차 및 지지하는 구조를 가지고 있어 X자형에 가깝습니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "책상 자체에 일체형으로 부착된 서랍이나 수납 선반이 없습니다. (상단의 모니터 받침대는 얹어놓은 별도 소품으로 판단됨)"
+      }
+    }
+  },
+  "3317154": {
+    "asked": [
+      "shape"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:46:21.204058+00:00",
+    "attributes": {
+      "shape": {
+        "value": "직사각형",
+        "confidence": 0.85,
+        "reason": "이미지에서 거울의 전체적인 형태가 가로보다 세로가 더 긴 직사각형인 것을 명확히 확인할 수 있습니다."
+      }
+    }
+  },
+  "3326382": {
+    "asked": [
+      "has_armrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:46:28.575958+00:00",
+    "attributes": {
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 양쪽 끝부분에 베개 모양의 완만한 팔걸이가 배치되어 있는 모습을 확인할 수 있습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 앞에 원형 소형 테이블만 있을 뿐, 발을 얹을 수 있는 별도의 스툴(오토만)은 관찰되지 않습니다."
+      }
+    }
+  },
+  "3338578": {
+    "asked": [
+      "has_legs",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:46:36.268979+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 바닥면에 본체를 지지하는 짧은 검은색 다리들이 명확히 보입니다."
+      },
+      "has_headrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 등받이 윗부분에 각도를 조절할 수 있는 헤드레스트가 장착되어 있습니다. (우측 좌석은 세워져 있고 좌측 좌석들은 눕혀져 있음)"
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 세트 외에 별도의 독립된 스툴(오토만)은 이미지에서 보이지 않습니다."
+      }
+    }
+  },
+  "334184": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:47:35.259910+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.85,
+        "reason": "일반적인 성인 1~2인용 크기와 디자인을 가진 침대 프레임입니다."
+      },
+      "has_headboard": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "세로 살대 모양의 원목 헤드보드가 명확하게 노출되어 있습니다."
+      },
+      "frame_type": {
+        "value": "하단오픈형",
+        "confidence": 0.85,
+        "reason": "침대 프레임 하단이 다리로 지지되어 바닥면이 노출된 오픈형 구조입니다."
+      },
+      "wood_tone": {
+        "value": "어두운 우드톤",
+        "confidence": 0.85,
+        "reason": "짙은 갈색(월넛 계열)의 어두운 우드 색상을 띠고 있습니다."
+      },
+      "head_type": {
+        "value": "일자형",
+        "confidence": 0.85,
+        "reason": "헤드보드가 평평하고 곧게 뻗은 일자형(살대형) 구조에 쿠션이 걸려 있는 형태입니다."
+      }
+    }
+  },
+  "3344851": {
+    "asked": [
+      "has_wheels",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:47:40.599394+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 하단 오발 다리 끝에 이동용 바퀴가 부착되어 있는 것을 명확히 확인할 수 있습니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 시트 양옆에 팔을 지지할 수 있는 팔걸이가 명확히 조립되어 있습니다."
+      }
+    }
+  },
+  "336645": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:47:53.223988+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "일자(ㅡ자) 형태로 곧게 뻗어 있는 구조입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "하단에 바퀴가 없이 고정형 다리로 서 있는 형태입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "문이 없이 프레임과 수납공간이 완전히 노출된 형태입니다."
+      },
+      "storage_features": {
+        "value": "선반 포함",
+        "confidence": 0.85,
+        "reason": "하단에 물건을 적재할 수 있는 2단 선반이 관찰됩니다."
+      }
+    }
+  },
+  "3381795": {
+    "asked": [
+      "sofa_type",
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:48:05.458815+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "스툴 하단에 은색 금속 다리가 명확히 노출되어 있습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "팔걸이가 없는 원형 스툴 형태입니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "헤드레스트가 없는 디자인입니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "스툴 단품 이미지로, 추가적인 별도의 스툴 구성은 보이지 않습니다."
+      }
+    }
+  },
+  "3381827": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:48:14.812577+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지 상에서 화장대나 콘솔에 결합되었거나 별도로 배치된 거울이 보이지 않습니다."
+      },
+      "storage_type": {
+        "value": "선반형",
+        "confidence": 0.85,
+        "reason": "서랍 없이 프레임과 유리판으로 구성된 2단 선반 형태의 수납 공간만 확인됩니다."
+      }
+    }
+  },
+  "3416498": {
+    "asked": [
+      "wood_tone",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:48:22.034966+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "수납장 하단에 지면을 지탱하는 아치 형태의 다리가 명확하게 확인됩니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "다리 끝부분이 바닥에 직접 닿아 있으며 바퀴는 보이지 않습니다."
+      }
+    }
+  },
+  "3432011": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:48:32.684534+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "문이 없는 완전 개방형 구조의 행거입니다."
+      },
+      "storage_features": {
+        "value": "수납 없음",
+        "confidence": 0.85,
+        "reason": "서랍이나 선반이 없는 심플한 스탠드 행거 형태입니다."
+      }
+    }
+  },
+  "343456": {
+    "asked": [
+      "installation_type",
+      "shape",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:48:44.663923+00:00",
+    "attributes": {
+      "shape": {
+        "value": "직사각형",
+        "confidence": 0.85,
+        "reason": "거울의 전체적인 외형이 세로로 긴 직사각형 형태입니다."
+      },
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울 가장자리에 흰색의 테두리(프레임)가 명확하게 관찰됩니다."
+      }
+    }
+  },
+  "3450353": {
+    "asked": [
+      "drawer_count",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:48:57.462775+00:00",
+    "attributes": {
+      "drawer_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "제품의 상단부에 1개의 서랍이 존재함이 확인됩니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "양 측면 판재가 아래로 연장되어 제품 몸통을 바닥에서 띄워주는 다리 역할을 하고 있습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥면에 바퀴가 없는 고정형 제품입니다."
+      },
+      "has_drawer": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "상단에 손잡이 홈이 있는 1단의 서랍이 확인됩니다."
+      }
+    }
+  },
+  "3456278": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:49:04.321670+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "이미지에 제시된 회전 책장 및 양옆의 책장 모두 별도의 문(도어)이 없이 수납 칸이 외부에 바로 노출되는 오픈형 구조입니다."
+      }
+    }
+  },
+  "346955": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:49:14.256926+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "옷장이 벽면을 따라 일자(ㅡ자) 형태로 나란히 배치되어 있습니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "하단에 바퀴가 없고 바닥에 안정적으로 안착되어 있는 고정형 가구입니다."
+      }
+    }
+  },
+  "3490352": {
+    "asked": [
+      "vanity_type",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:49:25.931626+00:00",
+    "attributes": {
+      "vanity_type": {
+        "value": "콘솔형",
+        "confidence": 0.85,
+        "reason": "슬림한 다리가 있는 콘솔 테이블 형태의 화장대 구조입니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "좌측 하단의 오픈형 선반 공간과 우측의 수납함(탬버 도어 형태)이 함께 구성되어 있습니다."
+      }
+    }
+  },
+  "3504715": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:49:35.001830+00:00",
+    "attributes": {
+      "wardrobe_type": {
+        "value": "선반 옷장",
+        "confidence": 0.85,
+        "reason": "우측 내부 수납공간에 옷걸이 봉과 함께 여러 단의 선반이 함께 구성되어 있는 것이 확인됩니다."
+      },
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "일자(ㅡ) 형태로 나란히 배치되어 있는 구조입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "바퀴가 없고 바닥에 평평하게 지지되어 설치되는 고정식 가구입니다."
+      },
+      "storage_features": {
+        "value": "선반 포함",
+        "confidence": 0.85,
+        "reason": "우측 오픈된 옷장 내부에 옷이 개어져 있는 선반 수납 영역이 명확하게 확인됩니다."
+      }
+    }
+  },
+  "3519624": {
+    "asked": [
+      "sofa_type",
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:49:46.031363+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "제품 하단에 은색 금속 재질의 5발 다리가 명확하게 보입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "팔걸이가 없는 형태의 스툴입니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "헤드레스트가 없는 형태의 스툴입니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "제품 자체가 단품 스툴이며, 추가적인 스툴 구성품은 보이지 않습니다."
+      }
+    }
+  },
+  "3532653": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:50:01.677257+00:00",
+    "attributes": {
+      "drawer_count": {
+        "value": "1단",
+        "confidence": 0.8,
+        "reason": "상단 열이 서랍으로 구성되어 있는 1단 구조의 서랍이 확인됩니다."
+      },
+      "door_type": {
+        "value": "여닫이형",
+        "confidence": 0.8,
+        "reason": "하단 수납부의 중앙 분할선 구조상 좌우로 열리는 여닫이문 형태로 확인됩니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "제품이 바닥에 거의 밀착되어 있어 별도의 높은 다리가 확인되지 않습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥면에 이동용 바퀴가 확인되지 않습니다."
+      }
+    }
+  },
+  "3543442": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:50:13.055121+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "테이블 상판을 지지하는 4개의 원목 다리가 보입니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 수납을 위한 서랍이나 선반 등의 구조가 존재하지 않습니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "테이블 다리 부분이 밝고 연한 원목 색상(내추럴 우드)으로 되어 있습니다."
+      },
+      "seating_capacity": {
+        "value": "2인",
+        "confidence": 0.85,
+        "reason": "식탁의 한 면이 벽에 붙어 있고, 의자 2개가 알맞게 배치되어 있는 아담한 규모의 식탁입니다."
+      }
+    }
+  },
+  "3549948": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:50:26.359190+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "프레임 하단에 바닥과 접해 있는 금속 다리가 명확히 관찰됩니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "하단에 바퀴가 없으며 고정식 다리로 되어 있습니다."
+      }
+    }
+  },
+  "3549981": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:50:38.220591+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "플랩형",
+        "confidence": 0.85,
+        "reason": "문이 아래쪽으로 열려 수평 상태로 고정되는 플랩형 도어가 확인됩니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "프레임 최하단에 바닥을 지지하는 작은 메탈 소재의 다리가 확인됩니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "하단 지지부가 바퀴가 아닌 일반 다리 형태로 되어 있습니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "앞으로 당겨서 여는 슬라이딩 방식의 서랍은 보이지 않으며, 오픈형 수납 칸과 플랩형 도어 수납 칸만 확인됩니다."
+      }
+    }
+  },
+  "3550577": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:50:47.434101+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "하단부가 바닥에 직접 닿는 걸레받이(플린스) 구조로 되어 있어 별도의 다리가 없습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "하단에 바퀴가 식별되지 않으며 바닥에 고정되어 있는 구조입니다."
+      }
+    }
+  },
+  "3563374": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:50:51.505767+00:00",
+    "attributes": {
+      "shelf_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "이미지에서 물건을 올려놓을 수 있는 선반 받침대가 1개만 확인됩니다."
+      }
+    }
+  },
+  "3591752": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:50:58.168005+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "발받침 제품의 바닥 프레임에 바퀴가 없으며, 평평한 고정용 패드로 지면과 맞닿아 있는 구조입니다."
+      },
+      "has_backrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등을 기댈 수 있는 등받이 구조가 전혀 없습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "팔을 올릴 수 있는 팔걸이 구조가 없습니다."
+      }
+    }
+  },
+  "3600188": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:51:04.335883+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "2단",
+        "confidence": 0.85,
+        "reason": "이미지에서 수직으로 2층 구조(상단과 하단)로 구성된 수납장을 확인할 수 있습니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "수납장 본체 하단에 바닥과 닿아 있는 얇은 메탈 소재의 다리가 명확히 확인됩니다."
+      }
+    }
+  },
+  "3603649": {
+    "asked": [
+      "bed_type",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:51:18.869011+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "수납침대",
+        "confidence": 0.85,
+        "reason": "침대 프레임을 들어 올려 하단 전체를 수납 공간으로 사용하는 구조입니다."
+      },
+      "frame_type": {
+        "value": "하단수납형",
+        "confidence": 0.85,
+        "reason": "프레임 하단 내부에 물건을 수납할 수 있는 칸막이와 공간이 존재합니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "밝은 색감의 내추럴 오크/원목 패턴의 프레임입니다."
+      },
+      "base_type": {
+        "value": "통깔판",
+        "confidence": 0.85,
+        "reason": "매트리스를 지지하는 리프트 업 부분이 틈새가 없는 일체형 통판 구조입니다."
+      }
+    }
+  },
+  "3605866": {
+    "asked": [
+      "vanity_type",
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:51:32.690123+00:00",
+    "attributes": {
+      "vanity_type": {
+        "value": "수납형",
+        "confidence": 0.85,
+        "reason": "상단의 슬라이딩 수납장(선반)과 중단의 서랍장 등 좁은 공간에 세로로 많은 수납공간을 제공하는 수납 특화형 화장대입니다."
+      },
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "상단 수납장 전면에 슬라이딩 방식으로 열고 닫을 수 있는 거울이 부착되어 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "거울 뒤쪽의 선반형 수납 구조와 하단의 서랍형 수납 구조가 모두 확인되는 복합형 수납 화장대입니다."
+      }
+    }
+  },
+  "3611067": {
+    "asked": [
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:51:42.424131+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "화장대 상단에 물건을 적재할 수 있는 선반형 구조와 하단에 서랍형 수납 공간이 함께 구성되어 있어 복합형으로 판단됩니다."
+      }
+    }
+  },
+  "3620043": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:52:02.286488+00:00",
+    "attributes": {}
+  },
+  "362306": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:52:17.034621+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.85,
+        "reason": "성인이 사용하기에 적합한 일반적인 규격의 침대로 확인됩니다."
+      },
+      "has_headboard": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "조명과 선반 수납 기능이 포함된 헤드보드가 명확하게 식별됩니다."
+      },
+      "frame_type": {
+        "value": "하단밀폐형",
+        "confidence": 0.85,
+        "reason": "프레임 하단이 다리 없이 바닥까지 완전히 밀폐된 구조입니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.8,
+        "reason": "프레임 표면이 밝은 메이플 또는 오크 색상의 자연스러운 우드톤을 띱니다."
+      },
+      "head_type": {
+        "value": "수납형",
+        "confidence": 0.85,
+        "reason": "헤드부분에 소품을 올려둘 수 있는 선반식 수납 공간과 LED 조명이 마련되어 있습니다."
+      },
+      "product_type": {
+        "value": "프레임+매트리스",
+        "confidence": 0.85,
+        "reason": "침대 프레임 위에 매트리스와 침구류가 완전히 구비된 형태로 제시되어 있습니다."
+      }
+    }
+  },
+  "3650246": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:52:25.527274+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 하단이 바닥에 직접 닿아 있으며, 별도의 돌출된 다리가 보이지 않습니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 좌우 양측에 컵홀더가 포함된 넓은 형태의 팔걸이가 확인됩니다."
+      },
+      "has_headrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "등받이 상단에 머리를 지지할 수 있는 헤드레스트가 적용되어 있습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 세트 구성품 외에 별도의 독립된 스툴(오토만)은 확인되지 않습니다. (중앙의 흰색 사각 블록은 컵이 놓인 협탁/테이블입니다.)"
+      }
+    }
+  },
+  "368525": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:52:41.684623+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "X자형",
+        "confidence": 0.85,
+        "reason": "상판을 받쳐주는 다리가 두 개의 판재가 교차된 십자(X자) 형태를 띠고 있습니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "상판 아래에 서랍이나 추가 선반 등의 수납 공간이 존재하지 않습니다."
+      },
+      "wood_tone": {
+        "value": "중간 우드톤",
+        "confidence": 0.85,
+        "reason": "너무 밝거나 어둡지 않은 자연스러운 중간 톤의 브라운 우드 색상입니다."
+      }
+    }
+  },
+  "37103": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:52:45.622632+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "이미지 속 책장은 별도의 문(도어)이 없이 선반 전체가 노출되어 있는 오픈형 구조입니다."
+      }
+    }
+  },
+  "3719757": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:52:54.320770+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "2단",
+        "confidence": 0.85,
+        "reason": "상단의 닫힌 수납 공간과 하단의 오픈형 선반 공간이 세로로 배치된 2단 구조입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거실장 본체를 지탱하고 바닥에서 띄워주는 프레임 형태의 다리가 있습니다."
+      }
+    }
+  },
+  "3746395": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:53:04.420790+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "옷장이 일렬로 배치되어 있는 ㅡ자형 구조입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "바닥에 고정되어 있는 일반적인 고정식 가구의 형태입니다."
+      }
+    }
+  },
+  "3755979": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:53:09.700114+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 상단에 사각형 거울이 부착되어 있는 것을 명확하게 확인할 수 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "중앙에 서랍이 배치되어 있고, 거울 아래와 맨 하단부에 오픈형 선반 공간이 함께 구성되어 있습니다."
+      }
+    }
+  },
+  "3768037": {
+    "asked": [
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:53:17.756875+00:00",
+    "attributes": {
+      "leg_type": {
+        "value": "원형베이스",
+        "confidence": 0.85,
+        "reason": "중앙의 외기둥과 바닥의 넓고 평평한 타원형 판 형태의 받침대로 지지하는 구조입니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "테이블 상판 아래에 서랍, 선반 등 수납을 위한 별도의 공간이 존재하지 않습니다."
+      }
+    }
+  },
+  "3791873": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:53:24.216823+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "제품 전면에 세로로 긴 형태의 거울이 부착되어 있는 것을 명확히 확인할 수 있습니다."
+      },
+      "storage_type": {
+        "value": "복합형",
+        "confidence": 0.85,
+        "reason": "거울 아래에 서랍이 존재하고, 그 아래에는 다이슨 에어랩 등이 수납된 오픈형 선반 공간이 함께 구성되어 있어 서랍형과 선반형이 결합된 형태입니다."
+      }
+    }
+  },
+  "3802663": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:53:29.207536+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 다리 끝에 바퀴가 없고 고정형 지지대로 이루어져 있습니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "높은 등받이와 등 쿠션이 명확하게 보입니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 양옆으로 몸을 감싸는 형태의 팔걸이와 쿠션이 있습니다."
+      }
+    }
+  },
+  "3817445": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:53:36.392741+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파가 바닥에 직접 밀착되어 있으며, 하부에 지지하는 다리가 존재하지 않는 좌식 형태입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파의 양측면에 별도의 팔걸이 돌출 부위나 구조가 존재하지 않습니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이 윗부분에 머리를 별도로 받쳐주는 헤드레스트 장치나 독립된 구조가 확인되지 않습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지 내에 함께 배치된 스툴이나 발받침(오토만)이 보이지 않습니다."
+      }
+    }
+  },
+  "3820890": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:53:52.635451+00:00",
+    "attributes": {
+      "shape": {
+        "value": "사각형",
+        "confidence": 0.85,
+        "reason": "테이블 상판의 모서리가 직각으로 이루어진 사각형 형태입니다."
+      },
+      "leg_type": {
+        "value": "4다리",
+        "confidence": 0.85,
+        "reason": "테이블의 네 모퉁이를 지지하는 4개의 독립된 다리가 확인됩니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "테이블 상판 아래에 서랍이나 선반 등의 수납 공간이 관찰되지 않습니다."
+      }
+    }
+  },
+  "3878485": {
+    "asked": [
+      "sofa_type",
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:54:06.084789+00:00",
+    "attributes": {
+      "sofa_type": {
+        "value": "모듈형",
+        "confidence": 0.8,
+        "reason": "소파가 분리된 개별 블록 단위로 조합된 모듈형 형태를 띠고 있습니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 하단 본체 아래에 바닥과 공간을 두고 지지하는 짧은 다리(받침)가 확인됩니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 좌우 끝부분에 컵홀더가 내장된 형태의 팔걸이가 존재합니다."
+      },
+      "has_headrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 등받이 윗부분에 머리를 지지하는 헤드레스트가 장착되어 있습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지 내에 소파와 세트로 구성된 독립된 스툴은 존재하지 않습니다. (앞에 놓인 것은 검은색 보조 테이블입니다.)"
+      }
+    }
+  },
+  "391303": {
+    "asked": [
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:54:12.315945+00:00",
+    "attributes": {
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "제품의 측면 판넬에 밝은 색상의 우드톤 결이 선명하게 노출되어 있습니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "서랍장 하단에 별도의 다리 없이 바닥에 밀착되도록 마감 처리되어 있습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "제품 하단에 바퀴가 존재하지 않습니다."
+      }
+    }
+  },
+  "3918955": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:54:16.608249+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 상단의 열린 덮개 안쪽에 거울이 부착되어 있는 것이 명확히 보입니다."
+      },
+      "storage_type": {
+        "value": "선반형",
+        "confidence": 0.85,
+        "reason": "서랍 구조 없이 화장품 등의 물건을 올려둘 수 있는 여러 단의 오픈형 선반 구조로 이루어져 있습니다."
+      }
+    }
+  },
+  "3953211": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:54:22.938032+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "콘솔 테이블 자체에 부착되거나 고정된 거울은 없으며, 상판 위의 원형 거울은 별도의 이동식 소품으로 판단됩니다."
+      },
+      "storage_type": {
+        "value": "선반형",
+        "confidence": 0.85,
+        "reason": "서랍 없이 2단의 개방형 유리 선반 구조로만 이루어져 있습니다."
+      }
+    }
+  },
+  "3955037": {
+    "asked": [
+      "storage_type",
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:54:55.141111+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "진열장",
+        "confidence": 0.85,
+        "reason": "선반 위에 양주병과 잔 등이 전시되어 있는 형태의 진열장입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "전면에 별도의 문이 없이 개방되어 있는 오픈형 구조입니다."
+      }
+    }
+  },
+  "4040822": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "has_storage",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:55:01.872197+00:00",
+    "attributes": {
+      "shape": {
+        "value": "타원형",
+        "confidence": 0.85,
+        "reason": "테이블 상판의 형태가 길쭉하고 양끝이 둥근 타원형 모양입니다."
+      },
+      "leg_type": {
+        "value": "원형베이스",
+        "confidence": 0.85,
+        "reason": "테이블의 지지 구조가 중앙의 단일 기둥과 바닥에 밀착된 둥근 원형 원반 형태로 되어 있습니다."
+      },
+      "has_storage": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "서랍이나 하부 선반 등 어떠한 수납 공간도 확인되지 않습니다."
+      }
+    }
+  },
+  "404695": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:55:05.949567+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "수납장 내부 또는 외관상 세로로 구성된 수납 구조가 1단으로 확인됩니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "제품이 바닥에 직접 닿아 있는 형태로 별도의 다리가 확인되지 않습니다."
+      }
+    }
+  },
+  "408422": {
+    "asked": [
+      "shelf_count"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:55:12.397456+00:00",
+    "attributes": {
+      "shelf_count": {
+        "value": "4단",
+        "confidence": 0.85,
+        "reason": "이미지에서 물건이 수납되어 있는 바닥면을 포함하여 총 4개의 가로 선반(단)이 명확히 확인됩니다."
+      }
+    }
+  },
+  "427309": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:55:18.584708+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "스탠드 본체를 지지하는 긴 다리들이 명확하게 식별됩니다."
+      }
+    }
+  },
+  "444869": {
+    "asked": [
+      "has_backrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:55:21.848222+00:00",
+    "attributes": {
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "이미지에서 메쉬 소재의 등받이가 명확하게 확인됩니다."
+      }
+    }
+  },
+  "460766": {
+    "asked": [
+      "drawer_count",
+      "wood_tone",
+      "door_type",
+      "has_legs",
+      "has_wheels",
+      "has_drawer"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:55:28.922971+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "여닫이형",
+        "confidence": 0.85,
+        "reason": "수납장 문이 앞으로 열려 있는 형태를 통해 여닫이형 도어임을 명확히 확인할 수 있습니다."
+      },
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "수납장 하단이 바닥에 직접 닿아 있는 형태로 별도의 다리가 없습니다."
+      },
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "제품 하단에 바퀴가 식별되지 않습니다."
+      },
+      "has_drawer": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지상에 서랍은 보이지 않고 선반형 수납 공간만 확인됩니다."
+      }
+    }
+  },
+  "48328": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:55:58.587671+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파가 바닥에 직접 닿아 있는 좌식 형태로 다리가 없습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 측면에 팔걸이가 없는 평평한 디자인입니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이 상단에 머리를 받치기 위한 별도의 헤드레스트 구조가 존재하지 않습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지 내에 발받침용 스툴이나 오토만이 구성되어 있지 않습니다."
+      }
+    }
+  },
+  "484091": {
+    "asked": [
+      "shape"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:56:02.003421+00:00",
+    "attributes": {
+      "shape": {
+        "value": "유니크형",
+        "confidence": 0.85,
+        "reason": "거울의 외곽선이 정형화된 도형이 아닌 비대칭적이고 자유로운 곡선 형태로 디자인되어 있습니다."
+      }
+    }
+  },
+  "517819": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:56:07.836451+00:00",
+    "attributes": {
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "행거 프레임이 일직선 형태로 나란히 배치되어 있는 ㅡ자형 구조입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "문이 달려있지 않고 수납된 옷이 그대로 노출되는 오픈형 구조입니다."
+      },
+      "storage_features": {
+        "value": "수납 없음",
+        "confidence": 0.85,
+        "reason": "별도의 서랍이나 물건을 올려둘 수 있는 평평한 선반 공간 없이 옷걸이 봉으로만 구성되어 있습니다."
+      }
+    }
+  },
+  "518192": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "mobility_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:56:15.308876+00:00",
+    "attributes": {
+      "wardrobe_type": {
+        "value": "선반 옷장",
+        "confidence": 0.85,
+        "reason": "옷을 걸 수 있는 행거 봉과 물건을 올려둘 수 있는 선반이 결합된 형태의 오픈형 옷장입니다."
+      },
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "3개의 프레임이 일렬로 나란히 배치된 일자형 구조입니다."
+      },
+      "mobility_type": {
+        "value": "고정식",
+        "confidence": 0.85,
+        "reason": "하단에 바퀴가 없고 바닥에 평평하게 지지되어 있는 고정식 제품입니다."
+      },
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "별도의 문이 없이 내부 수납 공간이 완전히 노출된 오픈형 구조입니다."
+      },
+      "storage_features": {
+        "value": "선반 포함",
+        "confidence": 0.85,
+        "reason": "프레임 하단과 중간에 물건을 수납할 수 있는 여러 단의 선반이 포함되어 있습니다. (별도 서랍은 없음)"
+      }
+    }
+  },
+  "569575": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:56:24.989837+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파가 바닥에 직접 닿아 있는 좌식 형태로, 별도의 다리가 확인되지 않습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 양옆에 팔걸이 구조가 존재하지 않습니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이 외에 머리를 별도로 지지하거나 각도를 조절할 수 있는 헤드레스트 부품이 보이지 않습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지 내에 독립된 스툴이나 발받침대가 존재하지 않습니다."
+      }
+    }
+  },
+  "574524": {
+    "asked": [
+      "sofa_type",
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:56:36.194184+00:00",
+    "attributes": {
+      "sofa_type": {
+        "value": "기본형(일자형)",
+        "confidence": 0.85,
+        "reason": "일자형 구조의 소파 본체와 우측 스툴이 결합된 형태입니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파와 스툴 하단에 금속 재질의 다리가 명확히 노출되어 있습니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 좌측면에 팔걸이가 존재합니다."
+      },
+      "has_headrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "등받이 상단에 헤드레스트가 적용되어 있습니다."
+      },
+      "has_stool": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "소파 우측에 본체와 분리되는 독립된 형태의 스툴이 존재합니다."
+      }
+    }
+  },
+  "604442": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:56:47.376350+00:00",
+    "attributes": {}
+  },
+  "611415": {
+    "asked": [
+      "wardrobe_type",
+      "layout_type",
+      "door_type",
+      "storage_features"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:56:55.654152+00:00",
+    "attributes": {
+      "wardrobe_type": {
+        "value": "서랍 옷장",
+        "confidence": 0.85,
+        "reason": "이미지 좌측 하단에 3단 서랍과 상단 옷장이 결합된 형태가 보입니다."
+      },
+      "layout_type": {
+        "value": "ㅡ자형",
+        "confidence": 0.85,
+        "reason": "벽면을 따라 일자(ㅡ자형) 형태로 곧게 배치된 형태입니다."
+      },
+      "door_type": {
+        "value": "여닫이",
+        "confidence": 0.85,
+        "reason": "문과 문 사이의 경계선과 틈새를 통해 슬라이딩이 아닌 앞으로 열리는 여닫이문 구조임을 확인할 수 있습니다."
+      },
+      "storage_features": {
+        "value": "서랍 포함",
+        "confidence": 0.85,
+        "reason": "좌측 하단에 3개의 서랍 서랍장이 외부로 노출되어 있는 것을 명확하게 확인할 수 있습니다."
+      }
+    }
+  },
+  "627693": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:57:02.734670+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 다리 끝부분에 바퀴 없이 바닥 고정용 마감 처리가 되어 있습니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "의자 시트 뒷부분에 등을 기댈 수 있는 등받이가 있는 것이 확인됩니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 좌판 양옆에 팔을 걸칠 수 있는 팔걸이가 없는 형태입니다."
+      }
+    }
+  },
+  "669428": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:57:09.881784+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "이미지에서 책장에 문(도어)이 전혀 없고 모든 칸이 사방으로 개방되어 있는 오픈형 형태임을 확인할 수 있습니다."
+      }
+    }
+  },
+  "673573": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:57:21.046445+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "수납침대",
+        "confidence": 0.85,
+        "reason": "침대 프레임 하단에 의류 등을 보관할 수 있는 서랍 수납 공간이 노출되어 있어 수납침대로 확인됩니다."
+      },
+      "has_headboard": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "침대 머리맡에 조명과 선반이 포함된 헤드보드가 존재합니다."
+      },
+      "frame_type": {
+        "value": "하단수납형",
+        "confidence": 0.85,
+        "reason": "프레임 하단부가 열려 서랍이 들어가 있는 수납형태를 띠고 있습니다."
+      },
+      "wood_tone": {
+        "value": "어두운 우드톤",
+        "confidence": 0.85,
+        "reason": "짙은 브라운/월넛 색상의 어두운 나무 톤을 띠고 있습니다."
+      },
+      "head_type": {
+        "value": "패널형",
+        "confidence": 0.85,
+        "reason": "침대 본체보다 좌우로 더 넓게 뻗어 있으며 세로 스트라이프 패턴이 들어간 판재 형태의 패널형 헤드보드입니다."
+      }
+    }
+  },
+  "673574": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type",
+      "product_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:57:30.776350+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.85,
+        "reason": "성인 두 명이 사용할 수 있는 크기와 구성의 침대로 보입니다."
+      },
+      "has_headboard": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "침대 머리맡에 조명과 선반이 달린 대형 헤드보드가 확인됩니다."
+      },
+      "frame_type": {
+        "value": "하단밀폐형",
+        "confidence": 0.85,
+        "reason": "침대 풋보드 부분이 바닥까지 완전히 막혀 있는 밀폐형 구조입니다."
+      },
+      "wood_tone": {
+        "value": "어두운 우드톤",
+        "confidence": 0.85,
+        "reason": "진한 브라운/월넛 색상의 어두운 우드톤을 띠고 있습니다."
+      },
+      "head_type": {
+        "value": "패널형",
+        "confidence": 0.8,
+        "reason": "세로 줄무늬 디자인의 넓은 백패널 형태를 가진 헤드보드입니다."
+      },
+      "product_type": {
+        "value": "프레임+매트리스",
+        "confidence": 0.85,
+        "reason": "나무 침대 프레임과 그 위에 놓인 흰색 매트리스가 모두 확인됩니다."
+      }
+    }
+  },
+  "744052": {
+    "asked": [
+      "shape",
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:57:39.677597+00:00",
+    "attributes": {
+      "shape": {
+        "value": "직사각형",
+        "confidence": 0.85,
+        "reason": "거울의 전체적인 형태가 세로로 긴 직사각형 모양입니다."
+      },
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울의 외곽을 둘러싸고 있는 우드 톤의 테두리(프레임)가 명확하게 보입니다."
+      }
+    }
+  },
+  "76172": {
+    "asked": [
+      "bed_type",
+      "has_headboard",
+      "frame_type",
+      "wood_tone",
+      "head_type",
+      "base_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:57:49.713955+00:00",
+    "attributes": {
+      "bed_type": {
+        "value": "성인용",
+        "confidence": 0.8,
+        "reason": "사무용 의자, 책상 배치 및 전체적인 구성과 스케일이 성인 및 학생용에 적합한 디자인입니다."
+      },
+      "has_headboard": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "침대 프레임 상단에 별도의 헤드보드가 없으며, 사방이 철제 안전 가드로만 둘러싸여 있습니다."
+      },
+      "frame_type": {
+        "value": "하단오픈형",
+        "confidence": 0.85,
+        "reason": "이층 침대(로프트 침대) 구조로 침대 아랫부분이 완전히 개방되어 책상과 서랍장을 놓을 수 있는 하단오픈형입니다."
+      },
+      "wood_tone": {
+        "value": "밝은 우드톤",
+        "confidence": 0.85,
+        "reason": "사다리의 발판과 하단 책상 상판의 목재 색상이 밝은 우드톤을 띱니다."
+      }
+    }
+  },
+  "850323": {
+    "asked": [
+      "level_count",
+      "has_legs"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:57:55.451183+00:00",
+    "attributes": {
+      "level_count": {
+        "value": "1단",
+        "confidence": 0.85,
+        "reason": "수납을 위한 서랍과 공간이 세로로 한 층으로만 이루어져 있습니다."
+      },
+      "has_legs": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거실장 프레임 바닥 부분에 바닥면과 본체를 띄워주는 은색의 낮은 다리(받침대)가 관찰됩니다."
+      }
+    }
+  },
+  "870275": {
+    "asked": [
+      "shape",
+      "leg_type",
+      "wood_tone",
+      "seating_capacity"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:06.508781+00:00",
+    "attributes": {
+      "shape": {
+        "value": "사각형",
+        "confidence": 0.85,
+        "reason": "상판의 모양이 직사각형 형태입니다."
+      }
+    }
+  },
+  "870358": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:12.343005+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "바닥에 닿는 편평한 금속 회전판/플린스 베이스만 있을 뿐, 일반적인 다리는 없습니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파의 양옆에 팔걸이가 존재하지 않는 둥근 형태입니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이가 일체형으로 둥글게 마감되어 있으며, 별도의 헤드레스트가 없습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "이미지 내에 함께 배치된 스툴(오토만)이 보이지 않습니다."
+      }
+    }
+  },
+  "873743": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:15.836488+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "도어가 전혀 없이 수납 공간이 완전히 개방되어 있는 사다리형 매거진랙입니다."
+      }
+    }
+  },
+  "881330": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:24.436902+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 하단부가 둥근 원판 형태로 마감되어 있고 바퀴가 없습니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "좌판 뒤쪽으로 등을 받쳐주는 등받이가 명확히 존재합니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "의자 측면에 팔을 걸칠 수 있는 팔걸이가 없습니다."
+      }
+    }
+  },
+  "922852": {
+    "asked": [
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:31.595147+00:00",
+    "attributes": {
+      "storage_type": {
+        "value": "서랍형",
+        "confidence": 0.85,
+        "reason": "화장대 상판 아래와 좌측 수납 공간에 서랍들이 명확히 확인되는 서랍형 구조입니다."
+      }
+    }
+  },
+  "93583": {
+    "asked": [
+      "has_frame"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:35.801377+00:00",
+    "attributes": {
+      "has_frame": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "거울의 둥근 테두리 가장자리를 따라 얇은 프레임이 감싸고 있는 모습이 명확하게 확인됩니다."
+      }
+    }
+  },
+  "967304": {
+    "asked": [
+      "has_wheels",
+      "has_backrest",
+      "has_armrest"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:41.222936+00:00",
+    "attributes": {
+      "has_wheels": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "흔들의자 하단이 곡선형 목재 지지대로 되어 있으며 바퀴는 존재하지 않습니다."
+      },
+      "has_backrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "등과 머리를 편안하게 기댈 수 있는 높은 등받이 부분이 명확하게 보입니다."
+      },
+      "has_armrest": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "시트 좌우측이 위로 둥글게 솟아올라 팔을 얹을 수 있는 팔걸이 형태를 구성하고 있습니다."
+      }
+    }
+  },
+  "974645": {
+    "asked": [
+      "has_legs",
+      "has_armrest",
+      "has_headrest",
+      "has_stool"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:46.971480+00:00",
+    "attributes": {
+      "has_legs": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파가 바닥에 밀착해 있으며 다리가 전혀 존재하지 않는 좌식 형태입니다."
+      },
+      "has_armrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "소파 좌우측에 팔을 걸 수 있는 팔걸이 구조가 없습니다."
+      },
+      "has_headrest": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "등받이가 일체형으로 이어져 있으며 별도의 돌출되거나 분리된 헤드레스트가 보이지 않습니다."
+      },
+      "has_stool": {
+        "value": "없음",
+        "confidence": 0.85,
+        "reason": "스툴이나 오토만 등의 보조 의자가 구성품으로 포함되어 있지 않습니다."
+      }
+    }
+  },
+  "982296": {
+    "asked": [
+      "door_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:49.950121+00:00",
+    "attributes": {
+      "door_type": {
+        "value": "오픈형",
+        "confidence": 0.85,
+        "reason": "별도의 도어(문) 없이 전면이 개방되어 책을 바로 수납할 수 있는 구조입니다."
+      }
+    }
+  },
+  "982702": {
+    "asked": [
+      "has_mirror",
+      "storage_type"
+    ],
+    "model": "gemini-3.5-flash",
+    "created_at": "2026-08-12T10:58:54.752481+00:00",
+    "attributes": {
+      "has_mirror": {
+        "value": "있음",
+        "confidence": 0.85,
+        "reason": "화장대 상단에 아치형 거울이 거치되어 있는 모습이 명확하게 확인됩니다."
+      },
+      "storage_type": {
+        "value": "서랍형",
+        "confidence": 0.85,
+        "reason": "화장대 하단에 열려 있는 두 개의 서랍 수납공간이 확인되며, 별도의 선반 구조는 보이지 않습니다."
+      }
+    }
+  }
+}

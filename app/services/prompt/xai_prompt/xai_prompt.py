@@ -57,29 +57,14 @@ XAI_PROMPT = """
       }
     }
 
-    [3] 최종 결과는 아래 스키마의 JSON 하나로만 반환하세요.
-    crops 배열의 crop_id는 반드시 위 "대상 구성"에 명시된 이미지 배열의 인덱스와 정확히 일치해야하며,
-    evaluations의 sku_id도 해당 crop의 하위에 제공된 SKU 라벨과 정확히 같아야 합니다.
-    {
-      "crops": [
-        {
-          "crop_index": 0,
-          "label": "의자",
-          "confidence": 94,
-          "object_attrs": [{ "key": "category", "value": "의자" }],
-          "evaluations": [
-            {
-              "sku_id": "CHR-2041",
-              "status": "Matched",
-              "total_score": 92,
-              "xai_result": {
-                "summary": "...",
-                "criteria": [ ... ],
-                "vlm_mood": { "summary": "...", "tags": ["미니멀", "홈오피스"] }
-              }
-            }
-          ]
-        }
-      ]
-    }
+        [3] 최종 결과는 지정된 응답 스키마의 JSON 하나로만 반환하세요.
+        crops 배열의 crop_index는 반드시 위 "대상 구성"에 표시된 crop 번호와
+        정확히 일치해야 합니다.
+
+        crop_index를 0부터 새로 매기거나 예시 값을 복사하면 안 됩니다.
+        evaluations의 sku_id는 해당 crop 아래에 제공된 SKU 후보 코드와
+        정확히 같아야 합니다.
+
+        요청에 없는 crop_index 또는 sku_id를 생성하지 마세요.
+        모든 대상 crop과 각 crop에 제공된 모든 SKU 후보를 정확히 한 번씩 반환하세요.
     """

@@ -1,11 +1,35 @@
-import type React from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Clock3, Plus, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { Button } from '@/commons/components/Button';
+import { fetchTaggingHistory } from '@/features/tagging/api/tagging';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
+import type { TaggingHistory } from '@/features/tagging/types';
 
-export const HistoryPage: React.FC = () => {
-  const { history, historyError, resetWorkflow } = useTaggingWorkflow();
+export const HistoryPage = () => {
+  const { resetWorkflow } = useTaggingWorkflow();
+  const [history, setHistory] = useState<TaggingHistory[]>([]);
+  const [historyError, setHistoryError] = useState<string>();
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+  const loadHistory = useCallback(async (): Promise<void> => {
+    setIsHistoryLoading(true);
+    setHistoryError(undefined);
+    try {
+      setHistory(await fetchTaggingHistory());
+    } catch (error) {
+      setHistoryError(
+        error instanceof Error ? error.message : '이력을 불러오지 못했습니다.',
+      );
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   return (
     <div className="px-6 py-6 pb-10">
@@ -21,15 +45,23 @@ export const HistoryPage: React.FC = () => {
       <p className="mt-1 text-sm leading-6 text-text-secondary">
         저장된 상품 연결과 태깅 결과를 최신순으로 확인합니다.
       </p>
+      {isHistoryLoading ? (
+        <section className="studio-surface mt-6 flex min-h-60 items-center justify-center px-6 text-sm font-semibold text-text-secondary">
+          이력을 불러오는 중입니다.
+        </section>
+      ) : null}
       {historyError ? (
-        <p
+        <section
           className="mt-6 rounded-md border border-warning-200 bg-warning-50 px-4 py-3 text-sm font-semibold text-warning-700"
           role="alert"
         >
-          최신 이력을 불러오지 못했습니다. {historyError}
-        </p>
+          <p>최신 이력을 불러오지 못했습니다. {historyError}</p>
+          <Button className="mt-3" onClick={() => void loadHistory()} size="sm">
+            다시 시도
+          </Button>
+        </section>
       ) : null}
-      {history.length === 0 && !historyError ? (
+      {history.length === 0 && !historyError && !isHistoryLoading ? (
         <section className="studio-surface mt-6 flex min-h-90 flex-col items-center justify-center px-6 text-center">
           <span className="flex size-16 items-center justify-center rounded-full bg-blue-100 text-blue-700">
             <Clock3 size={28} />
@@ -49,7 +81,7 @@ export const HistoryPage: React.FC = () => {
           </Link>
         </section>
       ) : null}
-      {history.length > 0 ? (
+      {history.length > 0 && !isHistoryLoading ? (
         <section className="mt-6 max-w-4xl">
           <p className="mb-3 text-sm font-bold text-text-primary">
             저장된 작업{' '}

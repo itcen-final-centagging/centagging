@@ -1,19 +1,33 @@
-"""VLM 보조 — 규칙으로 못 채운 속성만, 상품당 1회 물어본다.
+"""VLM 보조 — 규칙으로 못 채운 이미지 기반 속성만 보완한다.
 
-이 모듈은 메타데이터 전체를 VLM으로 추출하지 않는다.
-metadata_builder에서 원본과 규칙으로 먼저 값을 채운 뒤,
-아직 값이 없는 속성만 이미지 기반으로 보완한다.
+처리 순서:
 
-결과는 초안이다. `data/catalog/draft/vlm_assist.json`에 저장되고,
-build_sku_json이 이 값을 규칙으로 못 채운 자리에만 채워 넣는다. confidence는
-0.85를 넘지 못하게 잘라 두어서 자동 채택되지 않고 항상 검수를 거친다.
+1. 원본 데이터 + 규칙으로 메타데이터 초안을 생성한다.
+2. 초안에서 값이 None인 속성만 확인한다.
+3. 그중 이미지에서 확인 가능한 속성만 VLM에게 요청한다.
+4. 메인 이미지 1장만 VLM에 전달한다.
+5. 이미지에서 확인할 수 없으면 null로 처리한다.
+6. 허용값에 없는 응답은 저장하지 않는다.
 
-실행
+VLM은 상품의 전체 메타데이터를 추출하지 않는다.
 
-    python -m scripts.catalog.vlm_assist              # 필요한 상품만
-    python -m scripts.catalog.vlm_assist 1341125      # 특정 상품
-    python -m scripts.catalog.vlm_assist --limit 10   # 호출 수 상한
-    python -m scripts.catalog.vlm_assist --dry-run    # 호출 없이 계획만
+VLM에게 맡기지 않는 정보:
+- color
+- brand
+- selling_price
+- size
+- length
+- width
+- depth
+- height
+- material
+
+실행:
+
+    python -m scripts.catalog.vlm_assist
+    python -m scripts.catalog.vlm_assist 1341125
+    python -m scripts.catalog.vlm_assist --limit 10
+    python -m scripts.catalog.vlm_assist --dry-run
 """
 
 from __future__ import annotations
@@ -31,372 +45,717 @@ from dotenv import load_dotenv
 from app.core import catalog_spec
 from scripts.catalog import metadata_builder, storage
 
-load_dotenv(storage.PROJECT_ROOT / ".env", override=True)
+# 환경 설정
 
-# 모델 이름은 배포 환경마다 달라 .env로 주입한다. API 키는 코드에 두지 않는다.
-MODEL_NAME = os.getenv("GEMINI_VLM_MODEL", "gemini-3.5-flash")
+load_dotenv(
+    storage.PROJECT_ROOT / ".env",
+    override=True,
+)
 
-# 상품당 보낼 이미지 수 (메인 + 각도컷). 상세컷은 배너가 많아 제외한다.
-MAX_IMAGES = 3
+MODEL_NAME = os.getenv(
+    "GEMINI_VLM_MODEL",
+    "gemini-3.5-flash",
+)
 
-# 이미지로는 판정할 수 없는 치수 계열 속성. VLM이 추론하지 못하게 뺀다.
-EXCLUDED_ATTRS = {"size", "length", "width", "depth", "height"}
+# 이미지 설정
 
-IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+# 상품당 메인 이미지 1장만 사용한다.
+MAX_IMAGES = 1
 
-PROMPT = """상품 이미지를 보고 아래 속성만 판정하세요.
+IMAGE_SUFFIXES = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+}
 
-이 상품의 카테고리는 이미 확정되어 있습니다: {category} > {sub_category}
-카테고리는 다시 판정하지 마세요.
+# VLM 제외 속성
 
-## 이미 확정된 정보 (참고용, 다시 답하지 마세요)
+# 이미지로 정확하게 판단하기 어렵거나
+# 굳이 VLM에게 맡길 필요가 없는 속성이다.
+EXCLUDED_ATTRS = {
+    "color",
+    "brand",
+    "selling_price",
+    "size",
+    "length",
+    "width",
+    "depth",
+    "height",
+    "material",
+}
+
+# 카테고리별 이미지 판정 가능 속성
+# ---------------------------------------------------------------------------
+
+# "이미지를 보고 형태/구조를 확인할 수 있는 속성"만 VLM에게 요청한다.
+#
+# style / pattern은 주관적인 판단이 들어갈 수 있으므로
+# 여기서는 제외한다.
+#
+# material도 사진만 보고 확정하기 어려우므로 제외한다.
+#
+# 즉 VLM의 역할을 최대한 좁혀서
+# "상품의 형태/구조/존재 여부"만 확인하도록 한다.
+
+IMAGE_INFERABLE_ATTRS: dict[str, set[str]] = {
+    "침대": {
+        "bed_type",
+        "has_headboard",
+        "frame_type",
+        "wood_tone",
+        "head_type",
+        "base_type",
+        "product_type",
+    },
+
+    "매트리스": {
+        # 현재 매트리스는 이미지에서 안정적으로 판단할
+        # 구조 속성이 거의 없으므로 비워둔다.
+    },
+
+    "테이블·식탁·책상": {
+        "shape",
+        "leg_type",
+        "has_storage",
+        "wood_tone",
+        "seating_capacity",
+    },
+
+    "소파": {
+        "sofa_type",
+        "has_legs",
+        "has_armrest",
+        "has_headrest",
+        "has_stool",
+    },
+
+    "서랍·수납장": {
+        "storage_type",
+        "drawer_count",
+        "wood_tone",
+        "door_type",
+        "has_legs",
+        "has_wheels",
+        "has_drawer",
+    },
+
+    "거실장·TV장": {
+        "tv_stand_type",
+        "level_count",
+        "has_legs",
+    },
+
+    "선반": {
+        "shelf_type",
+        "shelf_count",
+    },
+
+    "진열장·책장": {
+        "storage_type",
+        "door_type",
+    },
+
+    "의자": {
+        "chair_type",
+        "has_wheels",
+        "has_backrest",
+        "has_armrest",
+    },
+
+    "행거·옷장": {
+        "wardrobe_type",
+        "layout_type",
+        "mobility_type",
+        "door_type",
+        "storage_features",
+    },
+
+    "거울": {
+        "installation_type",
+        "shape",
+        "has_frame",
+    },
+
+    "화장대·콘솔": {
+        "vanity_type",
+        "has_mirror",
+        "storage_type",
+    },
+}
+
+# VLM Prompt
+
+PROMPT = """상품의 메인 이미지를 보고 아래 속성만 판정하세요.
+
+상품의 카테고리와 소분류는 이미 확정되어 있습니다.
+
+카테고리: {category}
+소분류: {sub_category}
+
+## 이미 규칙으로 확인된 정보
+
 {known}
 
-## 판정할 속성과 허용값
+## 이미지에서 확인할 속성과 허용값
+
 {targets}
 
-## 규칙
-1. 허용값에 없는 값을 만들지 마세요.
-2. 이미지에서 확인할 수 없으면 value를 null로 두세요. 추측 금지.
-3. boolean 속성은 true 또는 false로 답하세요.
-4. confidence는 0.0~1.0이며, 근거가 약하면 낮게 주세요.
-5. reason에는 이미지에서 실제로 본 것만 쓰세요.
+## 판단 규칙
 
-## 응답 형식 (JSON 객체 하나만)
+1. 반드시 제시된 허용값 중 하나만 선택하세요.
+2. 이미지에서 명확하게 확인할 수 없는 경우 value는 null로 하세요.
+3. 추측하지 마세요.
+4. 상품명이나 일반적인 상품 지식으로 판단하지 마세요.
+5. 이미지에서 실제로 보이는 형태와 구조만 근거로 판단하세요.
+6. 색상, 브랜드, 가격, 사이즈, 치수, 재질은 판단하지 마세요.
+7. 존재 여부 속성은 허용값에 있는 "있음" 또는 "없음"만 사용하세요.
+8. 판단할 수 없으면 "모름"을 사용하지 말고 반드시 null을 사용하세요.
+9. confidence는 0.0~1.0 사이로 작성하세요.
+10. reason에는 이미지에서 실제로 확인한 근거만 간단히 작성하세요.
+
+## 응답 형식
+
+반드시 JSON 객체 하나만 반환하세요.
+
 {{
-  "속성명": {{"value": 값, "confidence": 0.0, "reason": "관찰 근거"}}
+  "속성명": {{
+    "value": "허용값 또는 null",
+    "confidence": 0.0,
+    "reason": "이미지에서 확인한 근거"
+  }}
 }}
 """
 
 
-def load_images(goods_dir: pathlib.Path, limit: int = MAX_IMAGES) -> list[str]:
-    """상품 폴더에서 메인·각도 이미지를 고른다.
+# 이미지 로드
 
-    Args:
-        goods_dir: `resource/crawl/{goods_id}` 경로입니다.
-        limit: 최대 이미지 장수입니다.
+def load_images(
+        goods_dir: pathlib.Path,
+        limit: int = MAX_IMAGES,
+) -> list[str]:
+    """상품의 메인 이미지 1장을 반환한다."""
 
-    Returns:
-        이미지 경로 목록입니다.
-
-    Raises:
-        FileNotFoundError: 쓸 수 있는 이미지가 없는 경우입니다.
-    """
     image_dir = goods_dir / "images"
-    paths = sorted(
-        path
-        for path in image_dir.glob("*")
-        if path.suffix.lower() in IMAGE_SUFFIXES
-        and "detail" not in path.name.lower()
-    )
-    if not paths:
-        raise FileNotFoundError(f"이미지가 없습니다: {image_dir}")
-    return [str(path) for path in paths[:limit]]
 
+    main_image = image_dir / "000_main.jpg"
+
+    if not main_image.exists():
+        raise FileNotFoundError(
+            f"메인 이미지가 없습니다: {main_image}"
+        )
+
+    return [str(main_image)]
+
+
+# VLM 대상 선정
 
 def plan_targets(
-    product: dict, verified: dict[str, Any]
-) -> tuple[str | None, str | None, dict[str, Any], list[str]]:
-    """이 상품에서 VLM에게 물어볼 속성만 골라낸다.
+        product: dict,
+) -> tuple[
+    str | None,
+    str | None,
+    dict[str, Any],
+    list[str],
+]:
+    """규칙으로 채우지 못한 이미지 기반 속성만 VLM 대상으로 선정한다.
 
-    원본·규칙·사람 검수로 이미 알 수 있는 속성은 빼고, 아직 값이 없는 속성만
-    targets에 넣는다.
+    조건:
 
-    Args:
-        product: 크롤링한 product.json 딕셔너리입니다.
-        verified: verified_attrs.json의 해당 상품 항목입니다.
+    1. 카탈로그에 정의된 속성이어야 한다.
+    2. 이미지로 확인 가능한 속성이어야 한다.
+    3. 제외 속성이 아니어야 한다.
+    4. 현재 값이 None이어야 한다.
 
-    Returns:
-        `(대분류, 소분류, 이미 아는 값, 물어볼 속성 목록)`입니다. 카테고리
-        매핑에 실패하면 대분류와 소분류가 None입니다.
+    사람 검수값은 사용하지 않는다.
     """
-    category, sub_category, _warnings = metadata_builder.resolve_category(
-        product
+
+    category, sub_category, _warnings = (
+        metadata_builder.resolve_category(product)
     )
+
     if category is None:
         return None, None, {}, []
 
-    # 원본 + 규칙으로 먼저 채운 값이 곧 "이미 아는 값"이다.
-    draft = metadata_builder.build_draft(product, category, sub_category)
-    known = {name: field["value"] for name, field in draft.items()}
-    # 사람이 검수한 값이 있으면 그쪽을 우선한다.
-    known.update(verified.get("attrs") or {})
+    # 원본 데이터 + 규칙 기반 초안
+    draft = metadata_builder.build_draft(
+        product,
+        category,
+        sub_category,
+    )
 
-    targets = [
-        key
-        for key in catalog_spec.attribute_names(category)
-        if key not in known and key not in EXCLUDED_ATTRS
-    ]
-    return category, sub_category, known, targets
-
-
-def build_prompt(
-    category: str,
-    sub_category: str | None,
-    known: dict[str, Any],
-    targets: list[str],
-) -> str:
-    """미해결 속성만 담은 프롬프트를 만든다.
-
-    허용값 목록을 함께 넣어 "아무 값이나 만들지 말고 이 중에서 고르라"고
-    제한한다.
-
-    Args:
-        category: 고정 대분류입니다.
-        sub_category: 고정 소분류입니다.
-        known: 이미 확정된 `{속성: 값}`입니다.
-        targets: 물어볼 속성 목록입니다.
-
-    Returns:
-        완성된 프롬프트 문자열입니다.
-    """
-    # VLM에게 "아무 값이나 만들어내지 말고 이 목록 중에서만 골라라"라고
-    # 제한하기 위해 허용값까지 함께 넘긴다.
-    allowed = {
-        key: catalog_spec.allowed_values(category, key) for key in targets
+    # 현재까지 알고 있는 값
+    known = {
+        name: field["value"]
+        for name, field in draft.items()
     }
-    # 위에서 만든 정보를 실제 프롬프트 템플릿에 끼워 넣는다.
-    return PROMPT.format(
-        category=category,
-        sub_category=sub_category or "미상",
-        known=json.dumps(known, ensure_ascii=False, indent=2),
-        targets=json.dumps(allowed, ensure_ascii=False, indent=2),
+
+    # 해당 카테고리에서 이미지로 판단 가능한 속성
+    image_attrs = IMAGE_INFERABLE_ATTRS.get(
+        category,
+        set(),
+    )
+
+    targets: list[str] = []
+
+    for key in catalog_spec.attribute_names(category):
+
+        # 이미지로 판단하지 않는 속성
+        if key not in image_attrs:
+            continue
+
+        # 명시적으로 제외한 속성
+        if key in EXCLUDED_ATTRS:
+            continue
+
+        # 이미 규칙으로 값이 있으면 VLM에게 묻지 않는다.
+        #
+        # None인 경우에만 VLM 대상으로 선정한다.
+        if known.get(key) is not None:
+            continue
+
+        targets.append(key)
+
+    return (
+        category,
+        sub_category,
+        known,
+        targets,
     )
 
 
-def call_gemini(prompt: str, image_paths: list[str]) -> dict[str, Any]:
-    """Gemini VLM을 1회 호출하고 JSON 응답을 파싱한다.
+# Prompt 생성
 
-    Args:
-        prompt: 전송할 프롬프트입니다.
-        image_paths: 함께 보낼 이미지 경로 목록입니다.
+def build_prompt(
+        category: str,
+        sub_category: str | None,
+        known: dict[str, Any],
+        targets: list[str],
+) -> str:
+    """VLM에 전달할 프롬프트를 생성한다."""
 
-    Returns:
-        파싱된 응답 딕셔너리입니다.
+    allowed = {
+        key: catalog_spec.allowed_values(
+            category,
+            key,
+        )
+        for key in targets
+    }
 
-    Raises:
-        RuntimeError: Vertex AI API 키가 없거나 응답이 비어 있는 경우입니다.
-    """
-    # VLM을 쓸 때만 필요한 의존성이라 함수 안에서 임포트한다.
-    from google import genai  # pylint: disable=import-outside-toplevel
-    from PIL import Image  # pylint: disable=import-outside-toplevel
+    return PROMPT.format(
+        category=category,
+        sub_category=sub_category or "미상",
+        known=json.dumps(
+            known,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        targets=json.dumps(
+            allowed,
+            ensure_ascii=False,
+            indent=2,
+        ),
+    )
 
-    # 키 값 자체는 로그·예외 메시지에 남기지 않는다.
-    api_key = os.getenv("VERTEX_API_KEY", "").strip()
+
+# Gemini 호출
+
+def call_gemini(
+        prompt: str,
+        image_paths: list[str],
+) -> dict[str, Any]:
+    """Gemini VLM을 1회 호출하고 JSON 응답을 반환한다."""
+
+    from google import genai
+    from PIL import Image
+
+    api_key = os.getenv(
+        "VERTEX_API_KEY",
+        "",
+    ).strip()
+
     if not api_key:
-        raise RuntimeError("VERTEX_API_KEY가 설정되지 않았습니다.")
+        raise RuntimeError(
+            "VERTEX_API_KEY가 설정되지 않았습니다."
+        )
 
-    client = genai.Client(vertexai=True, api_key=api_key)
-    images = [Image.open(path) for path in image_paths]
-    # 프롬프트와 이미지를 한 리스트에 담아야 해서 원소 타입을 Any로 둔다.
-    contents: list[Any] = [prompt, *images]
+    client = genai.Client(
+        vertexai=True,
+        api_key=api_key,
+    )
+
+    images = [
+        Image.open(path)
+        for path in image_paths
+    ]
+
+    contents: list[Any] = [
+        prompt,
+        *images,
+    ]
 
     try:
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=contents,
-            config={"response_mime_type": "application/json"},
+            config={
+                "response_mime_type": "application/json",
+            },
         )
+
         if not response.text:
-            raise RuntimeError("Gemini 응답이 비어 있습니다.")
-        parsed: dict[str, Any] = json.loads(response.text)
+            raise RuntimeError(
+                "Gemini 응답이 비어 있습니다."
+            )
+
+        parsed: dict[str, Any] = json.loads(
+            response.text
+        )
+
         return parsed
+
     finally:
         for image in images:
             image.close()
 
 
+# VLM 응답 검증
+
 def filter_response(
-    response: dict[str, Any], category: str, targets: list[str]
+        response: dict[str, Any],
+        category: str,
+        targets: list[str],
 ) -> dict[str, Any]:
-    """허용값 밖이거나 물어보지 않은 속성을 버린다.
+    """VLM 응답에서 검증된 값만 저장한다.
 
-    Args:
-        response: VLM 응답입니다.
-        category: 고정 대분류입니다.
-        targets: 물어본 속성 목록입니다.
+    검증:
 
-    Returns:
-        검증을 통과한 `{속성: {value, confidence, reason}}`입니다.
+    - 요청하지 않은 속성 제거
+    - null 제거
+    - 허용값 외의 값 제거
+    - confidence 0.85 상한
     """
+
     picked: dict[str, Any] = {}
+
     for key, payload in response.items():
-        # 요청하지 않은 속성은 저장하지 않는다.
+
+        # 요청하지 않은 속성은 버린다.
         if key not in targets:
             continue
 
-        value = payload.get("value") if isinstance(payload, dict) else payload
+        if isinstance(payload, dict):
+            value = payload.get("value")
+            confidence = payload.get(
+                "confidence",
+                0.5,
+            )
+            reason = payload.get(
+                "reason"
+            )
+        else:
+            value = payload
+            confidence = 0.5
+            reason = None
+
+        # VLM이 판단하지 못한 경우
+        # 최종 데이터에서는 그대로 null로 남기면 되므로
+        # VLM 보조 결과에는 저장하지 않는다.
         if value is None:
             continue
 
-        # 허용값 검증 - VLM의 환각·표기 흔들림을 한 번 걸러 준다.
-        allowed = catalog_spec.allowed_values(category, key)
+        # 허용값 확인
+        allowed = catalog_spec.allowed_values(
+            category,
+            key,
+        )
+
         if allowed and value not in allowed:
             continue
 
+        # confidence 방어
+        try:
+            confidence = float(
+                confidence
+            )
+        except (
+                TypeError,
+                ValueError,
+        ):
+            confidence = 0.5
+
+        # VLM 결과는 초안이므로 자동 채택되지 않도록
+        # confidence 상한을 둔다.
+        confidence = max(
+            0.0,
+            min(
+                confidence,
+                0.85,
+            ),
+        )
+
         picked[key] = {
             "value": value,
-            "confidence": (
-                payload.get("confidence", 0.5)
-                if isinstance(payload, dict)
-                else 0.5
-            ),
-            "reason": (
-                payload.get("reason") if isinstance(payload, dict) else None
-            ),
+            "confidence": confidence,
+            "reason": reason,
         }
+
     return picked
 
 
-def target_dirs(goods_ids: list[str]) -> list[pathlib.Path]:
-    """처리할 상품 폴더 목록을 정한다.
+# 대상 상품 폴더
 
-    Args:
-        goods_ids: 명령행에서 지정한 goods_id 목록입니다. 비어 있으면 전체를
-            대상으로 합니다.
+def target_dirs(
+        goods_ids: list[str],
+) -> list[pathlib.Path]:
+    """처리할 상품 폴더를 반환한다."""
 
-    Returns:
-        상품 폴더 경로 목록입니다.
-    """
     if goods_ids:
-        return [storage.CRAWL_DIR / goods_id for goods_id in goods_ids]
-    return sorted(path for path in storage.CRAWL_DIR.iterdir() if path.is_dir())
+        return [
+            storage.CRAWL_DIR / goods_id
+            for goods_id in goods_ids
+        ]
 
+    return sorted(
+        path
+        for path in storage.CRAWL_DIR.iterdir()
+        if path.is_dir()
+    )
+
+
+# 처리 결과
 
 @dataclasses.dataclass(frozen=True)
 class AskResult:
-    """상품 1건에 대한 VLM 보조 처리 결과.
-
-    Attributes:
-        payload: vlm_assist.json에 저장할 결과입니다. 호출하지 않았거나
-            실패했으면 None입니다.
-        enough: 규칙·확정값만으로 충분해 물어볼 속성이 없었으면 True입니다.
-    """
+    """상품 1건의 VLM 보조 처리 결과."""
 
     payload: dict[str, Any] | None = None
+
+    # 규칙만으로 충분하거나
+    # 이미지 기반 VLM 대상이 없었던 경우
     enough: bool = False
 
 
+# 상품 1건 처리
+
 def ask_product(
-    goods_dir: pathlib.Path, verified: dict[str, Any], dry_run: bool
+        goods_dir: pathlib.Path,
+        dry_run: bool,
 ) -> AskResult:
-    """상품 1건에 대해 계획을 세우고 필요하면 VLM을 호출한다.
+    """상품 1건에 대해 필요한 이미지 속성만 VLM으로 확인한다."""
 
-    Args:
-        goods_dir: `resource/crawl/{goods_id}` 경로입니다.
-        verified: verified_attrs.json의 해당 상품 항목입니다.
-        dry_run: True면 무엇을 물어볼지만 출력하고 호출하지 않습니다.
-
-    Returns:
-        처리 결과를 담은 `AskResult`입니다.
-    """
     key = goods_dir.name
+
     product_path = goods_dir / "product.json"
+
     if not product_path.exists():
-        print(f"[{key}] product.json 없음 — 건너뜀")
+        print(
+            f"[{key}] product.json 없음 — 건너뜀"
+        )
         return AskResult()
 
-    with product_path.open(encoding="utf-8") as file:
+    with product_path.open(
+            encoding="utf-8"
+    ) as file:
         product = json.load(file)
 
-    category, sub_category, known, targets = plan_targets(product, verified)
-    if category is None:
-        print(f"[{key}] 카테고리 매핑 실패 — 건너뜀")
-        return AskResult()
-    if not targets:
-        return AskResult(enough=True)
+    (
+        category,
+        sub_category,
+        known,
+        targets,
+    ) = plan_targets(product)
 
-    print(f"[{key}] 물어볼 속성 {len(targets)}개: {', '.join(targets)}")
+    if category is None:
+        print(
+            f"[{key}] 카테고리 매핑 실패 — 건너뜀"
+        )
+        return AskResult()
+
+    if not targets:
+        print(
+            f"[{key}] "
+            "이미지로 보완할 속성 없음"
+        )
+        return AskResult(
+            enough=True,
+        )
+
+    print(
+        f"[{key}] "
+        f"물어볼 속성 {len(targets)}개: "
+        f"{', '.join(targets)}"
+    )
+
     if dry_run:
         return AskResult()
 
     try:
         response = call_gemini(
-            build_prompt(category, sub_category, known, targets),
+            build_prompt(
+                category,
+                sub_category,
+                known,
+                targets,
+            ),
             load_images(goods_dir),
         )
-    # 상품 1건의 실패로 전체 실행을 멈추지 않는다. 원인은 그대로 출력한다.
-    except (RuntimeError, FileNotFoundError, ValueError) as error:
-        print(f"  실패: {error}")
+
+    except Exception as error:
+        print(
+            f"  실패: "
+            f"{type(error).__name__}: {error}"
+        )
         return AskResult()
+
+    attributes = filter_response(
+        response,
+        category,
+        targets,
+    )
 
     return AskResult(
         payload={
             "asked": targets,
             "model": MODEL_NAME,
-            "created_at": datetime.datetime.now(
-                datetime.timezone.utc
-            ).isoformat(),
-            "attributes": filter_response(response, category, targets),
+            "created_at": (
+                datetime.datetime.now(
+                    datetime.timezone.utc
+                ).isoformat()
+            ),
+            "attributes": attributes,
         }
     )
 
 
+# CLI
 def parse_args() -> argparse.Namespace:
-    """명령행 인자를 읽는다.
+    """명령행 인자를 읽는다."""
 
-    Returns:
-        파싱된 인자 네임스페이스입니다.
-    """
     parser = argparse.ArgumentParser(
-        description="규칙으로 못 채운 속성만 Gemini에게 물어본다."
+        description=(
+            "규칙으로 채우지 못한 "
+            "이미지 기반 속성만 "
+            "Gemini에게 물어본다."
+        )
     )
+
     parser.add_argument(
         "goods_ids",
         nargs="*",
-        help="대상 goods_id (생략하면 필요한 상품 전체)",
+        help=(
+            "대상 goods_id "
+            "(생략하면 전체)"
+        ),
     )
+
     parser.add_argument(
         "--limit",
         type=int,
         default=0,
-        help="최대 호출 수 (0이면 제한 없음)",
+        help=(
+            "최대 VLM 호출 수 "
+            "(0이면 제한 없음)"
+        ),
     )
+
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="호출하지 않고 어떤 상품에 무엇을 물어볼지만 출력",
+        help=(
+            "호출하지 않고 "
+            "무엇을 물어볼지만 출력"
+        ),
     )
+
     return parser.parse_args()
 
 
+# Main
+
 def main() -> None:
-    """미해결 속성이 남은 상품에만 VLM 보조를 돌린다."""
+    """미해결 이미지 속성이 있는 상품만 VLM 보조를 수행한다."""
+
     args = parse_args()
 
-    verified_all = storage.load_json(storage.VERIFIED_PATH, {})
-    results = storage.load_json(storage.VLM_PATH, {})
+    # 기존 VLM 결과
+    results = storage.load_json(
+        storage.VLM_PATH,
+        {},
+    )
 
     calls = 0
     skipped = 0
-    for goods_dir in target_dirs(args.goods_ids):
-        if args.limit and calls >= args.limit:
-            print(f"호출 상한({args.limit}) 도달 — 남은 상품은 다음 실행으로")
+
+    for goods_dir in target_dirs(
+            args.goods_ids
+    ):
+
+        # 이미 VLM 처리한 상품은 다시 호출하지 않는다.
+        if goods_dir.name in results:
+            print(
+                f"[{goods_dir.name}] "
+                "이미 처리됨 — 건너뜀"
+            )
+            continue
+
+        # 호출 제한
+        if (
+                args.limit
+                and calls >= args.limit
+        ):
+            print(
+                f"호출 상한({args.limit}) 도달 — "
+                "남은 상품은 다음 실행으로"
+            )
             break
 
         result = ask_product(
-            goods_dir, verified_all.get(goods_dir.name) or {}, args.dry_run
+            goods_dir,
+            args.dry_run,
         )
-        skipped += int(result.enough)
+
+        skipped += int(
+            result.enough
+        )
+
         if result.payload is None:
             continue
 
-        calls += 1
-        results[goods_dir.name] = result.payload
-        print(f"  응답 채택 {len(result.payload['attributes'])}개")
-
-    if calls:
-        storage.dump_json(storage.VLM_PATH, results)
-        saved_path = storage.VLM_PATH.relative_to(storage.PROJECT_ROOT)
-        print(f"저장 완료: {saved_path}")
-        print(
-            "이 결과는 초안입니다. 사람이 확인한 값만 "
-            "scripts/catalog/verified_attrs.json에 옮겨 적으세요."
+        # VLM 결과 저장
+        results[goods_dir.name] = (
+            result.payload
         )
+
+        calls += 1
+
+        # 성공한 상품마다 즉시 저장
+        storage.dump_json(
+            storage.VLM_PATH,
+            results,
+        )
+
+        print(
+            "  응답 저장 완료 "
+            f"{len(result.payload['attributes'])}개"
+        )
+
+    saved_path = (
+        storage.VLM_PATH.relative_to(
+            storage.PROJECT_ROOT
+        )
+    )
+
     print(
-        f"VLM 호출 {calls}회 / 규칙·확정값으로 충분해 건너뛴 상품 {skipped}건"
+        f"VLM 호출 {calls}회 / "
+        f"VLM 보완 불필요 {skipped}건"
+    )
+
+    print(
+        f"저장 파일: {saved_path}"
     )
 
 
+# Entry point
 if __name__ == "__main__":
     main()

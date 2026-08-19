@@ -19,6 +19,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # 기존 로컬 DB에 비파괴 스키마 변경을 적용하는 일회성 컨테이너
+  db-migrate:
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    profiles: ["migration"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - ./docker/db/migrations:/migrations:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - psql
+      - --set=ON_ERROR_STOP=1
+      - --host=db
+      - --username=${POSTGRES_USER:-centagging}
+      - --dbname=${POSTGRES_DB:-centagging}
+      - --file=/migrations/create_ai_job.sql
+
   # FastAPI 백엔드 / FastAPI backend
   api:
     build:
@@ -58,6 +77,35 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Cloud SQL 작업 큐를 처리하는 백그라운드 Worker / Background AI job worker
+  ai-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      VERTEX_API_KEY: ${VERTEX_API_KEY:-}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+      VERTEX_AI_LOCATION: ${VERTEX_AI_LOCATION:-global}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
+      IMAGE_STORAGE_ROOT: ${IMAGE_STORAGE_ROOT:-uploads}
+      SKU_IMAGE_ROOT: ${SKU_IMAGE_ROOT:-data/images}
+      POSTGRES_DB: ${POSTGRES_DB:-centagging}
+      POSTGRES_USER: ${POSTGRES_USER:-centagging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads:ro
+      - ./data/images:/app/data/images:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m app.workers.ai_job_worker
 
   # React 관리자 화면 / React admin interface
   frontend:

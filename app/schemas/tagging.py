@@ -2,7 +2,7 @@
 
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class MatchedSkuImage(BaseModel):
@@ -39,6 +39,7 @@ class XaiResult(BaseModel):
 class SkuCandidate(BaseModel):
     """탐지된 객체 1건에 대한 SKU 후보입니다."""
 
+    sku_id: int
     sku_code: str
     product_name: str
     category: str
@@ -47,6 +48,7 @@ class SkuCandidate(BaseModel):
     similarity_score: int
     matched_sku_image: MatchedSkuImage
     xai_result: XaiResult
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
 class SceneImageInfo(BaseModel):
@@ -64,18 +66,47 @@ class SceneImageInfo(BaseModel):
 class BoundingBox(BaseModel):
     """0~1000으로 정규화된 탐지 객체 좌표입니다."""
 
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
+    xmin: float = Field(ge=0, le=1000)
+    ymin: float = Field(ge=0, le=1000)
+    xmax: float = Field(ge=0, le=1000)
+    ymax: float = Field(ge=0, le=1000)
+
+    @model_validator(mode="after")
+    def validate_area(self) -> "BoundingBox":
+        """크롭 가능한 넓이를 가진 좌표인지 검증합니다."""
+        if self.xmin >= self.xmax or self.ymin >= self.ymax:
+            raise ValueError(
+                "bbox는 xmin < xmax 및 ymin < ymax를 만족해야 합니다."
+            )
+        return self
+
+
+class EditedSceneObject(BaseModel):
+    """사용자가 편집 완료한 탐지 객체입니다."""
+
+    category: str = Field(min_length=1, max_length=100)
+    bbox_coord: BoundingBox
+
+
+class SceneObjectUpdateRequest(BaseModel):
+    """추천 전에 반영할 최종 탐지 객체 목록입니다."""
+
+    objects: list[EditedSceneObject] = Field(min_length=1)
+
+
+class SceneObjectUpdateResult(BaseModel):
+    """객체 편집 반영 결과입니다."""
+
+    object_count: int
+    processing_status: typing.Literal["DETECTED"] = "DETECTED"
 
 
 class DetectedObject(BaseModel):
-    """탐지된 가구 객체 1건과 해당 SKU 후보 목록입니다."""
+    """탐지된 가구 객체의 속성과 SKU 후보 목록입니다."""
 
-    object_index: int
+    object_idx: int
     label: str = ""
-    bbox: BoundingBox
+    bbox_coord: BoundingBox
     confidence: int = Field(default=0, ge=0, le=100)
     attrs: dict[str, str] = Field(default_factory=dict)
     sku_candidates: list[SkuCandidate]
@@ -88,28 +119,70 @@ class DetectionResult(BaseModel):
     scene_image: SceneImageInfo
     objects: list[DetectedObject]
 
+class ObjectAttributes(BaseModel):
+    """탐지 객체 속성입니다."""
+    
+    color: str
+    material: str
+    style: str
+
+
+
+class ObjectMetadata(BaseModel):
+    """확정 시점의 탐지 객체 속성입니다."""
+
+    object_idx: int
+    category: str
+    sub_category: str | None
+    bbox_coord: BoundingBox
+    attrs: ObjectAttributes
 
 class SkuMatching(BaseModel):
     """확정할 객체-SKU 매핑 1건입니다.
 
-    tagging_result 테이블 1행에 대응하며, 추천 응답에서 사용자가 선택한
-    후보를 그대로 돌려받습니다.
+     tagging_result 한 건에 해당하는 선택된 SKU입니다.
+     - RECOMMEND: AI 추천 후보에서 사용자가 선택한 SKU
+       → 순위와 유사도가 있어야 합니다.
+     - SEARCH: 전체 검색에서 사용자가 직접 선택한 SKU
+       → 순위와 유사도가 없어야 합니다.
+     DB의 ck_result_source 조건과 같은 규칙을 따릅니다.
     """
 
-    # scene_image.object_metadata 배열의 인덱스입니다.
-    object_index: int = Field(ge=0)
-    sku_code: str = Field(min_length=1)
-    match_rank: int = Field(ge=1)
-    similarity_score: int = Field(ge=0, le=100)
-    xai_result: XaiResult
+    object_idx: int = Field(ge=0)
+    sku_id: int = Field(ge=1)
+    sku_image_id: int | None = None
+    match_source: typing.Literal["RECOMMEND", "SEARCH"]
+    match_rank: int | None = Field(default=None, ge=1)
+    similarity_score: int | None = Field(default=None, ge=0, le=100)
+    object_metadata: ObjectMetadata
+    xai_result: XaiResult | None = None
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
+
+    @model_validator(mode="after")
+    def validate_source_consistency(self) -> "SkuMatching":
+        """match_source별 필드 조합이 DB 제약(ck_result_source)과 맞는지 검증합니다."""
+        if self.match_source == "SEARCH":
+            if (
+                self.match_rank is not None
+                or self.similarity_score is not None
+                or self.xai_result is not None
+            ):
+                raise ValueError(
+                    "match_source가 SEARCH이면 match_rank/similarity_score/"
+                    "xai_result는 비어 있어야 합니다."
+                )
+        elif self.match_rank is None or self.similarity_score is None:
+            raise ValueError(
+                "match_source가 RECOMMEND이면 match_rank와 similarity_score가 "
+                "필요합니다."
+            )
+        return self
 
 
 class SkuMatchingRequest(BaseModel):
-    """탐지 객체별 SKU 확정 요청입니다."""
+    """탐지 객체 저장 요청입니다."""
 
-    # 빈 배열은 확정할 대상이 없다는 뜻이라 요청 자체를 거부합니다.
-    matching: list[SkuMatching] = Field(min_length=1)
+    tagging_results: list[SkuMatching] = Field(min_length=1)
 
 
 class SkuMatchingResult(BaseModel):

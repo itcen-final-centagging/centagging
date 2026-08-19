@@ -67,9 +67,70 @@ COMMENT ON COLUMN scene_image.file_size            IS '연출 이미지 파일 �
 COMMENT ON COLUMN scene_image.analysis_error       IS '탐지·임베딩·SKU 후보 생성 실패 사유';
 COMMENT ON COLUMN scene_image.analysis_status      IS '태깅 처리 상태: pending | detected | embedded | completed | failed';
 COMMENT ON COLUMN scene_image.created_at           IS '연출 이미지 업로드 일시';
-COMMENT ON COLUMN scene_image.object_metadata      IS '탐지 객체 메타데이터 배열 [{object_idx,bbox_coord:{xmin,ymin,xmax,ymax},attribute:{label}}, ...]';
+COMMENT ON COLUMN scene_image.object_metadata      IS '탐지 객체 메타데이터 배열 [{object_idx,category,sub_category,bbox_coord:{xmin,ymin,xmax,ymax},attributes:{...}}, ...]';
 COMMENT ON COLUMN scene_image.width_px             IS '이미지 너비(pixel)';
 COMMENT ON COLUMN scene_image.height_px            IS '이미지 높이(pixel)';
+
+-- ------------------------------------------------------------
+-- 3. ai_job : AI 분석용 영속 작업 큐
+--    FastAPI는 작업을 등록하고 별도 Worker가 선점하여 처리한다.
+-- ------------------------------------------------------------
+CREATE TABLE ai_job (
+    job_id          UUID        PRIMARY KEY,
+    scene_image_id  BIGINT      NOT NULL
+                                REFERENCES scene_image(scene_image_id)
+                                ON DELETE CASCADE,
+    job_type        VARCHAR(30) NOT NULL,
+    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    input_payload   JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    result_payload  JSONB,
+    error_code      VARCHAR(50),
+    error_message   TEXT,
+    attempt_count   SMALLINT    NOT NULL DEFAULT 0,
+    max_attempts    SMALLINT    NOT NULL DEFAULT 3,
+    worker_id       VARCHAR(100),
+    locked_at       TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at      TIMESTAMPTZ,
+    finished_at     TIMESTAMPTZ,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_ai_job_type CHECK (
+        job_type IN ('DETECT_SCENE', 'RECOMMEND_SKU')
+    ),
+    CONSTRAINT ck_ai_job_status CHECK (
+        status IN ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED')
+    ),
+    CONSTRAINT ck_ai_job_attempts CHECK (
+        attempt_count >= 0
+        AND max_attempts > 0
+        AND attempt_count <= max_attempts
+    )
+);
+
+-- 대기 작업을 생성 순서대로 선점할 때 사용하는 부분 인덱스다.
+CREATE INDEX idx_ai_job_pending_created
+    ON ai_job(status, created_at)
+    WHERE status = 'PENDING';
+
+CREATE INDEX idx_ai_job_scene_created
+    ON ai_job(scene_image_id, created_at DESC);
+
+-- 동일 장면·유형의 활성 작업이 중복 등록되지 않게 한다.
+CREATE UNIQUE INDEX uq_ai_job_active_scene_type
+    ON ai_job(scene_image_id, job_type)
+    WHERE status IN ('PENDING', 'RUNNING');
+
+COMMENT ON TABLE ai_job IS 'AI 분석용 영속 작업 큐';
+COMMENT ON COLUMN ai_job.job_id IS '클라이언트가 조회할 AI 작업 UUID';
+COMMENT ON COLUMN ai_job.scene_image_id IS '분석 대상 연출 이미지';
+COMMENT ON COLUMN ai_job.job_type IS 'DETECT_SCENE | RECOMMEND_SKU';
+COMMENT ON COLUMN ai_job.status IS 'PENDING | RUNNING | SUCCEEDED | FAILED';
+COMMENT ON COLUMN ai_job.input_payload IS '작업 실행에 필요한 입력값';
+COMMENT ON COLUMN ai_job.result_payload IS '완료된 작업의 결과값';
+COMMENT ON COLUMN ai_job.attempt_count IS '현재까지 실행을 시도한 횟수';
+COMMENT ON COLUMN ai_job.max_attempts IS '재시도를 포함한 최대 실행 횟수';
+COMMENT ON COLUMN ai_job.worker_id IS '작업을 선점한 Worker 식별자';
+COMMENT ON COLUMN ai_job.locked_at IS 'Worker가 작업을 선점한 시각';
 
 -- ------------------------------------------------------------
 -- 4. sku_catalog : 상품 마스터 + 속성 (FT-CAT-002/003)
@@ -78,11 +139,10 @@ CREATE TABLE sku_catalog (
     sku_id       BIGSERIAL    PRIMARY KEY,
     sku_code     VARCHAR(50)  NOT NULL UNIQUE,
     product_name VARCHAR(200) NOT NULL,
-    brand        VARCHAR(100),
-    price        INT,
-    space        VARCHAR(50),
     category     VARCHAR(50),
     sub_category VARCHAR(50),
+    brand        VARCHAR(50),
+    price        INTEGER,
     key_features JSONB        NOT NULL DEFAULT '[]'::jsonb,
     attributes   JSONB        NOT NULL DEFAULT '{}'::jsonb,
     text_embedding VECTOR(3072),
@@ -122,7 +182,7 @@ CREATE TABLE sku_image (
     sku_id       BIGINT      NOT NULL REFERENCES sku_catalog(sku_id) ON DELETE CASCADE,
     image_url    TEXT        NOT NULL,
     image_type   VARCHAR(20) NOT NULL DEFAULT 'MAIN'
-                 CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
+                 CHECK (image_type IN ('MAIN','ANGLE')),
     embedding    VECTOR(3072),
     indexed_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -144,7 +204,7 @@ COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
 
 -- ------------------------------------------------------------
 -- 6. tagging_result : 최종 객체-SKU 매핑 + 검수 이력
---    scene_image.object_metadata 배열의 object_index로 탐지 객체를 식별한다.
+--    scene_image.object_metadata 배열의 object_idx로 탐지 객체를 식별한다.
 --    이미지 1장에서 객체 N개를 태깅하면 N행이 생성됨
 --
 --    xai_result 구조 (현재 API 응답·저장 계약)
@@ -156,7 +216,7 @@ COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
 CREATE TABLE tagging_result (
     result_id        BIGSERIAL   PRIMARY KEY,
     scene_image_id   BIGINT      NOT NULL REFERENCES scene_image(scene_image_id),
-    object_index     SMALLINT    NOT NULL,
+    object_idx       SMALLINT    NOT NULL,
     sku_id           BIGINT      NOT NULL REFERENCES sku_catalog(sku_id),
     sku_image_id     BIGINT      REFERENCES sku_image(sku_image_id),
     match_source     VARCHAR(20) NOT NULL
@@ -171,7 +231,7 @@ CREATE TABLE tagging_result (
     created_by       BIGINT      NOT NULL REFERENCES app_user(user_id),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_result_scene_object UNIQUE (scene_image_id, object_index),
+    CONSTRAINT uq_result_scene_object UNIQUE (scene_image_id, object_idx),
     -- 검색 경유는 순위·유사도·근거가 없고, 추천 경유는 순위·유사도가 반드시 있어야 함
     CONSTRAINT ck_result_source CHECK (
         (match_source = 'SEARCH'
@@ -197,7 +257,7 @@ CREATE INDEX idx_result_scene        ON tagging_result(scene_image_id);
 CREATE INDEX idx_result_sku          ON tagging_result(sku_id);
 
 COMMENT ON TABLE  tagging_result                  IS '최종 객체-SKU 매핑 + 검수 이력';
-COMMENT ON COLUMN tagging_result.object_index     IS 'scene_image.object_metadata 배열의 객체 인덱스';
+COMMENT ON COLUMN tagging_result.object_idx       IS 'scene_image.object_metadata 배열의 객체 인덱스';
 COMMENT ON COLUMN tagging_result.sku_image_id     IS '매칭 근거가 된 SKU 이미지';
 COMMENT ON COLUMN tagging_result.match_source     IS 'RECOMMEND(추천 경유) | SEARCH(카탈로그 검색 경유)';
 COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 순위';
@@ -206,3 +266,108 @@ COMMENT ON COLUMN tagging_result.similarity_grade IS '화면 표시용 등급 �
 COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 위 주석의 JSON 구조 참고';
 COMMENT ON COLUMN tagging_result.status           IS '최종 관리자 검수 상태: PENDING | ACTIVE | DEACTIVE';
 COMMENT ON COLUMN tagging_result.vlm_mood         IS '연출 이미지 분위기 요약과 태그';
+
+-- ------------------------------------------------------------
+-- 7. approval : 객체-SKU 매칭(tagging_result) 단위 승인 요청
+--    현재 스키마는 객체를 scene_image.object_metadata의 배열 인덱스로
+--    식별하므로 tagging_result와 object_index를 함께 보관한다.
+-- ------------------------------------------------------------
+CREATE TABLE approval (
+    request_id        BIGSERIAL   PRIMARY KEY,
+    tagging_result_id BIGINT      NOT NULL REFERENCES tagging_result(result_id) ON DELETE CASCADE,
+    scene_image_id    BIGINT      NOT NULL REFERENCES scene_image(scene_image_id) ON DELETE CASCADE,
+    object_index      SMALLINT    NOT NULL,
+    status            VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    requested_by      BIGINT      NOT NULL REFERENCES app_user(user_id),
+    requested_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reviewed_by       BIGINT      REFERENCES app_user(user_id),
+    reviewed_at       TIMESTAMPTZ,
+    reject_reason     VARCHAR(255),
+    CONSTRAINT ck_approval_status CHECK (status IN ('PENDING','ACTIVE','REJECTED')),
+    CONSTRAINT ck_approval_reviewed CHECK (
+        (status = 'PENDING'  AND reviewed_by IS NULL AND reviewed_at IS NULL AND reject_reason IS NULL)
+     OR (status = 'ACTIVE'   AND reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)
+     OR (status = 'REJECTED' AND reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL
+                             AND reject_reason IS NOT NULL)
+    )
+);
+
+-- 같은 확정 결과에 PENDING은 1건만. 반려 후 재요청은 허용된다.
+CREATE UNIQUE INDEX uq_approval_pending
+    ON approval(tagging_result_id) WHERE status = 'PENDING';
+
+CREATE INDEX idx_approval_status_req ON approval(status, requested_at DESC);
+CREATE INDEX idx_approval_scene       ON approval(scene_image_id);
+
+COMMENT ON TABLE  approval               IS '객체-SKU 매칭(tagging_result) 단위 승인 요청';
+COMMENT ON COLUMN approval.request_id    IS '승인 요청 고유 번호';
+COMMENT ON COLUMN approval.object_index  IS '승인 대상 탐지 객체의 object_metadata 배열 인덱스';
+COMMENT ON COLUMN approval.status        IS 'PENDING | ACTIVE | REJECTED';
+COMMENT ON COLUMN approval.requested_by  IS '태깅을 저장한 작업자';
+COMMENT ON COLUMN approval.reviewed_by   IS '승인·반려를 수행한 사용자';
+
+-- ------------------------------------------------------------
+-- 8. product_image_submission : 관리자 제품 이미지 등록 요청
+--    업로드한 제품 이미지는 최종 승인 전까지 SKU 카탈로그와 분리한다.
+--    APPROVED 전이에서만 sku_catalog / sku_image에 실제 반영된다.
+-- ------------------------------------------------------------
+CREATE TABLE product_image_submission (
+    submission_id       BIGSERIAL    PRIMARY KEY,
+    target_type         VARCHAR(20)  CHECK (target_type IN ('EXISTING', 'NEW')),
+    target_sku_id       BIGINT       REFERENCES sku_catalog(sku_id),
+    proposed_sku_code   VARCHAR(50),
+    proposed_product_name VARCHAR(200),
+    proposed_brand      VARCHAR(100),
+    proposed_price      INT          CHECK (proposed_price IS NULL OR proposed_price >= 0),
+    proposed_space      VARCHAR(50),
+    proposed_category   VARCHAR(50),
+    proposed_sub_category VARCHAR(50),
+    proposed_attributes JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    image_url           TEXT         NOT NULL,
+    image_type          VARCHAR(20)  NOT NULL DEFAULT 'MAIN'
+                                  CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
+    status              VARCHAR(20)  NOT NULL DEFAULT 'DRAFT'
+                                  CHECK (status IN ('DRAFT','PENDING','APPROVED','REJECTED')),
+    requested_by        BIGINT       NOT NULL REFERENCES app_user(user_id),
+    requested_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    submitted_at        TIMESTAMPTZ,
+    reviewed_by         BIGINT       REFERENCES app_user(user_id),
+    reviewed_at         TIMESTAMPTZ,
+    reject_reason       VARCHAR(255),
+    final_sku_id        BIGINT       REFERENCES sku_catalog(sku_id),
+    final_sku_image_id  BIGINT       REFERENCES sku_image(sku_image_id),
+    CONSTRAINT ck_product_image_submission_attributes CHECK (
+        jsonb_typeof(proposed_attributes) = 'object'
+    ),
+    CONSTRAINT ck_product_image_submission_review CHECK (
+        (status = 'DRAFT'
+            AND reviewed_by IS NULL AND reviewed_at IS NULL
+            AND reject_reason IS NULL AND final_sku_id IS NULL
+            AND final_sku_image_id IS NULL AND submitted_at IS NULL)
+     OR (status = 'PENDING'
+            AND reviewed_by IS NULL AND reviewed_at IS NULL
+            AND reject_reason IS NULL AND final_sku_id IS NULL
+            AND final_sku_image_id IS NULL AND submitted_at IS NOT NULL)
+     OR (status = 'APPROVED'
+            AND reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL
+            AND final_sku_id IS NOT NULL AND final_sku_image_id IS NOT NULL
+            AND reject_reason IS NULL AND submitted_at IS NOT NULL)
+     OR (status = 'REJECTED'
+            AND reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL
+            AND reject_reason IS NOT NULL AND final_sku_id IS NULL
+            AND final_sku_image_id IS NULL AND submitted_at IS NOT NULL)
+    )
+);
+
+CREATE INDEX idx_product_submission_requester_status
+    ON product_image_submission(requested_by, status, requested_at DESC);
+CREATE INDEX idx_product_submission_status
+    ON product_image_submission(status, requested_at DESC);
+
+COMMENT ON TABLE product_image_submission IS '관리자의 제품 이미지 신규/기존 SKU 등록 승인 요청';
+COMMENT ON COLUMN product_image_submission.target_type IS 'EXISTING: 기존 SKU 이미지 추가, NEW: 신규 SKU 생성';
+COMMENT ON COLUMN product_image_submission.status IS 'DRAFT | PENDING | APPROVED | REJECTED';
+COMMENT ON COLUMN product_image_submission.final_sku_id IS '최종 승인으로 연결 또는 생성된 SKU';
+
+-- sku_image 멱등성 인덱스: confirm이 두 번 호출돼도 같은 크롭이 중복 등록되지 않는다.
+CREATE UNIQUE INDEX uq_sku_image_sku_url ON sku_image(sku_id, image_url);

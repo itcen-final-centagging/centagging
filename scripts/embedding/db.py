@@ -6,10 +6,10 @@ docker/db/init/schema.sql의 sku_catalog·sku_image 테이블을 그대로 쓴�
     sku_catalog.sku_id (PK)
         └─ sku_image.sku_id (FK, ON DELETE CASCADE)
 
-sku_id는 data/images/{sku_id}/main.* 폴더 이름과 그대로 맞춰 써야 하므로,
-BIGSERIAL이지만 sku.json에 있는 값을 명시적으로 넣는다. 적재 후
-시퀀스를 MAX(sku_id)로 맞춰서, 이후 애플리케이션이 넣는 새 행과 겹치지
-않게 한다.
+
+data/images의 이미지는 파일명에 sku_id가 아니라 sku_code를
+쓰므로, 이미지 적재 시에는 sku_code -> sku_id 매핑을 먼저 조회해서 쓴다
+(fetch_sku_ids_by_code).
 """
 
 from __future__ import annotations
@@ -64,11 +64,12 @@ def upsert_sku_metadata(conn: psycopg.Connection, sku: dict[str, Any]) -> bool:
             """
             INSERT INTO sku_catalog (
                 sku_id, sku_code, product_name, category, sub_category,
-                key_features, attributes
+                brand, price, key_features, attributes
             )
             VALUES (
                 %(sku_id)s, %(sku_code)s, %(product_name)s, %(category)s,
-                %(sub_category)s, %(key_features)s, %(attributes)s
+                %(sub_category)s, %(brand)s, %(price)s, %(key_features)s,
+                %(attributes)s
             )
             ON CONFLICT (sku_id) DO NOTHING
             """,
@@ -78,6 +79,8 @@ def upsert_sku_metadata(conn: psycopg.Connection, sku: dict[str, Any]) -> bool:
                 "product_name": sku["product_name"],
                 "category": sku["category"],
                 "sub_category": sku.get("sub_category"),
+                "brand": sku.get("brand"),
+                "price": sku.get("price"),
                 "key_features": Json(sku.get("key_features") or []),
                 "attributes": Json(sku.get("attributes") or {}),
             },
@@ -129,12 +132,27 @@ def update_text_embedding(
         )
 
 
-def fetch_image_embedded_sku_ids(conn: psycopg.Connection) -> set[int]:
-    """MAIN 이미지 임베딩이 이미 채워진 sku_id 집합을 돌려준다."""
+def fetch_sku_ids_by_code(conn: psycopg.Connection) -> dict[str, int]:
+    """sku_code -> sku_id 매핑을 돌려준다.
+
+    data/images의 파일명은 sku_id가 아니라 sku_code를 쓰므로,
+    이미지를 적재하기 전에 이 매핑으로 sku_id를 찾는다.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT sku_code, sku_id FROM sku_catalog")
+        return {row[0]: row[1] for row in cur.fetchall()}
+
+
+def fetch_embedded_image_urls(conn: psycopg.Connection) -> set[str]:
+    """임베딩이 이미 채워진 image_url 집합을 돌려준다.
+
+    이미지 1건 = image_url 1개 기준으로 완료 여부를 추적한다. SKU당
+    이미지가 여러 장(MAIN + ANGLE 등)일 수 있어 sku_id 단위로는 더 이상
+    완료 여부를 판단할 수 없다.
+    """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT sku_id FROM sku_image "
-            "WHERE image_type = 'MAIN' AND embedding IS NOT NULL"
+            "SELECT image_url FROM sku_image WHERE embedding IS NOT NULL"
         )
         return {row[0] for row in cur.fetchall()}
 
@@ -143,21 +161,23 @@ def upsert_sku_image(
     conn: psycopg.Connection,
     sku_id: int,
     image_url: str,
+    image_type: str,
     embedding: list[float],
     overwrite: bool = False,
 ) -> bool:
-    """SKU의 MAIN 이미지 행을 적재하되, 이미 임베딩이 있으면 건드리지 않는다.
+    """SKU 이미지 1건을 적재하되, 이미 임베딩이 있으면 건드리지 않는다.
 
-    같은 sku_id의 MAIN 이미지 행이 없으면 새로 만든다. 있는데 embedding이
-    아직 비어 있으면(예: image_url만 먼저 채워진 경우) 채워 넣는다. 이미
-    embedding이 있으면 overwrite=True가 아닌 한 그대로 두고 건너뛴다.
-    (sku_image에는 (sku_id, image_type) 유니크 제약이 없어 애플리케이션
-    쪽에서 존재 여부를 먼저 확인한다.)
+    같은 image_url의 행이 없으면 새로 만든다. 있는데 embedding이 아직
+    비어 있으면 채워 넣는다. 이미 embedding이 있으면 overwrite=True가
+    아닌 한 그대로 두고 건너뛴다. image_url을 키로 써서 SKU당 이미지가
+    여러 장이어도(MAIN + ANGLE, sequence 여러 장) 안전하게 재실행할 수
+    있다.
 
     Args:
         conn: DB 연결입니다.
         sku_id: sku_catalog.sku_id입니다.
         image_url: 이미지 경로(프로젝트 루트 기준 상대 경로)입니다.
+        image_type: 'MAIN' 또는 'ANGLE'입니다.
         embedding: Gemini 이미지 임베딩 벡터입니다.
         overwrite: True면 이미 임베딩이 있어도 덮어씁니다(--force-images용).
 
@@ -168,8 +188,8 @@ def upsert_sku_image(
     with conn.cursor() as cur:
         cur.execute(
             "SELECT sku_image_id, embedding FROM sku_image "
-            "WHERE sku_id = %s AND image_type = 'MAIN'",
-            (sku_id,),
+            "WHERE sku_id = %s AND image_url = %s",
+            (sku_id, image_url),
         )
         existing = cur.fetchone()
 
@@ -179,15 +199,15 @@ def upsert_sku_image(
         if existing:
             cur.execute(
                 "UPDATE sku_image "
-                "SET image_url = %s, embedding = %s, indexed_at = %s "
+                "SET image_type = %s, embedding = %s, indexed_at = %s "
                 "WHERE sku_image_id = %s",
-                (image_url, embedding, now, existing[0]),
+                (image_type, embedding, now, existing[0]),
             )
         else:
             cur.execute(
                 "INSERT INTO sku_image "
                 "(sku_id, image_url, image_type, embedding, indexed_at) "
-                "VALUES (%s, %s, 'MAIN', %s, %s)",
-                (sku_id, image_url, embedding, now),
+                "VALUES (%s, %s, %s, %s, %s)",
+                (sku_id, image_url, image_type, embedding, now),
             )
         return True
