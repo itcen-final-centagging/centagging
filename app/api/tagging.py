@@ -169,7 +169,7 @@ async def enqueue_sku_recommendation(
             database_session,
             scene_id,
             AiJobType.RECOMMEND_SKU,
-            input_payload={"object_idxs": object_idxs or []},
+            input_payload={"object_idxs": object_idxs or None},
         )
     except ai_job_repository.ActiveAiJobExistsError as error:
         raise HTTPException(
