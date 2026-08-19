@@ -19,6 +19,14 @@ def build_embedding_text(sku: dict[str, Any]) -> str:
 
     Returns:
         상품명 -> 카테고리 -> 속성 -> 대표 특징 순으로 이어붙인 텍스트입니다.
+
+    Note:
+        attributes 값이 없는(None) 항목은 "wood_tone: None"처럼 글자 그대로
+        "None"이 텍스트에 섞여 들어가지 않도록 아예 목록에서 뺍니다.
+        sku.json 612건 중 55건(9%)이 이런 값 없는 속성을 하나 이상 갖고
+        있었습니다. 이 변경 하나의 효과만 측정하기 위해, 속성 표기 순서·
+        color 처리 방식·key_features 구성 등 다른 부분은 일부러 그대로
+        뒀습니다.
     """
     lines: list[str] = [sku["product_name"]]
 
@@ -28,8 +36,13 @@ def build_embedding_text(sku: dict[str, Any]) -> str:
     lines.append(category_line)
 
     attributes = sku.get("attributes") or {}
-    if attributes:
-        attr_text = ", ".join(f"{key}: {value}" for key, value in attributes.items())
+    clean_attributes = {
+        key: value
+        for key, value in attributes.items()
+        if value is not None and str(value).strip() != ""
+    }
+    if clean_attributes:
+        attr_text = ", ".join(f"{key}: {value}" for key, value in clean_attributes.items())
         lines.append(f"속성: {attr_text}")
 
     key_features = sku.get("key_features") or []

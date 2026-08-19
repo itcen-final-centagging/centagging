@@ -4,6 +4,7 @@
     python -m scripts.embedding.build_embeddings
     python -m scripts.embedding.build_embeddings --limit 5 --dry-run
     python -m scripts.embedding.build_embeddings --skip-images
+    python -m scripts.embedding.build_embeddings --skip-images --force-text  텍스트만
     python -m scripts.embedding.build_embeddings --force-text --force-images
 
 단계:
