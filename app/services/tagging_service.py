@@ -24,7 +24,7 @@ from app.services.similar_sku_service import SimilarSkuService
 from app.services.xai_scoring_service import XaiObjectResult, XaiScoringService
 
 DETECTED_STATUS = "DETECTED"
-ATTRIBUTE_EXTRACTION_CONCURRENCY = 1
+ATTRIBUTE_EXTRACTION_CONCURRENCY = 3
 
 
 # 단일 태깅 유스케이스를 제공하는 오케스트레이터입니다.
