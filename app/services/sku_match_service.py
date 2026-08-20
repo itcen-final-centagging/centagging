@@ -129,7 +129,6 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
                     scene_image_id=scene_id,
                     object_index=result.object_idx,
                     requested_by=user_id,
-                    status="PENDING",
                 )
                 for result in results
             )

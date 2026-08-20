@@ -69,6 +69,7 @@ services:
       VERTEX_AI_LOCATION: ${VERTEX_AI_LOCATION:-global}
       GEMINI_VLM_MODEL: ${GEMINI_VLM_MODEL:-gemini-3.5-flash}
       GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
+      GEMINI_RERANK_MODEL: ${GEMINI_RERANK_MODEL:-gemini-2.5-flash-lite}
       IMAGE_STORAGE_ROOT: ${IMAGE_STORAGE_ROOT:-uploads}
       SKU_IMAGE_ROOT: ${SKU_IMAGE_ROOT:-data/images}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
