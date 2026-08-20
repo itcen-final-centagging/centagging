@@ -7,7 +7,7 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.models.sku import SkuCatalog, SkuImage
 from app.schemas import sku_search as sku_search_schema
-from app.services.gemini_service import GeminiService
+from app.services.gemini_service import GeminiConfigurationError, GeminiService
 from app.services.sku_image_storage import SkuImageStorage
 
 EMBEDDING_DIMENSIONS = 3072
@@ -48,12 +48,15 @@ async def search_skus(
         유사도 내림차순으로 정렬된 SKU 검색 결과입니다.
 
     Raises:
+        GeminiConfigurationError: Gemini 설정 오류
         SkuSearchQueryError: 검색어 임베딩에 실패했거나 응답 차원이
             올바르지 않은 경우입니다.
     """
     try:
         embedding = gemini_service.embed_text(query)
-    except Exception as error:  # 외부 SDK 경계; 도메인 오류로 변환합니다.
+    except GeminiConfigurationError:
+        raise
+    except Exception as error:
         raise SkuSearchQueryError("검색어 임베딩에 실패했습니다.") from error
 
     if len(embedding) != EMBEDDING_DIMENSIONS:
@@ -132,6 +135,7 @@ async def get_sku_detail(
     main_image = orm.aliased(SkuImage, name="main_image")
     stmt = (
         sqlalchemy.select(
+            SkuCatalog.sku_id,
             SkuCatalog.sku_code,
             SkuCatalog.product_name,
             SkuCatalog.brand,
@@ -140,6 +144,7 @@ async def get_sku_detail(
             SkuCatalog.sub_category,
             SkuCatalog.attributes,
             main_image.image_url,
+            main_image.sku_image_id,
         )
         .outerjoin(
             main_image,
@@ -155,6 +160,7 @@ async def get_sku_detail(
         return None
 
     return sku_search_schema.SkuDetailData(
+        sku_id=row["sku_id"],
         sku_code=row["sku_code"],
         product_name=row["product_name"],
         brand=row["brand"],
@@ -163,4 +169,5 @@ async def get_sku_detail(
         sub_category=row["sub_category"],
         attrs=row["attributes"] or {},
         image_url=_to_public_url(sku_image_storage, row["image_url"]),
+        sku_image_id=row["sku_image_id"],
     )

@@ -8,6 +8,7 @@ import json
 import logging
 import time
 import typing
+from collections.abc import Mapping
 
 from google.genai import errors, types
 from PIL import Image
@@ -21,6 +22,7 @@ from app.schemas.gemini_detection import (
 )
 from app.services.furniture_attribute_rules import (
     build_allowed_attribute_schema,
+    build_attribute_response_schema,
     validate_attribute_result,
 )
 from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
@@ -285,12 +287,13 @@ class GeminiService:
                 attribute_context,
             ]
 
+            # FurnitureAttributeResult를 Gemini SDK에 직접 전달 X
             response = client.models.generate_content(
                 model=self._settings.gemini_vlm_model,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=FurnitureAttributeResult,
+                    response_schema=build_attribute_response_schema(category),
                 ),
             )
 
@@ -331,11 +334,11 @@ class GeminiService:
                 "Gemini 속성 추출 요청이 실패했습니다."
             ) from error
 
-    def embed_image(self, image: Image.Image) -> list[float]:
+    def embed_image(self, image: Image.Image | bytes) -> list[float]:
         """이미지를 임베딩하여 벡터 값을 반환합니다.
 
         Args:
-            image: PIL 이미지 객체입니다.
+            image: PIL 이미지 객체 또는 이미 변환된 JPEG 바이트입니다.
 
         Returns:
             임베딩 벡터(float 리스트)입니다.
@@ -352,10 +355,14 @@ class GeminiService:
         try:
             client = genai_client.create_client(self._settings)
 
-            image_format = (image.format or "PNG").upper()
-            buffer = io.BytesIO()
-            image.save(buffer, format=image_format)
-            image_bytes = buffer.getvalue()
+            if isinstance(image, bytes):
+                image_format = "JPEG"
+                image_bytes = image
+            else:
+                image_format = (image.format or "PNG").upper()
+                buffer = io.BytesIO()
+                image.save(buffer, format=image_format)
+                image_bytes = buffer.getvalue()
 
             response = client.models.embed_content(
                 model=self._settings.gemini_embedding_model,
@@ -418,9 +425,20 @@ class GeminiService:
         except GeminiEmbeddingError:
             raise
         except Exception as error:
-            logging.getLogger(__name__).exception(
-                "Gemini 텍스트 임베딩 실패"
-            )
+            logging.getLogger(__name__).exception("Gemini 텍스트 임베딩 실패")
             raise GeminiEmbeddingError(
                 f"Gemini 텍스트 임베딩에 실패했습니다: {error}"
             ) from error
+
+    def embed_with_attrs(
+        self,
+        image: Image.Image,
+        *,
+        category: str | None = None,
+        sub_category: str | None = None,
+        attrs: Mapping[str, str] | None = None,
+    ) -> list[float]:
+        """이미지와 추출 속성을 함께 임베딩합니다."""
+        raise NotImplementedError(
+            "하이브리드 임베딩 구현이 아직 연결되지 않았습니다."
+        )
