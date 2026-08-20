@@ -23,6 +23,8 @@ const RESULTS_PER_PAGE = 5;
 
 export const DetectionPanel = () => {
   const [page, setPage] = useState(1);
+  // 편집 모드가 아닐 때 목록 카드와 이미지 박스를 마우스 오버로 연동합니다.
+  const [hoveredObjectId, setHoveredObjectId] = useState<string>();
   const {
     addObject,
     deleteObject,
