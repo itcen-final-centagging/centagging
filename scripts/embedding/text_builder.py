@@ -1,7 +1,16 @@
-"""sku.json 항목 -> 텍스트 임베딩용 문자열.
+"""sku.json 항목 -> 텍스트 임베딩용 문자열. (baseline, 버전 1)
 
 sku_catalog.text_embedding 컬럼 주석대로 "상품명·카테고리·속성·대표 특징"을
 근거로 삼는다. 순수 함수만 두고 API·DB 호출은 하지 않는다.
+
+이 파일은 실험 비교용 baseline 원본입니다. noise_removal/natural_attribute_phrasing
+이전, 가장 처음 버전 그대로입니다 — attributes 값이 None이어도 걸러내지 않고
+"key: None" 형태로 그대로 이어붙입니다.
+
+baseline 지표를 다시 측정해야 할 때만 이 파일 내용을 scripts/embedding/text_builder.py에
+그대로 덮어쓰고, 612건 전체를 재임베딩한 뒤 검색 테스트를 돌리세요. 테스트가 끝나면
+반드시 현재 버전(noise_removal + natural_attribute_phrasing)으로 되돌리고 다시
+재임베딩해야 합니다 — 이 파일 자체를 그대로 두고 쓰면 안 됩니다.
 """
 
 from __future__ import annotations

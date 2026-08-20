@@ -31,6 +31,7 @@ class Settings:  # pylint: disable=too-many-instance-attributes
     vertex_api_key: str = dataclasses.field(default="", repr=False)
     gcp_project_id: str = ""
     vertex_ai_location: str = "global"
+    gemini_rerank_model: str = "gemini-2.5-flash-lite"
 
 
 def get_settings() -> Settings:
@@ -47,6 +48,9 @@ def get_settings() -> Settings:
         gemini_vlm_model=os.getenv("GEMINI_VLM_MODEL", "gemini-3.5-flash"),
         gemini_embedding_model=os.getenv(
             "GEMINI_EMBEDDING_MODEL", "gemini-embedding-2"
+        ),
+        gemini_rerank_model=os.getenv(
+            "GEMINI_RERANK_MODEL", "gemini-2.5-flash-lite"
         ),
         mvp_login_id=os.getenv("MVP_LOGIN_ID", ""),
         mvp_login_password=os.getenv("MVP_LOGIN_PASSWORD", ""),
