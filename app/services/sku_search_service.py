@@ -1,5 +1,9 @@
 """SKU 카탈로그의 텍스트 임베딩 기반 유사도 검색 기능을 제공합니다."""
 
+import collections.abc
+import logging
+import typing
+
 import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import sqlalchemy
 from sqlalchemy import orm
@@ -7,12 +11,19 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.models.sku import SkuCatalog, SkuImage
 from app.schemas import sku_search as sku_search_schema
-from app.services.gemini_service import GeminiService, GeminiConfigurationError
+from app.services.gemini_service import GeminiConfigurationError, GeminiService
 from app.services.sku_image_storage import SkuImageStorage
 
 EMBEDDING_DIMENSIONS = 3072
 DEFAULT_RESULT_LIMIT = 5
+# LLM 재정렬 대상 후보 풀 크기입니다. attribute_reranking/llm_semantic_
+# reranking 실험(search_eval_v2)에서 검증한 Top-30 후보 풀과 동일한
+# 크기를 그대로 사용합니다 — 코사인 유사도만으로는 놓치는 케이스를
+# 재정렬 단계에서 건져올 여지를 주기 위함입니다.
+CANDIDATE_POOL_SIZE = 30
 _HALFVEC = pgvector_sa.HALFVEC(EMBEDDING_DIMENSIONS)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SkuSearchQueryError(RuntimeError):
@@ -28,6 +39,109 @@ def _to_public_url(
     return sku_image_storage.public_url(stored_path)
 
 
+def _to_rerank_candidate(
+    row: collections.abc.Mapping[str, typing.Any],
+) -> dict[str, typing.Any]:
+    """재정렬 프롬프트에 넘길 catalog 필드만 뽑아냅니다.
+
+    정답 SKU나 평가용 라벨은 애초에 이 함수의 입력(row)에 존재하지
+    않습니다 — search_skus의 SELECT 절이 catalog 필드만 조회하기
+    때문입니다.
+
+    Args:
+        row: SQL 조회 결과 한 행입니다.
+
+    Returns:
+        sku_code와 catalog 필드만 담은 딕셔너리입니다.
+    """
+    return {
+        "sku_code": row["sku_code"],
+        "product_name": row["product_name"],
+        "category": row["category"],
+        "sub_category": row["sub_category"],
+        "attributes": row.get("attributes") or {},
+        "brand": row["brand"],
+        "price": row["price"],
+    }
+
+
+def _reorder_by_ranked_codes(
+    items: list[sku_search_schema.SkuSearchItem],
+    ranked_codes: list[str],
+) -> list[sku_search_schema.SkuSearchItem]:
+    """LLM이 반환한 sku_code 순서대로 items를 재배열합니다.
+
+    LLM이 일부만 반환했거나 목록에 없는 코드를 냈다면, 남은 자리는
+    원래(코사인 유사도) 순서로 채웁니다 — 재정렬이 부분적으로만
+    성공해도 후보를 잃지 않도록 하기 위함입니다.
+
+    Args:
+        items: 코사인 유사도 순서의 원본 결과 목록입니다.
+        ranked_codes: Gemini가 반환한 재정렬된 sku_code 목록입니다.
+
+    Returns:
+        재정렬된 SkuSearchItem 목록이며, 길이는 items와 같습니다.
+    """
+    by_code = {item.sku_code: item for item in items}
+    ordered: list[sku_search_schema.SkuSearchItem] = []
+    seen: set[str] = set()
+
+    for code in ranked_codes:
+        item = by_code.get(code)
+        if item is not None and code not in seen:
+            ordered.append(item)
+            seen.add(code)
+
+    for item in items:
+        if item.sku_code not in seen:
+            ordered.append(item)
+            seen.add(item.sku_code)
+
+    return ordered
+
+
+def _rerank_items(
+    gemini_service: GeminiService,
+    query: str,
+    items: list[sku_search_schema.SkuSearchItem],
+    rows: collections.abc.Sequence[collections.abc.Mapping[str, typing.Any]],
+    limit: int,
+) -> list[sku_search_schema.SkuSearchItem]:
+    """LLM으로 후보 풀을 재정렬합니다. 실패하면 원래 순서로 폴백합니다.
+
+    재정렬은 검색 품질을 높이는 부가 단계이므로, 재정렬 자체가
+    실패(인증 미설정, API 오류, 응답 파싱 실패 등)해도 검색 결과 자체를
+    막아서는 안 됩니다. 실패 시 코사인 유사도 순서를 그대로 사용합니다.
+
+    Args:
+        gemini_service: 재정렬 호출에 사용하는 서비스입니다.
+        query: 검색 프롬프트입니다.
+        items: 코사인 유사도 순서의 후보 SkuSearchItem 목록입니다
+            (최대 CANDIDATE_POOL_SIZE개).
+        rows: items와 같은 순서의 원본 SQL 조회 결과입니다. 재정렬
+            프롬프트에 필요한 attributes 등 catalog 필드를 담고
+            있습니다.
+        limit: 최종적으로 반환할 결과 개수입니다.
+
+    Returns:
+        재정렬 후 limit개로 자른 SkuSearchItem 목록입니다.
+    """
+    try:
+        candidates = [_to_rerank_candidate(row) for row in rows]
+        ranked_codes = gemini_service.rerank_sku_candidates(
+            query, candidates, top_k=limit
+        )
+        reordered = _reorder_by_ranked_codes(items, ranked_codes)
+    except Exception:  # noqa: BLE001 - 재정렬 실패가 검색을 막으면 안 됨
+        _LOGGER.warning(
+            "SKU 재정렬 실패 - 코사인 유사도 순서로 대체합니다.",
+            exc_info=True,
+        )
+        reordered = items
+
+    return reordered[:limit]
+
+
 async def search_skus(
     session: sqlalchemy_async.AsyncSession,
     gemini_service: GeminiService,
@@ -37,15 +151,20 @@ async def search_skus(
 ) -> sku_search_schema.SkuSearchData:
     """검색어와 의미적으로 유사한 SKU를 조회합니다.
 
+    1차로 코사인 유사도 상위 CANDIDATE_POOL_SIZE개를 후보 풀로 뽑고,
+    Gemini로 검색어 조건에 맞게 재정렬한 뒤 상위 limit개를 반환합니다.
+    재정렬이 실패하면 코사인 유사도 순서를 그대로 사용합니다.
+
     Args:
         session: 비동기 SQLAlchemy 세션입니다.
-        gemini_service: 검색어 텍스트 임베딩에 사용하는 서비스입니다.
+        gemini_service: 검색어 임베딩과 후보 재정렬에 사용하는
+            서비스입니다.
         sku_image_storage: 대표 이미지 경로를 공개 URL로 바꾸는 저장소입니다.
         query: 검색 프롬프트입니다.
         limit: 반환할 최대 SKU 개수입니다 (기본 5건).
 
     Returns:
-        유사도 내림차순으로 정렬된 SKU 검색 결과입니다.
+        검색어 관련도 순으로 정렬된 SKU 검색 결과입니다.
 
     Raises:
         GeminiConfigurationError: Gemini 설정 오류
@@ -72,6 +191,7 @@ async def search_skus(
         .label("distance")
     )
 
+    pool_size = max(limit, CANDIDATE_POOL_SIZE)
     main_image = orm.aliased(SkuImage, name="main_image")
     stmt = (
         sqlalchemy.select(
@@ -81,6 +201,7 @@ async def search_skus(
             SkuCatalog.sub_category,
             SkuCatalog.brand,
             SkuCatalog.price,
+            SkuCatalog.attributes,
             main_image.image_url,
             (1 - distance).label("similarity"),
         )
@@ -93,7 +214,7 @@ async def search_skus(
             ),
         )
         .order_by(distance)
-        .limit(limit)
+        .limit(pool_size)
     )
 
     rows = (await session.execute(stmt)).mappings().all()
@@ -114,7 +235,9 @@ async def search_skus(
         for row in rows
     ]
 
-    return sku_search_schema.SkuSearchData(skus=items)
+    ranked_items = _rerank_items(gemini_service, query, items, rows, limit)
+
+    return sku_search_schema.SkuSearchData(skus=ranked_items)
 
 
 async def get_sku_detail(

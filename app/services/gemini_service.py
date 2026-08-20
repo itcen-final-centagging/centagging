@@ -19,6 +19,7 @@ from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiModelDetectionResult,
 )
+from app.schemas.sku_rerank import SkuRerankResult
 from app.services.furniture_attribute_rules import (
     build_allowed_attribute_schema,
     validate_attribute_result,
@@ -28,6 +29,9 @@ from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
 )
 from app.services.prompt.detect_prompt.furniture_detect_prompt import (
     FURNITURE_DETECTION_PROMPT,
+)
+from app.services.prompt.rerank_prompt.sku_rerank_prompt import (
+    SKU_RERANK_PROMPT,
 )
 
 
@@ -78,6 +82,35 @@ class GeminiVerificationResult(typing.TypedDict):
 
 class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
+
+
+def _build_rerank_contents(
+    query: str, candidates: list[dict[str, typing.Any]], top_k: int
+) -> list[types.ContentUnionDict]:
+    """SKU 재정렬 요청 본문을 만듭니다.
+
+    정답 SKU나 평가용 라벨은 절대 포함하지 않습니다 — 검색어와 candidates에
+    담긴 catalog 필드(sku_code/product_name/category/sub_category/
+    attributes/brand/price)만 모델에 전달합니다.
+
+    Args:
+        query: 검색 프롬프트입니다.
+        candidates: 1차 코사인 유사도로 뽑은 후보 SKU 목록입니다.
+        top_k: 반환받을 최대 sku_code 개수입니다.
+
+    Returns:
+        Gemini ``generate_content`` 호출에 넘길 contents 목록입니다.
+    """
+    payload = json.dumps(
+        {
+            "query": query,
+            "top_k": top_k,
+            "candidates": candidates,
+        },
+        ensure_ascii=False,
+        default=str,
+    )
+    return [SKU_RERANK_PROMPT, payload]
 
 
 class GeminiService:
@@ -306,6 +339,96 @@ class GeminiService:
                 "Gemini 속성 추출 요청이 실패했습니다."
             ) from error
 
+    def rerank_sku_candidates(
+        self,
+        query: str,
+        candidates: list[dict[str, typing.Any]],
+        top_k: int,
+    ) -> list[str]:
+        """검색어 의미에 맞게 후보 SKU 목록을 Gemini로 재정렬합니다.
+
+        1차 코사인 유사도로 뽑은 후보 풀의 순서를, 검색어와 각 후보의
+        catalog 필드(product_name/category/sub_category/attributes/
+        brand/price)를 비교해 다시 매깁니다. candidates에는 catalog
+        필드만 담아야 하며 정답이나 평가용 정보는 포함하지 않습니다.
+
+        Args:
+            query: 검색 프롬프트입니다.
+            candidates: 재정렬할 후보 SKU 목록입니다. 각 항목은 최소한
+                sku_code 키를 가져야 합니다.
+            top_k: 반환받을 최대 sku_code 개수입니다.
+
+        Returns:
+            검색어와 가장 잘 맞는 순서로 정렬된 sku_code 목록입니다
+            (최대 top_k개). candidates가 비어 있으면 빈 목록입니다.
+
+        Raises:
+            GeminiConfigurationError: Gemini API 키가 설정되지 않은
+                경우입니다.
+            GeminiApiError: Gemini API 호출 또는 응답 검증에 실패한
+                경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "Google Gen AI 인증 설정이 누락되었습니다."
+            )
+        if not candidates:
+            return []
+
+        try:
+            client = genai_client.create_client(self._settings)
+            contents = _build_rerank_contents(query, candidates, top_k)
+
+            response = client.models.generate_content(
+                model=self._settings.gemini_rerank_model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=SkuRerankResult,
+                    temperature=0.0,
+                ),
+            )
+
+            if not response.text:
+                raise GeminiResponseInvalidError(
+                    "Gemini 재정렬 응답이 비어 있습니다."
+                )
+
+            result = SkuRerankResult.model_validate_json(response.text)
+
+            valid_codes = {candidate["sku_code"] for candidate in candidates}
+            seen: set[str] = set()
+            ranked_codes: list[str] = []
+            for code in result.ranked_sku_codes:
+                if code in valid_codes and code not in seen:
+                    ranked_codes.append(code)
+                    seen.add(code)
+
+            return ranked_codes[:top_k]
+
+        except GeminiResponseInvalidError:
+            raise
+
+        except ValidationError as error:
+            raise GeminiResponseInvalidError(
+                "Gemini 재정렬 응답이 올바르지 않습니다."
+            ) from error
+
+        except errors.ClientError as error:
+            if getattr(error, "code", None) in (401, 403):
+                raise GeminiAuthenticationError(
+                    "Gemini 인증이 실패했습니다."
+                ) from error
+
+            raise GeminiInferenceError(
+                "Gemini 재정렬 요청이 실패했습니다."
+            ) from error
+
+        except Exception as error:
+            raise GeminiInferenceError(
+                "Gemini 재정렬 요청이 실패했습니다."
+            ) from error
+
     def embed_image(self, image: Image.Image) -> list[float]:
         """이미지를 임베딩하여 벡터 값을 반환합니다.
 
@@ -393,9 +516,7 @@ class GeminiService:
         except GeminiEmbeddingError:
             raise
         except Exception as error:
-            logging.getLogger(__name__).exception(
-                "Gemini 텍스트 임베딩 실패"
-            )
+            logging.getLogger(__name__).exception("Gemini 텍스트 임베딩 실패")
             raise GeminiEmbeddingError(
                 f"Gemini 텍스트 임베딩에 실패했습니다: {error}"
             ) from error
