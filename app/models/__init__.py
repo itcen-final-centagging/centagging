@@ -7,12 +7,14 @@
 
 # pylint: disable=unused-import
 from app.models.app_user import AppUser
+from app.models.approval import Approval
 from app.models.scene_image import SceneImage
 from app.models.sku import SkuCatalog, SkuImage
 from app.models.tagging_result import TaggingResult
 
 __all__ = [
     "AppUser",
+    "Approval",
     "SceneImage",
     "SkuCatalog",
     "SkuImage",

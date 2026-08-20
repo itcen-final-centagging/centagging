@@ -359,6 +359,7 @@ const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
     material: '',
     mood: '',
     styleTags: item.style_tags,
+    subCategory: '',
   },
 });
 
@@ -419,8 +420,10 @@ export const fetchRecommendations = async (
   objectIdx: number,
   objects: EditedSceneObject[],
 ): Promise<SkuCandidate[]> => {
-  const candidatesByObjectIndex =
-    await fetchObjectRecommendations(sceneImageId, objects);
+  const candidatesByObjectIndex = await fetchObjectRecommendations(
+    sceneImageId,
+    objects,
+  );
   return candidatesByObjectIndex.get(objectIdx) ?? [];
 };
 
@@ -511,9 +514,7 @@ type SaveTaggingReviewInput = {
  * AI 추천인지 직접 검색한 결과인지 구분해서 저장합니다.
  * matchRank가 있으면 RECOMMEND, 없으면 SEARCH입니다.
  */
-const toMatchSource = (
-  selectedSku: SkuCandidate,
-): 'RECOMMEND' | 'SEARCH' =>
+const toMatchSource = (selectedSku: SkuCandidate): 'RECOMMEND' | 'SEARCH' =>
   selectedSku.matchRank !== null ? 'RECOMMEND' : 'SEARCH';
 
 export const saveTaggingReview = async (
@@ -540,7 +541,6 @@ export const saveTaggingReview = async (
               match_rank: selectedSku.matchRank,
               object_idx: objectIdx,
               match_source: toMatchSource(selectedSku),
-              object_index: objectIdx,
               object_metadata: {
                 attrs: {
                   ...object.metadata.attributes,
@@ -554,7 +554,10 @@ export const saveTaggingReview = async (
                 bbox_coord: { xmax, xmin, ymax, ymin },
                 category: reviewedText(values?.category, selectedSku.category),
                 object_idx: objectIdx,
-                sub_category: object.metadata.subCategory ?? '',
+                sub_category: reviewedText(
+                  values?.subCategory,
+                  object.metadata.subCategory,
+                ),
               },
               similarity_score:
                 selectedSku.score === null
@@ -567,9 +570,9 @@ export const saveTaggingReview = async (
                   values?.mood,
                   selectedSku.vlmMood?.summary,
                 ),
-                tags: styleTags?.length
-                  ? styleTags
-                  : (selectedSku.vlmMood?.tags ?? []),
+                // 검수 화면에서 고른 태그만 저장합니다. 검수 값 자체가 없을
+                // 때만 VLM이 추출한 원본 태그를 그대로 사용합니다.
+                tags: styleTags ?? selectedSku.vlmMood?.tags ?? [],
               },
               xai_result: {
                 criteria: selectedSku.xaiResult?.criteria ?? [],

@@ -182,7 +182,7 @@ CREATE TABLE sku_image (
     sku_id       BIGINT      NOT NULL REFERENCES sku_catalog(sku_id) ON DELETE CASCADE,
     image_url    TEXT        NOT NULL,
     image_type   VARCHAR(20) NOT NULL DEFAULT 'MAIN'
-                 CHECK (image_type IN ('MAIN','ANGLE')),
+                 CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
     embedding    VECTOR(3072),
     indexed_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -319,7 +319,6 @@ CREATE TABLE product_image_submission (
     proposed_product_name VARCHAR(200),
     proposed_brand      VARCHAR(100),
     proposed_price      INT          CHECK (proposed_price IS NULL OR proposed_price >= 0),
-    proposed_space      VARCHAR(50),
     proposed_category   VARCHAR(50),
     proposed_sub_category VARCHAR(50),
     proposed_attributes JSONB        NOT NULL DEFAULT '{}'::jsonb,

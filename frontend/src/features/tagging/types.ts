@@ -6,6 +6,7 @@ export type WorkflowStage =
   | 'detect'
   | 'not-found'
   | 'redetecting'
+  | 'recommending'
   | 'recommend'
   | 'catalog'
   | 'review'
@@ -114,6 +115,7 @@ export interface TaggingValues {
   material: string;
   mood: string;
   styleTags: string[];
+  subCategory: string;
 }
 
 export interface TaggingHistory {

@@ -96,6 +96,7 @@ def _build_xai_request(
         ),
     )
     candidate = tagging.SkuCandidate(
+        sku_id=11,
         sku_code="CHR-2041",
         product_name="사무용 의자",
         category="의자",
@@ -182,8 +183,9 @@ class XaiScoringServiceTest(unittest.TestCase):
             )
         ]
 
-        with self.assertRaises(gemini_service.GeminiRateLimitError):
-            service.score_all(crops)
+        with mock.patch("app.services.genai_retry.time.sleep"):
+            with self.assertRaises(gemini_service.GeminiRateLimitError):
+                service.score_all(crops)
 
     def test_gemini_response_schema_excludes_dynamic_xai_attrs(self) -> None:
         """Gemini Developer API에 동적 딕셔너리 스키마를 전달하지 않습니다."""

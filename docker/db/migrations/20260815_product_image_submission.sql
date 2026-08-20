@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS product_image_submission (
     proposed_product_name VARCHAR(200),
     proposed_brand      VARCHAR(100),
     proposed_price      INT          CHECK (proposed_price IS NULL OR proposed_price >= 0),
-    proposed_space      VARCHAR(50),
     proposed_category   VARCHAR(50),
     proposed_sub_category VARCHAR(50),
     proposed_attributes JSONB        NOT NULL DEFAULT '{}'::jsonb,
