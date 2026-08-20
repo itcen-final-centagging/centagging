@@ -1,9 +1,4 @@
-"""SKU 카탈로그·이미지 ORM 모델입니다.
-
-SQLAlchemy models for the SKU catalog and its images. 테이블은
-``docker/db/init/schema.sql``에 이미 정의되어 있으며(연출컷 매칭
-서비스팀 소유), 여기서는 그 스키마에 매핑되는 모델만 선언합니다.
-"""
+"""SKU 카탈로그·이미지 ORM 모델입니다."""
 
 import datetime
 import typing
@@ -15,11 +10,11 @@ from sqlalchemy.dialects import postgresql
 
 
 class Base(orm.DeclarativeBase):  # pylint: disable=too-few-public-methods
-    """모든 ORM 모델의 공통 베이스입니다. / Common base for all ORM models."""
+    """모든 ORM 모델의 공통 베이스입니다."""
 
 
 class SkuCatalog(Base):  # pylint: disable=too-few-public-methods
-    """상품 마스터 + 속성입니다 (``schema.sql``의 ``sku_catalog``)."""
+    """상품 마스터 + 속성입니다."""
 
     __tablename__ = "sku_catalog"
 
@@ -61,11 +56,7 @@ class SkuCatalog(Base):  # pylint: disable=too-few-public-methods
 
 
 class SkuImage(Base):  # pylint: disable=too-few-public-methods
-    """SKU 이미지입니다 (``schema.sql``의 ``sku_image``).
-
-    임베딩 색인은 연출컷 매칭 서비스팀의 별도 배치가 채우므로 이
-    모델은 ``embedding``/``indexed_at`` 컬럼을 다루지 않습니다.
-    """
+    """SKU 이미지입니다."""
 
     __tablename__ = "sku_image"
 

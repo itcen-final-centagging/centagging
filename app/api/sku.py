@@ -1,147 +1,61 @@
-# pylint: disable=duplicate-code
-# create_sku()의 키워드 인자 목록이 app.services.sku_service.create_sku
-# 시그니처와 자연스럽게 겹쳐 발생하는 오탐입니다.
 """신규 SKU 등록 API입니다. / New SKU registration API."""
 
-import datetime
 import json
 import typing
 
 import fastapi
-import pydantic
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app import dependencies
 from app.core import config, database
 from app.schemas import common as common_schema
+from app.schemas import sku as sku_schema
 from app.services import sku_service
+from app.services.sku_image_storage import SkuImageStorage
 
 router = fastapi.APIRouter(prefix="/sku", tags=["sku"])
 
-_ALLOWED_MIME_TYPES = {"image/jpeg", "image/png"}
-_MAX_IMAGE_SIZE = 10 * 1024 * 1024
 _MAX_BATCH_IMAGE_COUNT = 20
-
-SkuImageType = typing.Literal["MAIN", "ANGLE", "DETAIL", "STYLING"]
-
-
-class MetadataExtractResponse(pydantic.BaseModel):
-    """AI가 추출한 메타데이터 응답입니다."""
-
-    category: typing.Optional[str] = None
-    sub_category: typing.Optional[str] = None
-    space: typing.Optional[str] = None
-    attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
-
-
-class SkuSummary(pydantic.BaseModel):
-    """유사/중복 조회에서 노출하는 SKU 요약 정보입니다."""
-
-    sku_id: int
-    sku_code: str
-    product_name: str
-
-
-class NameCheckResponse(pydantic.BaseModel):
-    """상품명 정확 일치 조회 응답입니다."""
-
-    exists: bool
-    matched: list[SkuSummary]
-
-
-class CodeCheckResponse(pydantic.BaseModel):
-    """SKU 코드 정확 일치 조회 응답입니다."""
-
-    sku_code: str
-    exists: bool
-
-
-class SkuCreateResponse(pydantic.BaseModel):
-    """신규 SKU 저장 응답입니다."""
-
-    sku_id: int
-    sku_code: str
-    product_name: str
-    main_image_url: str
-
-
-class SkuImageUploadItem(pydantic.BaseModel):
-    """기존 SKU에 새로 연결한 이미지 1건입니다."""
-
-    sku_image_id: int
-    image_url: str
-    image_type: SkuImageType
-
-
-class SkuImageBatchCreateResponse(pydantic.BaseModel):
-    """기존 SKU 이미지 일괄 추가 응답입니다."""
-
-    sku_id: int
-    sku_code: str
-    images: list[SkuImageUploadItem]
-
-
-class SkuCatalogItem(pydantic.BaseModel):
-    """카탈로그 목록의 SKU 한 건입니다."""
-
-    sku_id: int
-    sku_code: str
-    product_name: str
-    brand: typing.Optional[str] = None
-    price: typing.Optional[int] = None
-    space: typing.Optional[str] = None
-    category: typing.Optional[str] = None
-    sub_category: typing.Optional[str] = None
-    attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
-    main_image_url: typing.Optional[str] = None
-    created_at: datetime.datetime
-
-
-class SkuCatalogListResponse(pydantic.BaseModel):
-    """전체 카탈로그 목록 응답입니다."""
-
-    items: list[SkuCatalogItem]
 
 
 def _validate_image(content: bytes, content_type: typing.Optional[str]) -> None:
-    """업로드 이미지의 형식과 용량을 검증합니다.
+    """업로드 이미지를 검증하고 실패 시 HTTP 오류로 변환합니다.
 
     Args:
         content: 업로드된 이미지의 원본 바이트입니다.
         content_type: 업로드 요청의 MIME 타입입니다.
 
     Raises:
-        fastapi.HTTPException: 형식이 다르거나 10MB를 초과한 경우입니다.
+        fastapi.HTTPException: 형식이 다르거나 10MB를 초과한 경우입니다(422).
     """
-    if content_type not in _ALLOWED_MIME_TYPES:
+    try:
+        sku_service.validate_image_upload(content, content_type)
+    except sku_service.SkuImageValidationError as error:
         raise fastapi.HTTPException(
             status_code=fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="JPG, PNG 파일만 업로드 가능합니다.",
-        )
-    if len(content) > _MAX_IMAGE_SIZE:
-        raise fastapi.HTTPException(
-            status_code=fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="파일 용량은 최대 10MB까지 가능합니다.",
-        )
+            detail=str(error),
+        ) from error
 
 
 # NOTE: 기존 SKU 라우터 확장부에 공통 관리자 권한·응답 규약을 적용합니다.
 @router.post(
     "/{sku_code}/images",
-    response_model=common_schema.SuccessResponse[SkuImageBatchCreateResponse],
+    response_model=common_schema.SuccessResponse[
+        sku_schema.SkuImageBatchCreateResponse
+    ],
     status_code=fastapi.status.HTTP_201_CREATED,
 )
 async def add_images_to_existing_sku(
     sku_code: str,
     images: list[fastapi.UploadFile] = fastapi.File(...),
-    image_type: SkuImageType = fastapi.Form("STYLING"),
+    image_type: sku_schema.SkuImageType = fastapi.Form("STYLING"),
     _: dependencies.AdminUser = fastapi.Depends(
         dependencies.require_super_admin
     ),
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
-) -> common_schema.SuccessResponse[SkuImageBatchCreateResponse]:
+) -> common_schema.SuccessResponse[sku_schema.SkuImageBatchCreateResponse]:
     """기존 SKU에 제품 이미지를 한 번에 추가합니다.
 
     관리자 일괄 등록 화면은 여러 파일을 업로드하되 하나의 큐 항목은
@@ -199,14 +113,16 @@ async def add_images_to_existing_sku(
         image_type=image_type,
     )
     return common_schema.success_response(
-        SkuImageBatchCreateResponse(
+        sku_schema.SkuImageBatchCreateResponse(
             sku_id=sku.sku_id,
             sku_code=sku.sku_code,
             images=[
-                SkuImageUploadItem(
+                sku_schema.SkuImageUploadItem(
                     sku_image_id=image.sku_image_id,
                     image_url=image.image_url,
-                    image_type=typing.cast(SkuImageType, image.image_type),
+                    image_type=typing.cast(
+                        sku_schema.SkuImageType, image.image_type
+                    ),
                 )
                 for image in created_images
             ],
@@ -214,10 +130,10 @@ async def add_images_to_existing_sku(
     )
 
 
-@router.post("/extract", response_model=MetadataExtractResponse)
+@router.post("/extract", response_model=sku_schema.MetadataExtractResponse)
 async def extract_metadata(
     image: fastapi.UploadFile = fastapi.File(...),
-) -> MetadataExtractResponse:
+) -> sku_schema.MetadataExtractResponse:
     """업로드 이미지를 분석해 SKU 메타데이터를 추출합니다.
 
     DB에 아무것도 저장하지 않는 상태 없는(stateless) 호출입니다.
@@ -226,7 +142,8 @@ async def extract_metadata(
         image: 분석 대상 이미지입니다.
 
     Returns:
-        추출된 category, sub_category, space, attributes입니다.
+        추출된 category, sub_category, attributes입니다. space는 AI가
+        채우지 않으며 항상 None으로 반환됩니다.
 
     Raises:
         fastapi.HTTPException: 이미지가 유효하지 않거나(422) AI 설정이
@@ -237,9 +154,7 @@ async def extract_metadata(
 
     settings = config.get_settings()
     try:
-        result = sku_service.extract_metadata(
-            settings, content, image.content_type or "image/jpeg"
-        )
+        result = sku_service.extract_metadata(settings, content)
     except sku_service.SkuConfigurationError as error:
         raise fastapi.HTTPException(
             status_code=fastapi.status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -251,103 +166,104 @@ async def extract_metadata(
             detail="메타데이터 추출에 실패했습니다.",
         ) from error
 
-    return MetadataExtractResponse(**result)
+    return sku_schema.MetadataExtractResponse(**result)
 
 
-@router.get("/catalog/check-name", response_model=NameCheckResponse)
-async def check_product_name(
-    product_name: str,
-    session: sqlalchemy_async.AsyncSession = fastapi.Depends(
-        database.get_database_session
-    ),
-) -> NameCheckResponse:
-    """상품명과 정확히 일치하는 기존 SKU가 있는지 확인합니다.
+@router.get(
+    "/catalog/filters",
+    response_model=common_schema.SuccessResponse[
+        sku_schema.SkuCatalogFilterOptions
+    ],
+)
+async def get_sku_catalog_filters() -> (
+    common_schema.SuccessResponse[sku_schema.SkuCatalogFilterOptions]
+):
+    """카탈로그 목록 화면의 필터 드롭다운 선택지를 반환합니다.
 
-    결과는 안내용이며 저장을 막지 않습니다.
-
-    Args:
-        product_name: 확인할 상품명입니다.
-        session: 비동기 DB 세션입니다.
+    DB 상태와 무관하게 catalog_spec 정의를 그대로 돌려주므로 세션이
+    필요 없다.
 
     Returns:
-        일치 여부와 일치한 SKU 목록입니다.
+        대분류, 대분류별 소분류, 색상, 스타일, 패턴 선택지입니다.
     """
-    matches = await sku_service.find_skus_by_product_name(session, product_name)
-    return NameCheckResponse(
-        exists=bool(matches),
-        matched=[
-            SkuSummary(
-                sku_id=match.sku_id,
-                sku_code=match.sku_code,
-                product_name=match.product_name,
-            )
-            for match in matches
-        ],
+    options = sku_service.get_catalog_filter_options()
+    return common_schema.success_response(
+        sku_schema.SkuCatalogFilterOptions(
+            categories=options["categories"],
+            sub_categories_by_category=options["sub_categories_by_category"],
+            colors=options["colors"],
+            styles=options["styles"],
+            pattern=options["pattern"],
+        )
     )
 
 
-@router.get("/catalog/check-code", response_model=CodeCheckResponse)
-async def check_sku_code(
-    sku_code: str,
-    session: sqlalchemy_async.AsyncSession = fastapi.Depends(
-        database.get_database_session
-    ),
-) -> CodeCheckResponse:
-    """SKU 코드와 정확히 일치하는 기존 SKU가 있는지 확인합니다.
-
-    Args:
-        sku_code: 확인할 SKU 코드입니다.
-        session: 비동기 DB 세션입니다.
-
-    Returns:
-        SKU 코드와 존재 여부입니다.
-    """
-    existing = await sku_service.find_sku_by_code(session, sku_code)
-    return CodeCheckResponse(sku_code=sku_code, exists=existing is not None)
-
-
-@router.get("/catalog", response_model=SkuCatalogListResponse)
+@router.get(
+    "/catalog",
+    response_model=common_schema.SuccessResponse[
+        sku_schema.SkuCatalogListResponse
+    ],
+)
 async def list_sku_catalog(
-    limit: int = 50,
+    filters: sku_schema.SkuCatalogFilters = fastapi.Depends(),
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
-) -> SkuCatalogListResponse:
+) -> common_schema.SuccessResponse[sku_schema.SkuCatalogListResponse]:
     """등록된 전체 SKU 목록을 최신순으로 조회합니다.
 
-    신규 SKU 등록이 실제로 저장됐는지 확인하는 용도입니다.
+    신규 SKU 등록이 실제로 저장됐는지 확인하는 용도이자, 관리자
+    카탈로그 화면의 목록·필터 조회에도 쓰인다.
 
     Args:
-        limit: 최대 반환 건수입니다 (기본 50).
+        filters: 대분류/소분류/색상/스타일 쿼리 파라미터입니다.
+            sub_category는 category 없이는 지정할 수 없습니다(먼저
+            대분류를 선택해야 합니다).
         session: 비동기 DB 세션입니다.
 
     Returns:
         대표 이미지 경로를 포함한 SKU 목록입니다.
+
+    Raises:
+        fastapi.HTTPException: 필터 값이나 조합이 유효하지 않은
+            경우입니다(422).
     """
-    rows = await sku_service.list_skus(session, limit=limit)
-    return SkuCatalogListResponse(
-        items=[
-            SkuCatalogItem(
-                sku_id=sku.sku_id,
-                sku_code=sku.sku_code,
-                product_name=sku.product_name,
-                brand=sku.brand,
-                price=sku.price,
-                space=sku.space,
-                category=sku.category,
-                sub_category=sku.sub_category,
-                attributes=sku.attributes,
-                main_image_url=image_url,
-                created_at=sku.created_at,
-            )
-            for sku, image_url in rows
-        ]
+    try:
+        rows = await sku_service.list_skus(session, filters=filters)
+    except sku_service.SkuFilterValidationError as error:
+        raise fastapi.HTTPException(
+            status_code=fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(error),
+        ) from error
+
+    storage = SkuImageStorage(config.get_settings().sku_image_root)
+    return common_schema.success_response(
+        sku_schema.SkuCatalogListResponse(
+            items=[
+                sku_schema.SkuCatalogItem(
+                    sku_id=sku.sku_id,
+                    sku_code=sku.sku_code,
+                    product_name=sku.product_name,
+                    brand=sku.brand,
+                    price=sku.price,
+                    space=sku.space,
+                    category=sku.category,
+                    sub_category=sku.sub_category,
+                    attributes=sku.attributes,
+                    main_image_url=(
+                        storage.public_url(image_url) if image_url else None
+                    ),
+                    created_at=sku.created_at,
+                )
+                for sku, image_url in rows
+            ]
+        )
     )
 
 
 @router.post(
     "",
-    response_model=SkuCreateResponse,
+    response_model=sku_schema.SkuCreateResponse,
     status_code=fastapi.status.HTTP_201_CREATED,
 )
 async def create_sku(
@@ -364,7 +280,7 @@ async def create_sku(
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
-) -> SkuCreateResponse:
+) -> sku_schema.SkuCreateResponse:
     """신규 SKU와 대표 이미지를 저장합니다.
 
     SKU 코드가 이미 존재하면 저장을 차단합니다.
@@ -429,7 +345,7 @@ async def create_sku(
             detail="이미 등록된 SKU 코드입니다.",
         ) from error
 
-    return SkuCreateResponse(
+    return sku_schema.SkuCreateResponse(
         sku_id=sku.sku_id,
         sku_code=sku.sku_code,
         product_name=sku.product_name,
