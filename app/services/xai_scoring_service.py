@@ -10,7 +10,12 @@ from google.genai import errors, types
 from pydantic import BaseModel, Field
 
 from app.core import config, genai_client
-from app.schemas.tagging import DetectedObject, XaiResult
+from app.schemas.tagging import (
+    DetectedObject,
+    VlmMood,
+    XaiCriterion,
+    XaiResult,
+)
 from app.services.gemini_service import (
     GeminiApiError,
     GeminiConfigurationError,
@@ -41,13 +46,21 @@ class ScoringCrop(BaseModel):
     candidates: list[ScoringCandidate] = Field(default_factory=list)
 
 
+class GeminiXaiResult(BaseModel):
+    """Gemini response-only XAI result without dynamic dictionaries."""
+
+    summary: str
+    criteria: list[XaiCriterion] = Field(default_factory=list)
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
+
+
 class SkuEvaluation(BaseModel):
     """Gemini가 반환한 SKU 후보 1건의 루브릭 평가입니다."""
 
     sku_id: str
     status: typing.Literal["Matched", "Rejected"]
     total_score: int = Field(ge=0, le=100)
-    xai_result: XaiResult
+    xai_result: GeminiXaiResult
 
 
 class ObjectAttribute(BaseModel):
@@ -55,6 +68,15 @@ class ObjectAttribute(BaseModel):
 
     key: str
     value: str
+
+
+class ResolvedSkuEvaluation(BaseModel):
+    """Gemini 응답을 애플리케이션 XAI 계약으로 변환한 SKU 평가입니다."""
+
+    sku_id: str
+    status: typing.Literal["Matched", "Rejected"]
+    total_score: int = Field(ge=0, le=100)
+    xai_result: XaiResult
 
 
 class CropScore(BaseModel):
@@ -65,6 +87,16 @@ class CropScore(BaseModel):
     confidence: int = Field(default=0, ge=0, le=100)
     object_attrs: list[ObjectAttribute] = Field(default_factory=list)
     evaluations: list[SkuEvaluation] = Field(default_factory=list)
+
+
+class XaiObjectResult(BaseModel):
+    """객체 단위 XAI 결과입니다."""
+
+    object_idx: int
+    xai_category: str = ""
+    xai_confidence: int = Field(default=0, ge=0, le=100)
+    xai_attrs: dict[str, str] = Field(default_factory=dict)
+    evaluations: list[ResolvedSkuEvaluation] = Field(default_factory=list)
 
 
 class RubricScoreResult(BaseModel):
@@ -94,12 +126,12 @@ class XaiScoringService:
             self._client = genai_client.create_client(self.settings)
         return self._client
 
-    async def enrich_detected_objects(
+    async def score_detected_objects(
         self,
         crops: list[CroppedObject],
         detected_objects: list[DetectedObject],
-    ) -> list[DetectedObject]:
-        """탐지 객체에 라벨·속성·XAI 판정을 채워 넣습니다.
+    ) -> dict[int, XaiObjectResult]:
+        """탐지 객체별 XAI 결과를 계산해 반환합니다.
 
         채점에 실패해도 임베딩 유사도 기반 응답이 유지되도록, 예외를
         기록만 하고 입력 객체를 그대로 돌려줍니다.
@@ -109,7 +141,7 @@ class XaiScoringService:
             detected_objects: SKU 후보까지 채워진 탐지 객체 목록입니다.
 
         Returns:
-            XAI 결과가 반영된 탐지 객체 목록입니다.
+            object_idx를 키로 하는 객체별 XAI 결과입니다.
         """
         crop_bytes = {crop.crop_index: crop.image_bytes for crop in crops}
         scoring_crops = await self._build_scoring_crops(
@@ -120,7 +152,7 @@ class XaiScoringService:
                 "XAI 채점 입력을 만들지 못했습니다. object_idxs=%s",
                 [item.object_idx for item in detected_objects],
             )
-            return detected_objects
+            return {}
 
         try:
             score_result = await asyncio.to_thread(
@@ -130,11 +162,11 @@ class XaiScoringService:
             _LOGGER.warning(
                 "Gemini 요청 한도 초과, 임베딩 유사도로 대체합니다."
             )
-            return detected_objects
+            return {}
         # 채점 실패로 추천 전체가 실패하지 않도록 폴백합니다.
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("루브릭 채점 실패, 임베딩 유사도로 대체합니다.")
-            return detected_objects
+            return {}
 
         # 응답 순서가 요청 순서와 다를 수 있으므로 crop_index로 색인합니다.
         scores = {crop.crop_index: crop for crop in score_result.crops}
@@ -150,12 +182,11 @@ class XaiScoringService:
                 sorted(returned_indexes),
             )
 
-        for detected in detected_objects:
-            crop_score = scores.get(detected.object_idx)
-            if crop_score is not None:
-                self._apply_crop_score(detected, crop_score)
-
-        return detected_objects
+        return {
+            crop_index: self._to_xai_object_result(crop_score)
+            for crop_index, crop_score in scores.items()
+            if crop_index in requested_indexes
+        }
 
     async def _build_scoring_crops(
         self,
@@ -211,37 +242,32 @@ class XaiScoringService:
         return scoring_crops
 
     @staticmethod
-    def _apply_crop_score(
-        detected: DetectedObject,
+    def _to_xai_object_result(
         crop_score: CropScore,
-    ) -> None:
-        """채점 결과를 탐지 객체 1건에 반영하고 후보를 재정렬합니다.
-
-        Args:
-            detected: 채점 결과를 반영할 탐지 객체입니다.
-            crop_score: 해당 크롭의 루브릭 채점 결과입니다.
-        """
-        detected.label = crop_score.label
-        detected.confidence = crop_score.confidence
-        detected.attrs = {
+    ) -> XaiObjectResult:
+        xai_attrs = {
             attribute.key: attribute.value
             for attribute in crop_score.object_attrs
         }
-
-        evaluations = {
-            evaluation.sku_id: evaluation
-            for evaluation in crop_score.evaluations
-        }
-        for candidate in detected.sku_candidates:
-            evaluation = evaluations.get(candidate.sku_code)
-            if evaluation is None:
-                continue
-            candidate.similarity_score = evaluation.total_score
-            candidate.xai_result = evaluation.xai_result
-
-        # 점수가 높은 후보를 앞에 둡니다.
-        detected.sku_candidates.sort(
-            key=lambda candidate: candidate.similarity_score, reverse=True
+        return XaiObjectResult(
+            object_idx=crop_score.crop_index,
+            xai_category=crop_score.label,
+            xai_confidence=crop_score.confidence,
+            xai_attrs=xai_attrs,
+            evaluations=[
+                ResolvedSkuEvaluation(
+                    sku_id=evaluation.sku_id,
+                    status=evaluation.status,
+                    total_score=evaluation.total_score,
+                    xai_result=XaiResult(
+                        summary=evaluation.xai_result.summary,
+                        criteria=evaluation.xai_result.criteria,
+                        vlm_mood=evaluation.xai_result.vlm_mood,
+                        xai_attrs=xai_attrs,
+                    ),
+                )
+                for evaluation in crop_score.evaluations
+            ],
         )
 
     def score_all(self, crops: list[ScoringCrop]) -> RubricScoreResult:

@@ -127,7 +127,11 @@ def crop_scene_objects(
         with Image.open(image_path) as scene_image:
             scene_image.load()
             return [
-                _build_cropped_object(scene_image, index, item)
+                _build_cropped_object(
+                    scene_image,
+                    int(item.get("object_idx", index)),
+                    item,
+                )
                 for index, item in enumerate(object_metadata)
             ]
     except (OSError, UnidentifiedImageError) as error:

@@ -2,6 +2,7 @@
 
 import json
 import types
+import unicodedata
 import unittest.mock
 
 import PIL.Image
@@ -68,6 +69,26 @@ def test_build_allowed_schema_rejects_unknown_category() -> None:
         raise AssertionError("알 수 없는 카테고리를 허용했습니다.")
 
 
+def test_build_response_schema_uses_explicit_attribute_properties() -> None:
+    schema = furniture_attribute_rules.build_attribute_response_schema("?섏옄")
+
+    assert schema["type"] == "OBJECT"
+    assert set(schema["required"]) == {"category", "attributes"}
+
+    properties = schema["properties"]
+    assert "category" in properties
+    assert properties["category"]["enum"] == ["의자"]
+    assert "sub_category" in properties
+    assert "attributes" in properties
+
+    attributes_schema = properties["attributes"]
+    assert attributes_schema["type"] == "OBJECT"
+    assert "additionalProperties" not in attributes_schema
+    assert "color" in attributes_schema["properties"]
+    assert "style" in attributes_schema["properties"]
+    assert "has_armrest" in attributes_schema["properties"]
+
+
 def test_normalize_attributes_keeps_only_allowed_keys_and_values() -> None:
     """허용된 시각 속성만 최종 결과에 남깁니다."""
     normalized = furniture_attribute_rules.normalize_attributes(
@@ -118,6 +139,26 @@ def test_validate_result_rejects_changed_category() -> None:
         raise AssertionError("변경된 카테고리를 허용했습니다.")
 
 
+def test_validate_result_normalizes_unicode_category_and_values() -> None:
+    """Gemini가 NFD 한글을 반환해도 카탈로그 표기로 정규화합니다."""
+    result = FurnitureAttributeResult(
+        category=unicodedata.normalize("NFD", "의자"),
+        sub_category=unicodedata.normalize("NFD", "인테리어의자"),
+        attributes={
+            "color": unicodedata.normalize("NFD", "블랙"),
+            "has_backrest": unicodedata.normalize("NFD", "있음"),
+        },
+    )
+
+    validated = furniture_attribute_rules.validate_attribute_result(
+        "의자", result
+    )
+
+    assert validated.category == "의자"
+    assert validated.sub_category == "인테리어의자"
+    assert validated.attributes == {"color": "블랙", "has_backrest": "있음"}
+
+
 def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
     """Gemini 결과를 규격에 맞게 정규화하여 반환합니다."""
     client = unittest.mock.Mock()
@@ -155,6 +196,12 @@ def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
     call = client.models.generate_content.call_args
     assert call.kwargs["model"] == "gemini-test"
     assert call.kwargs["contents"][0] is image
+    response_schema = call.kwargs["config"].response_schema
+    assert response_schema["type"] == "OBJECT"
+    assert (
+        "additionalProperties"
+        not in response_schema["properties"]["attributes"]
+    )
     context = json.loads(call.kwargs["contents"][2])
     assert context["category"] == "의자"
     assert context["attributes"]["category_specific"]["material"]

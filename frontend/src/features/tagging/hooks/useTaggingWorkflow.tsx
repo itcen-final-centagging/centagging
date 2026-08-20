@@ -12,7 +12,6 @@ import { useSkuSelections } from './useSkuSelections';
 import { useTaggingObjectEditor } from './useTaggingObjectEditor';
 import {
   analyzeImage,
-  fetchObjectRecommendations,
   saveTaggingReview,
   searchCatalogItems,
   updateSceneObjects,
@@ -33,6 +32,7 @@ import type {
 type TaggingWorkflowContextValue = {
   analysisMode?: 'live' | 'mock' | null;
   analysisScenario: AnalysisScenario;
+  addCatalogSkuToCandidates: (sku: SkuCandidate) => void;
   addObject: () => void;
   beginAnalysis: () => Promise<void>;
   catalogResults: SkuCandidate[];
@@ -246,18 +246,30 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
         setStage('recommend');
         return;
       }
-      // 삭제·추가 이후 서버의 object_metadata 배열 순서와 인덱스를 맞춥니다.
-      const finalObjects = detectedObjects.map((object, objectIdx) => ({
-        ...object,
-        objectIdx,
-      }));
-      await updateSceneObjects(analysisId, finalObjects);
-      const candidatesByObjectIdx =
-        await fetchObjectRecommendations(analysisId);
-      const objectsWithCandidates = finalObjects.map((object) => ({
-        ...object,
-        candidates: candidatesByObjectIdx.get(object.objectIdx) ?? [],
-      }));
+      // 편집된 객체를 임시 요청으로 전달하고 POST 응답의 추천 결과를 반영합니다.
+      const finalObjects = detectedObjects.map((object) => ({ ...object }));
+      const recommendationsByObjectIdx = await updateSceneObjects(
+        analysisId,
+        finalObjects,
+      );
+
+      const objectsWithCandidates = finalObjects.map((object) => {
+        const recommendation = recommendationsByObjectIdx.get(object.objectIdx);
+
+        return {
+          ...object,
+          category: recommendation?.category ?? object.category,
+          metadata: {
+            ...object.metadata,
+            category: recommendation?.category ?? object.metadata.category,
+            subCategory:
+              recommendation?.sub_category ?? object.metadata.subCategory,
+            attributes: recommendation?.attrs ?? object.metadata.attributes,
+          },
+          candidates: recommendation?.sku_candidates ?? [],
+          xaiAttrs: recommendation?.xai_attrs ?? object.xaiAttrs ?? {},
+        };
+      });
       if (
         objectsWithCandidates.every((object) => object.candidates.length === 0)
       ) {
@@ -322,44 +334,73 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [],
   );
 
-  const saveTagging = useCallback(async (
-    valuesByObject?: Record<string, TaggingValues>,
-  ): Promise<void> => {
-    if (!analysisId || confirmedSelections.length === 0) return;
-    const recommendationObjects = detectedObjects.filter(
-      (object) => object.candidates.length > 0,
-    );
-    if (confirmedSelections.length < recommendationObjects.length) {
-      setWorkflowError('모든 탐지 객체의 SKU를 확정한 뒤 검수해 주세요.');
+  const addCatalogSkuToCandidates = useCallback(
+    (sku: SkuCandidate): void => {
+      if (!selectedObject) return;
+      const targetObjectId = selectedObject.id;
+
+      const appendSku = (object: FurnitureObject): FurnitureObject => ({
+        ...object,
+        candidates: [
+          ...object.candidates.filter((candidate) => candidate.sku !== sku.sku),
+          sku,
+        ],
+      });
+
+      setDetectedObjects((objects) =>
+        objects.map((object) =>
+          object.id === targetObjectId ? appendSku(object) : object,
+        ),
+      );
+      setSelectedObject((object) =>
+        object && object.id === targetObjectId ? appendSku(object) : object,
+      );
+      selectSku(sku);
       setStage('recommend');
-      return;
-    }
-    setStage('saving');
-    setWorkflowError(undefined);
-    try {
-      if (analysisMode === 'mock') {
-        setStage('saved');
+    },
+    [selectSku, selectedObject, setDetectedObjects, setSelectedObject],
+  );
+
+  const saveTagging = useCallback(
+    async (valuesByObject?: Record<string, TaggingValues>): Promise<void> => {
+      if (!analysisId || confirmedSelections.length === 0) return;
+      const recommendationObjects = detectedObjects.filter(
+        (object) => object.candidates.length > 0,
+      );
+      if (confirmedSelections.length < recommendationObjects.length) {
+        setWorkflowError('모든 탐지 객체의 SKU를 확정한 뒤 검수해 주세요.');
+        setStage('recommend');
         return;
       }
-      await saveTaggingReview({
-        matching: confirmedSelections.map(({ object, sku }) => ({
-          object,
-          objectIdx: object.objectIdx,
-          selectedSku: sku,
-          values: valuesByObject?.[object.id],
-        })),
-        sceneImageId: analysisId,
-      });
-      setStage('saved');
-    } catch (error) {
-      setWorkflowError(
-        error instanceof Error
-          ? error.message
-          : '태깅 결과를 저장하지 못했습니다.',
-      );
-      setStage('failed');
-    }
-  }, [analysisId, analysisMode, confirmedSelections, detectedObjects]);
+
+      setStage('saving');
+      setWorkflowError(undefined);
+      try {
+        if (analysisMode === 'mock') {
+          setStage('saved');
+          return;
+        }
+        await saveTaggingReview({
+          matching: confirmedSelections.map(({ object, sku }) => ({
+            object,
+            objectIdx: object.objectIdx,
+            selectedSku: sku,
+            values: valuesByObject?.[object.id],
+          })),
+          sceneImageId: analysisId,
+        });
+        setStage('saved');
+      } catch (error) {
+        setWorkflowError(
+          error instanceof Error
+            ? error.message
+            : '태깅 결과를 저장하지 못했습니다.',
+        );
+        setStage('failed');
+      }
+    },
+    [analysisId, analysisMode, confirmedSelections, detectedObjects],
+  );
 
   const resetWorkflow = useCallback((): void => {
     setStage('upload');
@@ -380,6 +421,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     () => ({
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
       addObject,
       beginAnalysis,
       catalogResults,
@@ -418,6 +460,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [
       analysisMode,
       analysisScenario,
+      addCatalogSkuToCandidates,
       addObject,
       beginAnalysis,
       catalogResults,

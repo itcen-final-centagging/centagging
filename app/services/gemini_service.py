@@ -8,6 +8,7 @@ import json
 import logging
 import time
 import typing
+from collections.abc import Mapping
 
 from google.genai import errors, types
 from PIL import Image
@@ -21,6 +22,7 @@ from app.schemas.gemini_detection import (
 )
 from app.services.furniture_attribute_rules import (
     build_allowed_attribute_schema,
+    build_attribute_response_schema,
     validate_attribute_result,
 )
 from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
@@ -78,6 +80,16 @@ class GeminiVerificationResult(typing.TypedDict):
 
 class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
+
+
+def _contains_hangul(text: str) -> bool:
+    """문자열에 한글 음절이 포함되어 있는지 반환합니다."""
+    return any("\uac00" <= char <= "\ud7a3" for char in text)
+
+
+def _fallback_evidence(category: str) -> str:
+    """탐지 근거가 한글이 아닐 때 사용할 기본 문장을 반환합니다."""
+    return f"이미지에서 {category} 형태가 확인됩니다."
 
 
 class GeminiService:
@@ -191,12 +203,6 @@ class GeminiService:
                 response.text
             )
 
-            def _contains_hangul(text: str) -> bool:
-                return any("\uac00" <= char <= "\ud7a3" for char in text)
-
-            def _fallback_evidence(category: str) -> str:
-                return f"이미지에서 {category} 형태가 확인됩니다."
-
             normalized_detections = []
 
             for detection in result.detections:
@@ -285,12 +291,13 @@ class GeminiService:
                 attribute_context,
             ]
 
+            # FurnitureAttributeResult를 Gemini SDK에 직접 전달 X
             response = client.models.generate_content(
                 model=self._settings.gemini_vlm_model,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=FurnitureAttributeResult,
+                    response_schema=build_attribute_response_schema(category),
                 ),
             )
 
@@ -418,9 +425,20 @@ class GeminiService:
         except GeminiEmbeddingError:
             raise
         except Exception as error:
-            logging.getLogger(__name__).exception(
-                "Gemini 텍스트 임베딩 실패"
-            )
+            logging.getLogger(__name__).exception("Gemini 텍스트 임베딩 실패")
             raise GeminiEmbeddingError(
                 f"Gemini 텍스트 임베딩에 실패했습니다: {error}"
             ) from error
+
+    def embed_with_attrs(
+        self,
+        image: Image.Image,
+        *,
+        category: str | None = None,
+        sub_category: str | None = None,
+        attrs: Mapping[str, str] | None = None,
+    ) -> list[float]:
+        """이미지와 추출 속성을 함께 임베딩합니다."""
+        raise NotImplementedError(
+            "하이브리드 임베딩 구현이 아직 연결되지 않았습니다."
+        )
