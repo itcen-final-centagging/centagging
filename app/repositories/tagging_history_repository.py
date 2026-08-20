@@ -22,7 +22,8 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
            si.origin_name,
            COALESCE(object_data.metadata,
                     si.object_metadata -> tr.object_idx)
-               -> 'bbox_coord' AS bbox
+               -> 'bbox_coord' AS bbox,
+           approval_data.status AS approval_status
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -36,6 +37,13 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
             WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
             LIMIT 1
        ) object_data ON TRUE
+ LEFT JOIN LATERAL (
+           SELECT a.status
+             FROM approval a
+            WHERE a.tagging_result_id = tr.result_id
+            ORDER BY a.requested_at DESC, a.request_id DESC
+            LIMIT 1
+       ) approval_data ON TRUE
      ORDER BY tr.created_at DESC, tr.result_id DESC
     """)
 
@@ -110,6 +118,7 @@ async def list_tagging_history(
                     ),
                     "created_by": row["created_by"],
                     "created_at": row["created_at"],
+                    "approval_status": row["approval_status"],
                     "style_tags": vlm_mood.get("tags", []),
                     "scene_image": {
                         "image_url": row["image_url"],

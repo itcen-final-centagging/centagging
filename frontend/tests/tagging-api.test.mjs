@@ -178,6 +178,7 @@ test('history results are mapped from the backend response', async (t) => {
               similarity_score: 92,
               created_by: 'mvp-user',
               created_at: '2026-08-11T00:00:00Z',
+              approval_status: 'REJECTED',
               style_tags: ['minimal'],
               scene_image: {
                 image_url: '/uploads/scene.png',
@@ -201,6 +202,7 @@ test('history results are mapped from the backend response', async (t) => {
   assert.equal(requestUrl, '/history/results');
   assert.deepEqual(history, [
     {
+      approvalStatus: 'REJECTED',
       id: '91',
       imageName: 'scene.png',
       objectName: 'chair',
@@ -210,9 +212,10 @@ test('history results are mapped from the backend response', async (t) => {
       tags: {
         category: '',
         color: '',
-        material: '',
+        materials: {},
         mood: '',
         styleTags: ['minimal'],
+        subCategory: '',
       },
     },
   ]);
@@ -306,7 +309,7 @@ test('save request uses its backend contract without refreshing history', async 
         values: {
           category: 'chair',
           color: 'white',
-          material: 'mesh',
+          materials: { material: 'mesh' },
           mood: 'A warm living room.',
           styleTags: ['modern'],
         },
@@ -350,9 +353,31 @@ test('save request uses its backend contract without refreshing history', async 
         values: {
           category: 'table',
           color: 'brown',
-          material: 'oak',
+          materials: { frame_material: 'steel', top_material: 'oak' },
           mood: 'A compact dining area.',
           styleTags: ['null', 'natural'],
+        },
+      },
+      {
+        object: {
+          bbox: [10, 20, 30, 40],
+          metadata: { attributes: {}, subCategory: 'bookcase' },
+          objectIdx: 3,
+        },
+        objectIdx: 3,
+        // 카탈로그 검색으로 직접 고른 SKU는 순위·유사도·XAI가 없습니다.
+        selectedSku: {
+          category: 'bookcase',
+          color: null,
+          matchRank: null,
+          material: null,
+          score: null,
+          sku: 'BOOK-0001',
+          skuId: 88,
+          style: null,
+          subCategory: 'bookcase',
+          vlmMood: null,
+          xaiResult: null,
         },
       },
     ],
@@ -366,7 +391,6 @@ test('save request uses its backend contract without refreshing history', async 
         match_rank: 2,
         match_source: 'RECOMMEND',
         object_idx: 1,
-        object_index: 1,
         object_metadata: {
           attrs: {
             color: 'white',
@@ -402,13 +426,13 @@ test('save request uses its backend contract without refreshing history', async 
         match_rank: 1,
         match_source: 'RECOMMEND',
         object_idx: 2,
-        object_index: 2,
         object_metadata: {
           attrs: {
             color: 'brown',
+            frame_material: 'steel',
             leg_type: 'four legs',
-            material: 'oak',
             style: 'natural',
+            top_material: 'oak',
           },
           bbox_coord: { xmax: 500, xmin: 60, ymax: 400, ymin: 50 },
           category: 'table',
@@ -433,6 +457,24 @@ test('save request uses its backend contract without refreshing history', async 
           summary: 'The table shape is a close match.',
           xai_attrs: { material: 'oak' },
         },
+      },
+      {
+        match_rank: null,
+        match_source: 'SEARCH',
+        object_idx: 3,
+        object_metadata: {
+          attrs: { color: '', material: '', style: '' },
+          bbox_coord: { xmax: 40, xmin: 20, ymax: 30, ymin: 10 },
+          category: 'bookcase',
+          object_idx: 3,
+          sub_category: 'bookcase',
+        },
+        similarity_score: null,
+        sku_id: 88,
+        sku_image_id: null,
+        vlm_mood: { summary: '', tags: [] },
+        // SEARCH 결과는 XAI 근거가 없으므로 null로 보내야 합니다(422 방지).
+        xai_result: null,
       },
     ],
   });
