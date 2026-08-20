@@ -11,6 +11,7 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 from app.core import config
 from app.schemas import approval as approval_schema
 from app.services import image_processing_service, sku_service
+from app.services.sku_image_storage import SkuImageStorage
 
 
 class ApprovalNotFoundError(RuntimeError):
@@ -36,7 +37,7 @@ _SELECT_LIST = sqlalchemy.text("""
            a.requested_at,
            a.reviewed_at,
            a.scene_image_id,
-           a.object_idx,
+           a.object_index,
            si.origin_name,
            ru.user_name AS requested_by_name,
            vu.user_name AS reviewed_by_name,
@@ -62,7 +63,7 @@ _SELECT_DETAIL = sqlalchemy.text("""
            a.reviewed_at,
            a.reject_reason,
            a.scene_image_id,
-           a.object_idx,
+           a.object_index,
            ru.user_name AS requested_by_name,
            vu.user_name AS reviewed_by_name,
            si.image_url AS scene_image_url,
@@ -136,6 +137,7 @@ class ApprovalService:
         """Initialize the approval service."""
         self.session = session
         self.settings = settings
+        self.sku_image_storage = SkuImageStorage(settings.sku_image_root)
 
     async def list_approvals(
         self, status: str
@@ -160,7 +162,7 @@ class ApprovalService:
                     reviewed_by_name=row["reviewed_by_name"],
                     scene_image_id=int(row["scene_image_id"]),
                     origin_name=str(row["origin_name"]),
-                    object_idx=int(row["object_idx"]),
+                    object_idx=int(row["object_index"]),
                     category=row["category"],
                     sku_code=str(row["sku_code"]),
                     product_name=str(row["product_name"]),
@@ -192,6 +194,9 @@ class ApprovalService:
         object_metadata = _as_object_metadata(row["object_metadata"])
         bbox = object_metadata.get("bbox_coord", {})
         category = object_metadata.get("category")
+        sku_image_url = row["sku_image_url"]
+        if sku_image_url is not None:
+            sku_image_url = self.sku_image_storage.public_url(sku_image_url)
         return approval_schema.ApprovalDetailResponse(
             request_id=int(row["request_id"]),
             status=typing.cast(approval_schema.ApprovalStatus, row["status"]),
@@ -206,7 +211,7 @@ class ApprovalService:
                 origin_name=str(row["origin_name"]),
             ),
             object=approval_schema.ApprovalObject(
-                object_idx=int(row["object_idx"]),
+                object_idx=int(row["object_index"]),
                 category=category,
                 bbox=approval_schema.BoundingBox(**bbox),
             ),
@@ -214,7 +219,7 @@ class ApprovalService:
                 sku_id=int(row["sku_id"]),
                 sku_code=str(row["sku_code"]),
                 product_name=str(row["product_name"]),
-                image_url=row["sku_image_url"],
+                image_url=sku_image_url,
             ),
             similarity_score=(
                 float(row["similarity_score"])
