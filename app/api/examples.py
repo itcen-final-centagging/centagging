@@ -1,5 +1,7 @@
-from app.schemas import common as common_schema
+"""OpenAPI 응답 예시 상수입니다."""
+
 from app.core import error_codes
+from app.schemas import common as common_schema
 
 # ------------------ Detail --------------------
 INVALID_CREDENTIALS_DETAIL = {
@@ -303,7 +305,11 @@ _XAI_RESULT_EXAMPLE = {
         "좌석 구조와 팔걸이 형태가 거의 일치하며 색상 계열도 동일합니다."
     ),
     "criteria": [
-        {"label": "구조", "score": 27, "comment": "3인용 좌석 분할이 같습니다."},
+        {
+            "label": "구조",
+            "score": 27,
+            "comment": "3인용 좌석 분할이 같습니다.",
+        },
         {"label": "색상", "score": 24, "comment": "베이지 톤이 유사합니다."},
         {
             "label": "디테일",
@@ -325,6 +331,7 @@ _XAI_RESULT_EXAMPLE = {
 SCENE_OBJECT_UPDATE_REQUEST_EXAMPLE = {
     "objects": [
         {
+            "object_idx": 0,
             "category": "소파",
             "bbox_coord": {
                 "xmin": 120.0,
@@ -334,6 +341,7 @@ SCENE_OBJECT_UPDATE_REQUEST_EXAMPLE = {
             },
         },
         {
+            "object_idx": 1,
             "category": "테이블",
             "bbox_coord": {
                 "xmin": 660.0,

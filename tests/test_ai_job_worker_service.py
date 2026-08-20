@@ -59,6 +59,22 @@ def _job(
     )
 
 
+def _recommendation_objects() -> list[dict[str, object]]:
+    """추천 Job이 전달받는 편집 객체 목록을 생성합니다."""
+    return [
+        {
+            "object_idx": 4,
+            "category": "chair",
+            "bbox_coord": {
+                "xmin": 200,
+                "ymin": 100,
+                "xmax": 800,
+                "ymax": 700,
+            },
+        }
+    ]
+
+
 def _scene() -> SceneImage:
     """Worker가 분석할 장면 이미지 엔티티를 생성합니다."""
     return SceneImage(
@@ -103,7 +119,9 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
 
     def setUp(self) -> None:
         """격리된 이미지 저장소와 DB 세션 대역을 준비합니다."""
-        self.storage_directory = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+        self.storage_directory = (
+            tempfile.TemporaryDirectory()
+        )  # pylint: disable=consider-using-with
         image_path = (
             pathlib.Path(self.storage_directory.name)
             / "scene-images"
@@ -219,21 +237,7 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
         self.assertIs(result, self.job)
         self.assertEqual(self.scene.analysis_status, "detected")
         self.assertIsNone(self.scene.analysis_error)
-        self.assertEqual(
-            self.scene.object_metadata,
-            [
-                {
-                    "object_idx": 0,
-                    "category": "chair",
-                    "bbox_coord": {
-                        "xmin": 200,
-                        "ymin": 100,
-                        "xmax": 800,
-                        "ymax": 700,
-                    },
-                }
-            ],
-        )
+        self.assertEqual(self.scene.object_metadata, [])
         self.assertEqual(self.fake_session.flush_count, 1)
         self.assertEqual(self.fake_session.rollback_count, 0)
         self.success_mock.assert_awaited_once()
@@ -298,6 +302,7 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
     async def test_recommends_sku_and_marks_job_succeeded(self) -> None:
         """SKU 추천은 결과를 작업에만 저장하고 장면 상태는 유지합니다."""
         self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
+        self.job.input_payload = {"objects": _recommendation_objects()}
         self.claim_mock.return_value = self.job
         self.success_mock.return_value = self.job
 
@@ -310,10 +315,13 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
             self.session,
             self.settings,
         )
-        self.tagging_service.get_sku_candidates.assert_awaited_once_with(
-            42,
-            object_idxs=None,
-        )
+        self.tagging_service.get_sku_candidates.assert_awaited_once()
+        recommendation_call = self.tagging_service.get_sku_candidates.await_args
+        assert recommendation_call is not None
+        self.assertEqual(recommendation_call.args, (42,))
+        objects = recommendation_call.kwargs["objects"]
+        self.assertEqual(objects[0].object_idx, 4)
+        self.assertEqual(objects[0].category, "chair")
         self.scene_mock.assert_not_awaited()
         self.success_mock.assert_awaited_once_with(
             self.session,
@@ -322,24 +330,44 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
         )
         self.failure_mock.assert_not_awaited()
 
-    async def test_recommends_all_objects_for_empty_selection(self) -> None:
-        """빈 선택 목록은 전체 탐지 객체 추천 요청으로 처리합니다."""
+    async def test_preserves_object_indexes_from_job_payload(self) -> None:
+        """추천 Job payload의 객체 인덱스를 서비스 호출까지 유지합니다."""
         self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
-        self.job.input_payload = {"object_idxs": []}
+        self.job.input_payload = {
+            "objects": [
+                *_recommendation_objects(),
+                {
+                    "object_idx": 9,
+                    "category": "table",
+                    "bbox_coord": {
+                        "xmin": 0,
+                        "ymin": 0,
+                        "xmax": 100,
+                        "ymax": 100,
+                    },
+                },
+            ]
+        }
         self.claim_mock.return_value = self.job
 
         await ai_job_worker_service.process_next_job(
             self.session, self.settings, "worker-1"
         )
 
-        self.tagging_service.get_sku_candidates.assert_awaited_once_with(
-            42,
-            object_idxs=None,
+        recommendation_call = self.tagging_service.get_sku_candidates.await_args
+        assert recommendation_call is not None
+        self.assertEqual(
+            [
+                object.object_idx
+                for object in recommendation_call.kwargs["objects"]
+            ],
+            [4, 9],
         )
 
     async def test_requeues_failed_sku_recommendation(self) -> None:
         """추천 실패는 장면 탐지 상태를 바꾸지 않고 작업만 재시도합니다."""
         self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
+        self.job.input_payload = {"objects": _recommendation_objects()}
         self.claim_mock.return_value = self.job
         self.failure_mock.return_value = self.job
         self.scene.analysis_status = "detected"

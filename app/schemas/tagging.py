@@ -34,6 +34,7 @@ class XaiResult(BaseModel):
     summary: str
     criteria: list[XaiCriterion] = Field(default_factory=list)
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
+    xai_attrs: dict[str, str] = Field(default_factory=dict)
 
 
 class SkuCandidate(BaseModel):
@@ -84,6 +85,7 @@ class BoundingBox(BaseModel):
 class EditedSceneObject(BaseModel):
     """사용자가 편집 완료한 탐지 객체입니다."""
 
+    object_idx: int = Field(ge=0)
     category: str = Field(min_length=1, max_length=100)
     bbox_coord: BoundingBox
 
@@ -105,10 +107,17 @@ class DetectedObject(BaseModel):
     """탐지된 가구 객체의 속성과 SKU 후보 목록입니다."""
 
     object_idx: int
-    label: str = ""
+    category: str = ""
+    sub_category: str | None = None
     bbox_coord: BoundingBox
     confidence: int = Field(default=0, ge=0, le=100)
+
+    # furniture attribute extraction 결과
     attrs: dict[str, str] = Field(default_factory=dict)
+
+    # XAI가 관찰한 객체 속성
+    xai_attrs: dict[str, str] = Field(default_factory=dict)
+
     sku_candidates: list[SkuCandidate]
 
 
@@ -119,13 +128,13 @@ class DetectionResult(BaseModel):
     scene_image: SceneImageInfo
     objects: list[DetectedObject]
 
+
 class ObjectAttributes(BaseModel):
     """탐지 객체 속성입니다."""
-    
+
     color: str
     material: str
     style: str
-
 
 
 class ObjectMetadata(BaseModel):
@@ -135,17 +144,18 @@ class ObjectMetadata(BaseModel):
     category: str
     sub_category: str | None
     bbox_coord: BoundingBox
-    attrs: ObjectAttributes
+    attrs: dict[str, str]
+
 
 class SkuMatching(BaseModel):
     """확정할 객체-SKU 매핑 1건입니다.
 
-     tagging_result 한 건에 해당하는 선택된 SKU입니다.
-     - RECOMMEND: AI 추천 후보에서 사용자가 선택한 SKU
-       → 순위와 유사도가 있어야 합니다.
-     - SEARCH: 전체 검색에서 사용자가 직접 선택한 SKU
-       → 순위와 유사도가 없어야 합니다.
-     DB의 ck_result_source 조건과 같은 규칙을 따릅니다.
+    tagging_result 한 건에 해당하는 선택된 SKU입니다.
+    - RECOMMEND: AI 추천 후보에서 사용자가 선택한 SKU
+      → 순위와 유사도가 있어야 합니다.
+    - SEARCH: 전체 검색에서 사용자가 직접 선택한 SKU
+      → 순위와 유사도가 없어야 합니다.
+    DB의 ck_result_source 조건과 같은 규칙을 따릅니다.
     """
 
     object_idx: int = Field(ge=0)

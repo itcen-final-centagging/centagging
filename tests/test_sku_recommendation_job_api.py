@@ -47,6 +47,24 @@ def _job() -> AiJob:
     )
 
 
+def _recommendation_request() -> dict[str, object]:
+    """추천 Job에 전달할 편집 객체 요청 본문을 생성합니다."""
+    return {
+        "objects": [
+            {
+                "object_idx": 0,
+                "category": "의자",
+                "bbox_coord": {
+                    "xmin": 120,
+                    "ymin": 100,
+                    "xmax": 600,
+                    "ymax": 900,
+                },
+            }
+        ]
+    }
+
+
 class SkuRecommendationJobApiTest(unittest.TestCase):
     """SKU 추천 작업 접수의 HTTP 계약을 검증합니다."""
 
@@ -86,7 +104,10 @@ class SkuRecommendationJobApiTest(unittest.TestCase):
                 new=unittest.mock.AsyncMock(return_value=_job()),
             ) as create_job,
         ):
-            response = self.client.post("/tagging/scenes/17/recommendations")
+            response = self.client.post(
+                "/tagging/scenes/17/recommendations",
+                json=_recommendation_request(),
+            )
 
         self.assertEqual(response.status_code, 202)
         self.assertEqual(
@@ -102,7 +123,7 @@ class SkuRecommendationJobApiTest(unittest.TestCase):
             self.session,
             17,
             AiJobType.RECOMMEND_SKU,
-            input_payload={"object_idxs": None},
+            input_payload={"objects": _recommendation_request()["objects"]},
         )
 
     def test_rejects_recommendation_before_detection_completes(self) -> None:
@@ -119,7 +140,10 @@ class SkuRecommendationJobApiTest(unittest.TestCase):
                 new=unittest.mock.AsyncMock(),
             ) as create_job,
         ):
-            response = self.client.post("/tagging/scenes/17/recommendations")
+            response = self.client.post(
+                "/tagging/scenes/17/recommendations",
+                json=_recommendation_request(),
+            )
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(
@@ -137,7 +161,10 @@ class SkuRecommendationJobApiTest(unittest.TestCase):
                 side_effect=scene_image_repository.SceneImageNotFoundError(17)
             ),
         ):
-            response = self.client.post("/tagging/scenes/17/recommendations")
+            response = self.client.post(
+                "/tagging/scenes/17/recommendations",
+                json=_recommendation_request(),
+            )
 
         self.assertEqual(response.status_code, 404)
 
@@ -159,7 +186,10 @@ class SkuRecommendationJobApiTest(unittest.TestCase):
                 ),
             ),
         ):
-            response = self.client.post("/tagging/scenes/17/recommendations")
+            response = self.client.post(
+                "/tagging/scenes/17/recommendations",
+                json=_recommendation_request(),
+            )
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(

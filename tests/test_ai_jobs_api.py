@@ -90,9 +90,9 @@ class AiJobApiTest(unittest.TestCase):
         """상태 조회 API가 사용할 작업을 설정합니다."""
         session = _FakeSession(job)
 
-        async def override_database_session() -> collections.abc.AsyncIterator[
-            _FakeSession
-        ]:
+        async def override_database_session() -> (
+            collections.abc.AsyncIterator[_FakeSession]
+        ):
             yield session
 
         self.app.dependency_overrides[database.get_database_session] = (

@@ -103,7 +103,7 @@ class AiJobStateConflictError(RuntimeError):
 
 
 def _constraint_name(error: sqlalchemy.exc.IntegrityError) -> str | None:
-    """PostgreSQL 무결성 오류에서 제약조건 이름을 추출합니다."""
+    """무결성 오류에서 제약조건 이름을 추출합니다."""
     diagnostic = getattr(error.orig, "diag", None)
     return getattr(diagnostic, "constraint_name", None)
 
