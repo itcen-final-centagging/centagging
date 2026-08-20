@@ -233,6 +233,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     if (!analysisId || detectedObjects.length === 0 || isEditing) return;
     setIsRecommendationLoading(true);
     setWorkflowError(undefined);
+    setStage('recommending');
     try {
       if (analysisMode === 'mock') {
         const firstCandidateObject = detectedObjects.find(

@@ -4,6 +4,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  LoaderCircle,
   Pencil,
   Plus,
   Trash2,
@@ -11,20 +12,18 @@ import {
 
 import { Button } from '@/commons/components/Button';
 import { ImagePreview } from '@/features/tagging/components/ImagePreview';
+import {
+  CATEGORIES,
+  withCurrentValue,
+} from '@/features/tagging/constants/catalogSpec';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import { cn } from '@/lib/utils';
 
-const CATEGORY_SUGGESTIONS = [
-  '소파',
-  '의자',
-  '테이블·식탁·책상',
-  '서랍·수납장',
-  '침대',
-];
 const RESULTS_PER_PAGE = 5;
 
 export const DetectionPanel = () => {
   const [page, setPage] = useState(1);
+  // 편집 모드가 아닐 때 목록 카드와 이미지 박스를 마우스 오버로 연동합니다.
   const [hoveredObjectId, setHoveredObjectId] = useState<string>();
   const {
     addObject,
@@ -220,14 +219,10 @@ export const DetectionPanel = () => {
                       onFocus={() => focusObjectForEditing(object)}
                       value={object.category ?? object.name}
                     >
-                      {!CATEGORY_SUGGESTIONS.includes(
+                      {withCurrentValue(
+                        CATEGORIES,
                         object.category ?? object.name,
-                      ) ? (
-                        <option value={object.category ?? object.name}>
-                          {object.category ?? object.name}
-                        </option>
-                      ) : null}
-                      {CATEGORY_SUGGESTIONS.map((category) => (
+                      ).map((category) => (
                         <option key={category} value={category}>
                           {category}
                         </option>
@@ -279,11 +274,18 @@ export const DetectionPanel = () => {
         ) : null}
 
         <Button
+          aria-busy={isRecommendationLoading}
           className="mt-5"
           disabled={
             isEditing || detectedObjects.length === 0 || isRecommendationLoading
           }
-          endDecorator={<ArrowRight size={17} />}
+          endDecorator={
+            isRecommendationLoading ? (
+              <LoaderCircle className="animate-spin" size={17} />
+            ) : (
+              <ArrowRight size={17} />
+            )
+          }
           fullWidth
           onClick={() => void loadSelectedObjectRecommendations()}
           size="lg"

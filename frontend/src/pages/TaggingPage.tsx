@@ -66,6 +66,7 @@ const PAGE_COPY = {
 const getCopyKey = (stage: string): keyof typeof PAGE_COPY => {
   if (stage === 'analyzing') return 'upload';
   if (stage === 'redetecting') return 'not-found';
+  if (stage === 'recommending') return 'recommend';
   if (stage === 'saving') return 'review';
   return stage as keyof typeof PAGE_COPY;
 };
@@ -132,6 +133,12 @@ export const TaggingPage: React.FC = () => {
         <LoadingPanel
           description="입력한 설명과 이미지를 함께 분석하고 있습니다."
           label="가구를 다시 찾고 있습니다"
+        />
+      ) : null}
+      {stage === 'recommending' ? (
+        <LoadingPanel
+          description="수정한 객체를 저장하고 각 객체의 SKU 후보를 조회하고 있습니다."
+          label="유사 SKU를 찾고 있습니다"
         />
       ) : null}
       {stage === 'recommend' ? <RecommendationPanel /> : null}

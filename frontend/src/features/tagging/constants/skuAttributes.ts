@@ -1,12 +1,21 @@
 /**
  * SKU 카탈로그 속성(attrs) 표시용 라벨/순서 정의입니다.
+ *
+ * 속성 목록 자체는 백엔드 스펙 사본인 `catalogSpec.ts`에서 파생시켜,
+ * 카테고리별 속성 정의가 두 곳으로 갈라지지 않도록 합니다.
  */
 
-export const COMMON_ATTRIBUTE_KEYS: string[] = ['color', 'style', 'pattern'];
+import {
+  COMMON_ATTRIBUTE,
+  PRODUCT_ATTRIBUTE,
+} from '@/features/tagging/constants/catalogSpec';
+
+export const COMMON_ATTRIBUTE_KEYS: string[] = Object.keys(COMMON_ATTRIBUTE);
 
 export const ATTRIBUTE_LABELS: Record<string, string> = {
   base_type: '베이스 유형',
   bed_type: '침대 유형',
+  brand: '브랜드',
   chair_type: '의자 유형',
   color: '색상',
   door_type: '도어 유형',
@@ -38,6 +47,7 @@ export const ATTRIBUTE_LABELS: Record<string, string> = {
   pattern: '패턴',
   product_type: '제품 유형',
   seating_capacity: '인승수',
+  selling_price: '판매가',
   shape: '형태',
   shelf_count: '단수',
   shelf_type: '선반 유형',
@@ -54,63 +64,11 @@ export const ATTRIBUTE_LABELS: Record<string, string> = {
   wood_tone: '우드톤',
 };
 
-export const CATEGORY_ATTRIBUTE_FIELDS: Record<string, string[]> = {
-  '거실장·TV장': [
-    'tv_stand_type',
-    'length',
-    'material',
-    'level_count',
-    'has_legs',
-  ],
-  거울: ['installation_type', 'shape', 'has_frame'],
-  '서랍·수납장': [
-    'storage_type',
-    'drawer_count',
-    'material',
-    'has_legs',
-    'has_wheels',
-    'has_drawer',
-    'wood_tone',
-  ],
-  선반: ['shelf_type', 'material', 'frame_material', 'shelf_count'],
-  소파: [
-    'sofa_type',
-    'material',
-    'has_legs',
-    'has_armrest',
-    'has_headrest',
-    'has_stool',
-  ],
-  의자: ['chair_type', 'material', 'has_wheels', 'has_backrest', 'has_armrest'],
-  '진열장·책장': ['storage_type', 'material', 'frame_material', 'door_type'],
-  침대: [
-    'bed_type',
-    'size',
-    'has_headboard',
-    'frame_type',
-    'material',
-    'base_type',
-    'product_type',
-    'wood_tone',
-    'head_type',
-  ],
-  '테이블·식탁·책상': [
-    'shape',
-    'top_material',
-    'frame_material',
-    'leg_type',
-    'has_storage',
-    'wood_tone',
-    'seating_capacity',
-  ],
-  매트리스: ['mattress_type', 'size', 'thickness', 'features', 'firmness'],
-  '행거·옷장': [
-    'layout_type',
-    'mobility_type',
-    'door_type',
-    'storage_features',
-    'material',
-    'wardrobe_type',
-  ],
-  '화장대·콘솔': ['vanity_type', 'has_mirror', 'storage_type', 'material'],
-};
+/** 대분류별로 표기할 카테고리 전용 속성 순서입니다. */
+export const CATEGORY_ATTRIBUTE_FIELDS: Record<string, string[]> =
+  Object.fromEntries(
+    Object.entries(PRODUCT_ATTRIBUTE).map(([category, attributes]) => [
+      category,
+      Object.keys(attributes),
+    ]),
+  );

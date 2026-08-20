@@ -4,25 +4,32 @@ import { ArrowLeft, ArrowRight, Check, Save, Sparkles } from 'lucide-react';
 import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ImagePreview } from '@/features/tagging/components/ImagePreview';
+import {
+  CATEGORIES,
+  getAllowedValues,
+  getMaterialValues,
+  getSubCategories,
+  withCurrentValue,
+} from '@/features/tagging/constants/catalogSpec';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import type {
   FurnitureObject,
   SkuCandidate,
   TaggingValues,
 } from '@/features/tagging/types';
+import { buildSkuAttributeRows } from '@/features/tagging/utils/skuAttributes';
 import { cn } from '@/lib/utils';
 
-const CATEGORIES = ['소파', '의자', '테이블·식탁·책상', '서랍·수납장', '침대'];
-const COLORS = ['그레이', '베이지', '화이트', '블랙', '브라운'];
-const MATERIALS = ['패브릭', '가죽', '원목', '메탈', '플라스틱'];
-const STYLE_TAGS = [
-  'null',
-  '모던',
-  '미니멀',
-  '내추럴',
-  '컨템포러리',
-  '라운드',
-  '패브릭',
+/**
+ * VLM이 crop 이미지에서 추출한 스타일 태그 목록입니다.
+ * 검수 화면의 스타일 태그 선택지는 이 값만 사용합니다.
+ */
+const getVlmStyleTags = (sku: SkuCandidate): string[] => [
+  ...new Set(
+    (sku.vlmMood?.tags ?? [])
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0),
+  ),
 ];
 
 interface MetadataRowProps {
@@ -64,10 +71,11 @@ const buildDefaultValues = (
     'material',
     sku.material ?? 'null',
   ),
-  mood: object.metadata.description ?? 'null',
-  styleTags: object.metadata.keyFeatures.length
-    ? object.metadata.keyFeatures.slice(0, 3)
-    : ['null'],
+  // 공간 분위기는 crop 이미지를 VLM이 해석한 결과를 기본값으로 씁니다.
+  mood: sku.vlmMood?.summary ?? object.metadata.description ?? '',
+  // 스타일 태그도 VLM이 crop에서 추출한 태그를 기본 선택으로 둡니다.
+  styleTags: getVlmStyleTags(sku),
+  subCategory: object.metadata.subCategory ?? sku.subCategory ?? 'null',
 });
 
 export const ReviewPanel = () => {
@@ -103,6 +111,28 @@ export const ReviewPanel = () => {
     valuesByObject[currentObject.id] ??
     buildDefaultValues(currentObject, currentSku);
   const isReviewed = reviewedIds[currentObject.id] === true;
+  // 스타일 태그 선택지와 SKU 상세 속성은 현재 확정한 SKU 기준으로 만듭니다.
+  const styleTagOptions = getVlmStyleTags(currentSku);
+  const skuAttributeRows = buildSkuAttributeRows(
+    currentSku,
+    currentObject.category,
+    { includeUnmappedAttrs: true },
+  );
+  // 드롭다운 선택지는 백엔드 카탈로그 스펙(catalogSpec)에서 가져옵니다.
+  // 선택된 카테고리가 바뀌면 소분류·소재 선택지도 함께 바뀝니다.
+  const categoryOptions = withCurrentValue(CATEGORIES, values.category);
+  const subCategoryOptions = withCurrentValue(
+    getSubCategories(values.category),
+    values.subCategory,
+  );
+  const colorOptions = withCurrentValue(
+    getAllowedValues(values.category, 'color'),
+    values.color,
+  );
+  const materialOptions = withCurrentValue(
+    getMaterialValues(values.category),
+    values.material,
+  );
   const reviewedCount = confirmedSelections.filter(
     ({ object }) => reviewedIds[object.id],
   ).length;
@@ -120,6 +150,28 @@ export const ReviewPanel = () => {
       return {
         ...currentValues,
         [currentObject.id]: { ...base, [key]: value },
+      };
+    });
+  };
+
+  /**
+   * 대분류가 바뀌면 이전 카테고리 기준으로 고른 소분류·소재는 더 이상
+   * 허용값이 아니므로 함께 초기화합니다.
+   */
+  const handleChangeCategory = (category: string): void => {
+    setValuesByObject((currentValues) => {
+      const base =
+        currentValues[currentObject.id] ??
+        buildDefaultValues(currentObject, currentSku);
+      if (base.category === category) return currentValues;
+      return {
+        ...currentValues,
+        [currentObject.id]: {
+          ...base,
+          category,
+          material: 'null',
+          subCategory: 'null',
+        },
       };
     });
   };
@@ -279,10 +331,22 @@ export const ReviewPanel = () => {
           {currentSku.name}
         </p>
         <dl className="mt-4">
-          <MetadataRow label="카테고리" value={values.category} />
-          <MetadataRow label="색상" value={currentSku.color ?? 'null'} />
-          <MetadataRow label="소재" value={currentSku.material ?? 'null'} />
-          <MetadataRow label="규격" value={currentSku.size ?? 'null'} />
+          <MetadataRow label="상품명" value={currentSku.name} />
+          {currentSku.subCategory ? (
+            <MetadataRow label="세부 분류" value={currentSku.subCategory} />
+          ) : null}
+          {currentSku.brand ? (
+            <MetadataRow label="브랜드" value={currentSku.brand} />
+          ) : null}
+          {typeof currentSku.price === 'number' ? (
+            <MetadataRow
+              label="가격"
+              value={`${currentSku.price.toLocaleString('ko-KR')}원`}
+            />
+          ) : null}
+          {skuAttributeRows.map(([label, value]) => (
+            <MetadataRow key={label} label={label} value={value} />
+          ))}
         </dl>
       </article>
       <article className="studio-surface p-5">
@@ -292,19 +356,39 @@ export const ReviewPanel = () => {
         <p className="mt-1.5 text-sm text-neutral-500">
           필수 태그를 확인하고 필요한 경우 수정해 주세요.
         </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
           <label className="text-sm font-bold text-neutral-700">
             가구 카테고리
             <select
               className="mt-2 h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm font-normal outline-none focus:border-primary focus:ring-3 focus:ring-primary-50"
-              onChange={(event) =>
-                handleChangeValue('category', event.target.value)
-              }
+              onChange={(event) => handleChangeCategory(event.target.value)}
               value={values.category}
             >
-              <option value="null">null</option>
-              {CATEGORIES.map((category) => (
+              {/* 값이 없을 때만 보이는 안내 문구입니다. 목록에는 노출하지 않습니다. */}
+              <option disabled hidden value="null">
+                선택 필요
+              </option>
+              {categoryOptions.map((category) => (
                 <option key={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-bold text-neutral-700">
+            세부 분류
+            <select
+              className="mt-2 h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm font-normal outline-none focus:border-primary focus:ring-3 focus:ring-primary-50 disabled:bg-neutral-50 disabled:text-neutral-400"
+              disabled={subCategoryOptions.length === 0}
+              onChange={(event) =>
+                handleChangeValue('subCategory', event.target.value)
+              }
+              value={values.subCategory}
+            >
+              {/* 값이 없을 때만 보이는 안내 문구입니다. 목록에는 노출하지 않습니다. */}
+              <option disabled hidden value="null">
+                선택 필요
+              </option>
+              {subCategoryOptions.map((subCategory) => (
+                <option key={subCategory}>{subCategory}</option>
               ))}
             </select>
           </label>
@@ -317,8 +401,11 @@ export const ReviewPanel = () => {
               }
               value={values.color}
             >
-              <option value="null">null</option>
-              {COLORS.map((color) => (
+              {/* 값이 없을 때만 보이는 안내 문구입니다. 목록에는 노출하지 않습니다. */}
+              <option disabled hidden value="null">
+                선택 필요
+              </option>
+              {colorOptions.map((color) => (
                 <option key={color}>{color}</option>
               ))}
             </select>
@@ -332,8 +419,11 @@ export const ReviewPanel = () => {
               }
               value={values.material}
             >
-              <option value="null">null</option>
-              {MATERIALS.map((material) => (
+              {/* 값이 없을 때만 보이는 안내 문구입니다. 목록에는 노출하지 않습니다. */}
+              <option disabled hidden value="null">
+                선택 필요
+              </option>
+              {materialOptions.map((material) => (
                 <option key={material}>{material}</option>
               ))}
             </select>
@@ -343,35 +433,49 @@ export const ReviewPanel = () => {
           <legend className="text-sm font-bold text-neutral-700">
             스타일 태그
           </legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {STYLE_TAGS.map((tag) => {
-              const isSelected = values.styleTags.includes(tag);
-              return (
-                <button
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 text-xs font-bold transition-colors',
-                    isSelected
-                      ? 'border-primary-300 bg-primary-20 text-primary-700'
-                      : 'border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50',
-                  )}
-                  key={tag}
-                  onClick={() => handleToggleTag(tag)}
-                  type="button"
-                >
-                  {isSelected ? (
-                    <Check className="mr-1 inline" size={12} />
-                  ) : null}
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
+          <p className="mt-1 text-xs text-neutral-500">
+            AI가 추출한 태그 중 저장할 항목만 선택해 주세요. 선택한 태그만
+            저장됩니다.
+          </p>
+          {styleTagOptions.length === 0 ? (
+            <p className="mt-2 text-xs text-neutral-400">
+              AI가 추출한 스타일 태그가 없습니다.
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {styleTagOptions.map((tag) => {
+                const isSelected = values.styleTags.includes(tag);
+                return (
+                  <button
+                    aria-pressed={isSelected}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 text-xs font-bold transition-colors',
+                      isSelected
+                        ? 'border-primary-300 bg-primary-20 text-primary-700'
+                        : 'border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50',
+                    )}
+                    key={tag}
+                    onClick={() => handleToggleTag(tag)}
+                    type="button"
+                  >
+                    {isSelected ? (
+                      <Check className="mr-1 inline" size={12} />
+                    ) : null}
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </fieldset>
         <label className="mt-5 block text-sm font-bold text-neutral-700">
           공간 분위기
+          <span className="mt-1 block text-xs font-normal text-neutral-500">
+            AI가 크롭 이미지에서 읽어낸 분위기입니다. 필요하면 수정해 주세요.
+          </span>
           <textarea
             className="mt-2 min-h-21 w-full resize-y rounded-md border border-neutral-200 bg-white p-3 text-sm font-normal outline-none focus:border-primary focus:ring-3 focus:ring-primary-50"
-            maxLength={100}
+            maxLength={300}
             onChange={(event) => handleChangeValue('mood', event.target.value)}
             value={values.mood}
           />
