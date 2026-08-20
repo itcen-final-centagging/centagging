@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 
 import type { FurnitureObject } from '../types';
 
+const DEFAULT_FURNITURE_CATEGORY = '소파';
+
 interface UseTaggingObjectEditorOptions {
   onMinimumObjectError: () => void;
 }
@@ -71,7 +73,7 @@ export const useTaggingObjectEditor = ({
 
   const updateObjectCategory = useCallback(
     (objectId: string, category: string) => {
-      const nextCategory = category.trim() || '기타 가구';
+      const nextCategory = category.trim() || DEFAULT_FURNITURE_CATEGORY;
       setDetectedObjects((objects) =>
         objects.map((object) =>
           object.id === objectId
@@ -120,7 +122,7 @@ export const useTaggingObjectEditor = ({
 
   const addObject = useCallback(() => {
     const id = `new-${crypto.randomUUID()}`;
-    const category = '기타 가구';
+    const category = DEFAULT_FURNITURE_CATEGORY;
     const object: FurnitureObject = {
       bbox: [350, 350, 650, 650],
       candidates: [],

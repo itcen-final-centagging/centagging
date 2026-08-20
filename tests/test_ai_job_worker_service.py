@@ -390,6 +390,35 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
         )
         self.success_mock.assert_not_awaited()
 
+    async def test_requeues_recommendation_after_rollback_expires_job(
+        self,
+    ) -> None:
+        """롤백 뒤에도 사전에 보관한 job_id로 추천 작업 실패를 기록합니다."""
+        self.job = _job(job_type=AiJobType.RECOMMEND_SKU)
+        self.job.input_payload = {"objects": _recommendation_objects()}
+        self.claim_mock.return_value = self.job
+        self.tagging_service.get_sku_candidates.side_effect = RuntimeError(
+            "temporary error"
+        )
+        original_rollback = self.fake_session.rollback
+
+        async def expire_job_after_rollback() -> None:
+            await original_rollback()
+            self.job.__dict__.pop("job_id")
+
+        self.fake_session.rollback = expire_job_after_rollback
+
+        await ai_job_worker_service.process_next_job(
+            self.session, self.settings, "worker-1"
+        )
+
+        self.failure_mock.assert_awaited_once_with(
+            self.session,
+            uuid.UUID("6c1fc192-d2c7-4a13-ae8d-b778736f4cd0"),
+            "RECOMMEND_SKU_FAILED",
+            "SKU 추천에 실패했습니다.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

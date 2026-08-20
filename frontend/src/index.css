@@ -355,6 +355,15 @@ textarea:focus-visible {
   box-shadow: 0 0 0 4px rgb(219 234 254 / 92%);
 }
 
+.detection-box-hovered {
+  z-index: 2;
+  border-width: 3px;
+  border-color: #2563eb;
+  box-shadow:
+    0 0 0 4px rgb(219 234 254 / 92%),
+    0 0 14px rgb(37 99 235 / 45%);
+}
+
 .detection-box-editing {
   border-color: var(--blue-600);
   box-shadow: 0 0 0 3px var(--blue-100);

@@ -25,6 +25,7 @@ from app.services.furniture_attribute_rules import (
     build_attribute_response_schema,
     validate_attribute_result,
 )
+from app.services.genai_retry import call_with_rate_limit_retry
 from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
     FURNITURE_ATTRIBUTE_PROMPT,
 )
@@ -80,6 +81,16 @@ class GeminiVerificationResult(typing.TypedDict):
 
 class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
+
+
+def _contains_hangul(text: str) -> bool:
+    """문자열에 한글 음절이 포함되어 있는지 반환합니다."""
+    return any("\uac00" <= char <= "\ud7a3" for char in text)
+
+
+def _fallback_evidence(category: str) -> str:
+    """탐지 근거가 한글이 아닐 때 사용할 기본 문장을 반환합니다."""
+    return f"이미지에서 {category} 형태가 확인됩니다."
 
 
 class GeminiService:
@@ -176,13 +187,16 @@ class GeminiService:
                 category_context,
             ]
 
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=GeminiModelDetectionResult,
+            response = call_with_rate_limit_retry(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=GeminiModelDetectionResult,
+                    ),
                 ),
+                operation_name="detect_furniture",
             )
             if not response.text:
                 raise GeminiResponseInvalidError(
@@ -191,6 +205,25 @@ class GeminiService:
 
             result = GeminiModelDetectionResult.model_validate_json(
                 response.text
+            )
+
+            normalized_detections = []
+
+            for detection in result.detections:
+                evidence = detection.evidence
+
+                if not _contains_hangul(evidence):
+                    logging.getLogger(__name__).warning(
+                        "Gemini evidence가 한글이 아니어서 fallback을 사용합니다."
+                    )
+                    evidence = _fallback_evidence(detection.category)
+
+                normalized_detections.append(
+                    detection.model_copy(update={"evidence": evidence})
+                )
+
+            result = result.model_copy(
+                update={"detections": normalized_detections}
             )
 
             invalid_categories = [
@@ -218,6 +251,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 탐지 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini authentication failed."
@@ -263,13 +300,18 @@ class GeminiService:
             ]
 
             # FurnitureAttributeResult를 Gemini SDK에 직접 전달 X
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=build_attribute_response_schema(category),
+            response = call_with_rate_limit_retry(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=(
+                            build_attribute_response_schema(category)
+                        ),
+                    ),
                 ),
+                operation_name="extract_furniture_attributes",
             )
 
             if not response.text:
@@ -290,6 +332,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 속성 추출 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini 인증이 실패했습니다."

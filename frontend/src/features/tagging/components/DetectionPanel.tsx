@@ -4,6 +4,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  LoaderCircle,
   Pencil,
   Plus,
   Trash2,
@@ -11,22 +12,19 @@ import {
 
 import { Button } from '@/commons/components/Button';
 import { ImagePreview } from '@/features/tagging/components/ImagePreview';
+import {
+  CATEGORIES,
+  withCurrentValue,
+} from '@/features/tagging/constants/catalogSpec';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import { cn } from '@/lib/utils';
 
-const CATEGORY_SUGGESTIONS = [
-  '소파',
-  '의자',
-  '테이블·식탁·책상',
-  '수납장',
-  '침대',
-  '조명',
-  '기타 가구',
-];
 const RESULTS_PER_PAGE = 5;
 
 export const DetectionPanel = () => {
   const [page, setPage] = useState(1);
+  // 편집 모드가 아닐 때 목록 카드와 이미지 박스를 마우스 오버로 연동합니다.
+  const [hoveredObjectId, setHoveredObjectId] = useState<string>();
   const {
     addObject,
     deleteObject,
@@ -58,6 +56,7 @@ export const DetectionPanel = () => {
   };
 
   const handleObjectToggle = (object: (typeof visibleObjects)[number]) => {
+    if (!isEditing) return;
     toggleObjectSelection(object);
   };
 
@@ -88,7 +87,7 @@ export const DetectionPanel = () => {
             <p className="mt-1 text-xs leading-5 text-neutral-400">
               {isEditing
                 ? '편집할 객체를 고르면 해당 박스만 표시됩니다. 박스를 드래그하거나 오른쪽 아래 원으로 크기를 조정하세요.'
-                : '박스나 목록을 눌러 여러 객체를 선택할 수 있습니다.'}
+                : '박스나 목록에 마우스를 올리면 해당 객체를 강조해 확인할 수 있습니다.'}
             </p>
           </div>
           {isEditing ? (
@@ -113,8 +112,10 @@ export const DetectionPanel = () => {
           image={uploadedImage}
           isEditing={isEditing}
           objects={detectedObjects}
+          hoveredObjectId={hoveredObjectId}
           onObjectBboxChange={updateObjectBboxes}
-          onObjectToggle={toggleObjectSelection}
+          onObjectHover={setHoveredObjectId}
+          onObjectToggle={isEditing ? toggleObjectSelection : undefined}
           selectedObjectIds={selectedObjectIds}
           showBoxes
           showOnlySelectedBoxes={isEditing}
@@ -150,7 +151,9 @@ export const DetectionPanel = () => {
 
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {visibleObjects.map((object) => {
-            const isSelected = selectedObjectIds.includes(object.id);
+            const isSelected =
+              isEditing && selectedObjectIds.includes(object.id);
+            const isHovered = hoveredObjectId === object.id;
             return (
               <article
                 className={cn(
@@ -158,13 +161,17 @@ export const DetectionPanel = () => {
                   isEditing && 'cursor-pointer',
                   isSelected
                     ? 'border-blue-500 bg-blue-50 shadow-[0_0_0_2px_#dbeafe]'
-                    : 'border-border bg-bg-primary hover:border-blue-300 hover:bg-bg-hover',
+                    : isHovered
+                      ? 'border-blue-500 bg-blue-50 shadow-[0_0_0_2px_#dbeafe]'
+                      : 'border-border bg-bg-primary hover:border-blue-300 hover:bg-bg-hover',
                 )}
                 key={object.id}
                 onClick={() => handleObjectCardClick(object)}
+                onMouseEnter={() => setHoveredObjectId(object.id)}
+                onMouseLeave={() => setHoveredObjectId(undefined)}
               >
                 <button
-                  aria-pressed={isSelected}
+                  aria-pressed={isEditing ? isSelected : undefined}
                   className="w-full text-left"
                   onClick={() => handleObjectToggle(object)}
                   type="button"
@@ -174,14 +181,11 @@ export const DetectionPanel = () => {
                       <span className="block text-sm font-extrabold text-neutral-800">
                         {object.name}
                       </span>
-                      <span className="mt-1 block text-xs text-neutral-500">
-                        {object.description ?? '탐지 근거 정보가 없습니다.'}
-                      </span>
                     </span>
                     <span className="shrink-0 rounded-full bg-success-50 px-2 py-1 text-[11px] font-bold text-success-600">
                       {object.confidence === null
                         ? '신뢰도 미제공'
-                        : `${object.confidence}%`}
+                        : `${object.confidence * 100}%`}
                     </span>
                   </span>
                 </button>
@@ -189,17 +193,11 @@ export const DetectionPanel = () => {
                 {!isEditing ? (
                   <details className="mt-3 border-t border-neutral-100 pt-3 text-xs text-text-secondary">
                     <summary className="cursor-pointer font-semibold text-blue-700">
-                      탐지 근거 · 신뢰도 확인
+                      탐지 근거
                     </summary>
                     <p className="mt-2 leading-5">
                       {object.description ??
                         '탐지 API가 근거 설명을 제공하지 않았습니다.'}
-                    </p>
-                    <p className="mt-1 text-text-tertiary">
-                      신뢰도:{' '}
-                      {object.confidence === null
-                        ? '제공되지 않음'
-                        : `${object.confidence}%`}
                     </p>
                   </details>
                 ) : null}
@@ -221,14 +219,10 @@ export const DetectionPanel = () => {
                       onFocus={() => focusObjectForEditing(object)}
                       value={object.category ?? object.name}
                     >
-                      {!CATEGORY_SUGGESTIONS.includes(
+                      {withCurrentValue(
+                        CATEGORIES,
                         object.category ?? object.name,
-                      ) ? (
-                        <option value={object.category ?? object.name}>
-                          {object.category ?? object.name}
-                        </option>
-                      ) : null}
-                      {CATEGORY_SUGGESTIONS.map((category) => (
+                      ).map((category) => (
                         <option key={category} value={category}>
                           {category}
                         </option>
@@ -280,11 +274,18 @@ export const DetectionPanel = () => {
         ) : null}
 
         <Button
+          aria-busy={isRecommendationLoading}
           className="mt-5"
           disabled={
             isEditing || detectedObjects.length === 0 || isRecommendationLoading
           }
-          endDecorator={<ArrowRight size={17} />}
+          endDecorator={
+            isRecommendationLoading ? (
+              <LoaderCircle className="animate-spin" size={17} />
+            ) : (
+              <ArrowRight size={17} />
+            )
+          }
           fullWidth
           onClick={() => void loadSelectedObjectRecommendations()}
           size="lg"
