@@ -137,6 +137,7 @@ class SearchSkusTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(session.executed_statements, [])
 
+
 class GetSkuDetailTest(unittest.IsolatedAsyncioTestCase):
     """get_sku_detail의 조회·매핑을 검증합니다."""
 

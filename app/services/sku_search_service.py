@@ -7,7 +7,7 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.models.sku import SkuCatalog, SkuImage
 from app.schemas import sku_search as sku_search_schema
-from app.services.gemini_service import GeminiService, GeminiConfigurationError
+from app.services.gemini_service import GeminiConfigurationError, GeminiService
 from app.services.sku_image_storage import SkuImageStorage
 
 EMBEDDING_DIMENSIONS = 3072

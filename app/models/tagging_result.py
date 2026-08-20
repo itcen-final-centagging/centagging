@@ -63,16 +63,12 @@ class TaggingResult(Base):  # pylint: disable=too-few-public-methods
     )
     xai_result: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
         orm.mapped_column(
-            mutable.MutableDict.as_mutable(
-                postgresql.JSONB(none_as_null=True)
-            )
+            mutable.MutableDict.as_mutable(postgresql.JSONB(none_as_null=True))
         )
     )
     vlm_mood: orm.Mapped[typing.Optional[dict[str, typing.Any]]] = (
         orm.mapped_column(
-            mutable.MutableDict.as_mutable(
-                postgresql.JSONB(none_as_null=True)
-            )
+            mutable.MutableDict.as_mutable(postgresql.JSONB(none_as_null=True))
         )
     )
     created_by: orm.Mapped[int] = orm.mapped_column(

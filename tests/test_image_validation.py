@@ -192,16 +192,18 @@ class UploadSceneImageApiTest(unittest.TestCase):
 
     def setUp(self) -> None:
         """격리된 저장소와 테스트용 DB 세션을 준비합니다."""
-        self.storage_directory = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+        self.storage_directory = (
+            tempfile.TemporaryDirectory()
+        )  # pylint: disable=consider-using-with
         self.session = _FakeSession()
         self.app = fastapi.FastAPI()
         self.app.add_middleware(request_context.RequestIdMiddleware)
         exception_handlers.register_exception_handlers(self.app)
         self.app.include_router(scene_images.router)
 
-        async def override_database_session() -> collections.abc.AsyncIterator[
-            _FakeSession
-        ]:
+        async def override_database_session() -> (
+            collections.abc.AsyncIterator[_FakeSession]
+        ):
             yield self.session
 
         self.app.dependency_overrides[database.get_database_session] = (
