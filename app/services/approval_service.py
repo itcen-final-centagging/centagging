@@ -41,8 +41,7 @@ _SELECT_LIST = sqlalchemy.text("""
            si.origin_name,
            ru.user_name AS requested_by_name,
            vu.user_name AS reviewed_by_name,
-           si.object_metadata -> tr.object_idx ->> 'category'
-               AS category,
+           object_data.metadata ->> 'category' AS category,
            sc.sku_code,
            sc.product_name,
            tr.similarity_score
@@ -52,6 +51,12 @@ _SELECT_LIST = sqlalchemy.text("""
       JOIN sku_catalog sc ON sc.sku_id = tr.sku_id
       LEFT JOIN app_user ru ON ru.user_id = a.requested_by
       LEFT JOIN app_user vu ON vu.user_id = a.reviewed_by
+      LEFT JOIN LATERAL (
+          SELECT item.metadata
+            FROM jsonb_array_elements(si.object_metadata) AS item(metadata)
+           WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
+           LIMIT 1
+      ) object_data ON TRUE
      WHERE (:status = 'ALL' OR a.status = :status)
      ORDER BY a.requested_at DESC
     """)
@@ -68,7 +73,7 @@ _SELECT_DETAIL = sqlalchemy.text("""
            vu.user_name AS reviewed_by_name,
            si.image_url AS scene_image_url,
            si.origin_name,
-           si.object_metadata -> tr.object_idx AS object_metadata,
+           object_data.metadata AS object_metadata,
            tr.similarity_score,
            tr.xai_result,
            sc.sku_id,
@@ -82,6 +87,12 @@ _SELECT_DETAIL = sqlalchemy.text("""
       LEFT JOIN sku_image simg ON simg.sku_image_id = tr.sku_image_id
       LEFT JOIN app_user ru ON ru.user_id = a.requested_by
       LEFT JOIN app_user vu ON vu.user_id = a.reviewed_by
+      LEFT JOIN LATERAL (
+          SELECT item.metadata
+            FROM jsonb_array_elements(si.object_metadata) AS item(metadata)
+           WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
+           LIMIT 1
+      ) object_data ON TRUE
      WHERE a.request_id = :request_id
     """)
 
@@ -90,15 +101,21 @@ _SELECT_FOR_UPDATE = sqlalchemy.text("""
            a.status,
            a.tagging_result_id,
            si.image_url AS scene_image_url,
-           si.object_metadata -> tr.object_idx AS object_metadata,
+           object_data.metadata AS object_metadata,
            sc.sku_id,
            sc.sku_code
       FROM approval a
       JOIN tagging_result tr ON tr.result_id = a.tagging_result_id
       JOIN scene_image si ON si.scene_image_id = a.scene_image_id
       JOIN sku_catalog sc ON sc.sku_id = tr.sku_id
+      LEFT JOIN LATERAL (
+          SELECT item.metadata
+            FROM jsonb_array_elements(si.object_metadata) AS item(metadata)
+           WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
+           LIMIT 1
+      ) object_data ON TRUE
      WHERE a.request_id = :request_id
-       FOR UPDATE
+       FOR UPDATE OF a, tr, si, sc
     """)
 
 _INSERT_SKU_IMAGE = sqlalchemy.text("""

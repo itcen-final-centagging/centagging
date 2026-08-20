@@ -17,7 +17,6 @@ export type ProductImageSubmission = {
   proposedPrice: number | null;
   proposedProductName: string | null;
   proposedSkuCode: string | null;
-  proposedSpace: string | null;
   proposedSubCategory: string | null;
   rejectReason: string | null;
   requestedAt: string;
@@ -40,7 +39,6 @@ export type ProductImageSubmissionDraft = {
   proposedPrice: number | null;
   proposedProductName: string | null;
   proposedSkuCode: string | null;
-  proposedSpace: string | null;
   proposedSubCategory: string | null;
   targetSkuCode: string | null;
   targetType: ProductImageTargetType;
@@ -57,7 +55,6 @@ type ApiSubmission = {
   proposed_price?: number | null;
   proposed_product_name: string | null;
   proposed_sku_code: string | null;
-  proposed_space?: string | null;
   proposed_sub_category?: string | null;
   reject_reason: string | null;
   requested_at: string;
@@ -100,7 +97,6 @@ const toSubmission = (item: ApiSubmission): ProductImageSubmission => ({
   proposedPrice: item.proposed_price ?? null,
   proposedProductName: item.proposed_product_name,
   proposedSkuCode: item.proposed_sku_code,
-  proposedSpace: item.proposed_space ?? null,
   proposedSubCategory: item.proposed_sub_category ?? null,
   rejectReason: item.reject_reason,
   requestedAt: item.requested_at,
@@ -123,7 +119,6 @@ const toRequestPayload = (draft: ProductImageSubmissionDraft) => ({
   proposed_price: draft.proposedPrice,
   proposed_product_name: draft.proposedProductName || null,
   proposed_sku_code: draft.proposedSkuCode || null,
-  proposed_space: draft.proposedSpace || null,
   proposed_sub_category: draft.proposedSubCategory || null,
   target_sku_code: draft.targetSkuCode || null,
   target_type: draft.targetType,

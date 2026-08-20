@@ -197,7 +197,6 @@ async def create_sku(  # pylint: disable=too-many-arguments
     product_name: str,
     brand: typing.Optional[str],
     price: typing.Optional[int],
-    space: typing.Optional[str],
     category: typing.Optional[str],
     sub_category: typing.Optional[str],
     attributes: dict[str, typing.Any],
@@ -211,7 +210,6 @@ async def create_sku(  # pylint: disable=too-many-arguments
         product_name: 상품명입니다.
         brand: 브랜드입니다 (수동 입력 전용).
         price: 가격입니다 (수동 입력 전용).
-        space: 사용 공간입니다.
         category: 대분류입니다.
         sub_category: 소분류입니다.
         attributes: 색상·소재 등 자유 속성입니다.
@@ -229,7 +227,6 @@ async def create_sku(  # pylint: disable=too-many-arguments
         product_name=product_name,
         brand=brand,
         price=price,
-        space=space,
         category=category,
         sub_category=sub_category,
         attributes=attributes,

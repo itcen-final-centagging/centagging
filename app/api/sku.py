@@ -142,9 +142,8 @@ async def extract_metadata(
         image: 분석 대상 이미지입니다.
 
     Returns:
-        추출된 category, sub_category, attributes입니다. space는 AI가
-        채우지 않으며 항상 None으로 반환됩니다.
-
+        추출된 category, sub_category, attributes입니다. 
+        
     Raises:
         fastapi.HTTPException: 이미지가 유효하지 않거나(422) AI 설정이
             없거나(503) 호출이 실패한 경우(502)입니다.
@@ -246,7 +245,6 @@ async def list_sku_catalog(
                     product_name=sku.product_name,
                     brand=sku.brand,
                     price=sku.price,
-                    space=sku.space,
                     category=sku.category,
                     sub_category=sku.sub_category,
                     attributes=sku.attributes,
@@ -272,7 +270,6 @@ async def create_sku(
     product_name: str = fastapi.Form(...),
     brand: typing.Optional[str] = fastapi.Form(None),
     price: typing.Optional[int] = fastapi.Form(None),
-    space: typing.Optional[str] = fastapi.Form(None),
     category: typing.Optional[str] = fastapi.Form(None),
     sub_category: typing.Optional[str] = fastapi.Form(None),
     attributes: typing.Optional[str] = fastapi.Form(None),
@@ -290,7 +287,6 @@ async def create_sku(
         product_name: 상품명입니다.
         brand: 브랜드입니다 (선택, 수동 입력 전용).
         price: 가격입니다 (선택, 수동 입력 전용).
-        space: 사용 공간입니다 (선택).
         category: 대분류입니다 (선택).
         sub_category: 소분류입니다 (선택).
         attributes: 색상·소재 등을 담은 JSON 문자열입니다 (선택).
@@ -333,7 +329,6 @@ async def create_sku(
             product_name=product_name,
             brand=brand,
             price=price,
-            space=space,
             category=category,
             sub_category=sub_category,
             attributes=parsed_attributes,
