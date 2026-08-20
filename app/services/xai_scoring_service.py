@@ -31,7 +31,7 @@ from app.services.prompt.xai_prompt.xai_prompt import XAI_PROMPT
 
 _LOGGER = logging.getLogger(__name__)
 
-XAI_CONCURRENCY = 1
+XAI_CONCURRENCY = 3
 
 THINKING_BUDGET = 0
 
