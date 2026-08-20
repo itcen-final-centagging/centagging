@@ -89,6 +89,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                     "summary": "차분한 홈오피스 분위기입니다.",
                     "tags": ["미니멀", "홈오피스"],
                 },
+                "approval_status": "REJECTED",
             }
         ]
         detail_row = {
@@ -163,6 +164,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                         "similarity_score": 92,
                         "created_by": "김태깅",
                         "created_at": "2026-08-10T17:56:00+09:00",
+                        "approval_status": "REJECTED",
                         "style_tags": ["미니멀", "홈오피스"],
                         "scene_image": {
                             "image_url": ("/uploads/scene-images/9f2c.jpg"),
@@ -205,12 +207,14 @@ class TaggingHistoryApiTest(unittest.TestCase):
         query = " ".join(self.session.executed_statement.split())
 
         self.assertIn(
-            "si.object_metadata -> tr.object_idx "
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
             "->> 'category' AS object_name",
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_idx "
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
             "-> 'bbox_coord' AS bbox",
             query,
         )
@@ -220,18 +224,33 @@ class TaggingHistoryApiTest(unittest.TestCase):
         )
         self.assertIn("tr.vlm_mood", query)
 
+    def test_queries_latest_approval_status_for_each_result(self) -> None:
+        """결과별 최신 승인 요청의 상태를 함께 조회합니다."""
+        self.client.get("/history/results")
+        query = " ".join(self.session.executed_statement.split())
+
+        self.assertIn("approval_data.status AS approval_status", query)
+        self.assertIn("WHERE a.tagging_result_id = tr.result_id", query)
+        self.assertIn(
+            "ORDER BY a.requested_at DESC, a.request_id DESC LIMIT 1",
+            query,
+        )
+
     def test_queries_detail_object_fields_by_object_idx(self) -> None:
         """상세 조회도 동일 객체의 카테고리와 좌표를 선택합니다."""
         self.client.get("/history/results/9901")
         query = " ".join(self.session.executed_statement.split())
 
         self.assertIn(
-            "si.object_metadata -> tr.object_idx "
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
             "->> 'category' AS object_category",
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_idx " "-> 'bbox_coord' AS bbox",
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
+            "-> 'bbox_coord' AS bbox",
             query,
         )
         self.assertNotIn("'attribute'", query)
