@@ -11,14 +11,18 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
     SELECT tr.result_id,
            sc.sku_code,
            sc.product_name,
-           si.object_metadata -> tr.object_idx ->> 'category' AS object_name,
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               ->> 'category' AS object_name,
            tr.similarity_score,
            tr.vlm_mood,
            au.user_name AS created_by,
            tr.created_at,
            si.image_url,
            si.origin_name,
-           si.object_metadata -> tr.object_idx -> 'bbox_coord' AS bbox
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               -> 'bbox_coord' AS bbox
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -26,6 +30,12 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
         ON au.user_id = tr.created_by
       JOIN sku_catalog sc
         ON sc.sku_id = tr.sku_id
+ LEFT JOIN LATERAL (
+           SELECT item.metadata
+             FROM jsonb_array_elements(si.object_metadata) AS item(metadata)
+            WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
+            LIMIT 1
+       ) object_data ON TRUE
      ORDER BY tr.created_at DESC, tr.result_id DESC
     """)
 
@@ -36,8 +46,12 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            tr.similarity_score,
            si.image_url AS scene_image_url,
            si.origin_name,
-           si.object_metadata -> tr.object_idx -> 'bbox_coord' AS bbox,
-           si.object_metadata -> tr.object_idx ->> 'category' AS object_category,
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               -> 'bbox_coord' AS bbox,
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               ->> 'category' AS object_category,
            sc.sku_code,
            sc.product_name,
            sc.brand,
@@ -55,6 +69,12 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
         ON au.user_id = tr.created_by
       JOIN sku_catalog sc
         ON sc.sku_id = tr.sku_id
+ LEFT JOIN LATERAL (
+           SELECT item.metadata
+             FROM jsonb_array_elements(si.object_metadata) AS item(metadata)
+            WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
+            LIMIT 1
+       ) object_data ON TRUE
  LEFT JOIN sku_image sku_img
         ON sku_img.sku_image_id = tr.sku_image_id
      WHERE tr.result_id = :result_id
