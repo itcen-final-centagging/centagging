@@ -6,7 +6,7 @@ FURNITURE_DETECTION_PROMPT = """
 
     ## Task
     Detect every distinct, independently selectable furniture object visible in the image.
-
+    Evidence must be written in Korean.
     Return only valid JSON matching the specified output format.
 
     ## Object selection rules
@@ -58,7 +58,7 @@ FURNITURE_DETECTION_PROMPT = """
                     "xmax": 631,
                     "ymax": 977
                 },
-                "evidence": "A separately visible chair with a backrest and four legs.",
+                "evidence": "등받이와 좌판, 다리 구조가 확인되어 의자로 판단됩니다.",
                 "confidence": 0.82
             }
         ]

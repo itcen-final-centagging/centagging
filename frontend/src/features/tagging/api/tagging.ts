@@ -419,8 +419,10 @@ export const fetchRecommendations = async (
   objectIdx: number,
   objects: EditedSceneObject[],
 ): Promise<SkuCandidate[]> => {
-  const candidatesByObjectIndex =
-    await fetchObjectRecommendations(sceneImageId, objects);
+  const candidatesByObjectIndex = await fetchObjectRecommendations(
+    sceneImageId,
+    objects,
+  );
   return candidatesByObjectIndex.get(objectIdx) ?? [];
 };
 
@@ -511,9 +513,7 @@ type SaveTaggingReviewInput = {
  * AI 추천인지 직접 검색한 결과인지 구분해서 저장합니다.
  * matchRank가 있으면 RECOMMEND, 없으면 SEARCH입니다.
  */
-const toMatchSource = (
-  selectedSku: SkuCandidate,
-): 'RECOMMEND' | 'SEARCH' =>
+const toMatchSource = (selectedSku: SkuCandidate): 'RECOMMEND' | 'SEARCH' =>
   selectedSku.matchRank !== null ? 'RECOMMEND' : 'SEARCH';
 
 export const saveTaggingReview = async (

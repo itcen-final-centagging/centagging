@@ -1,9 +1,21 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import {ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Search, SearchX} from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  SearchX,
+} from 'lucide-react';
 
 import { Button } from '@/commons/components/Button';
+import {
+  fetchSkuDetail,
+  toCandidateFromDetail,
+  type SkuDetail,
+} from '@/features/tagging/api/tagging';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
-import { fetchSkuDetail, toCandidateFromDetail, type SkuDetail, } from '@/features/tagging/api/tagging';
 import {
   ATTRIBUTE_LABELS,
   CATEGORY_ATTRIBUTE_FIELDS,
@@ -41,18 +53,14 @@ const buildDetailAttributeRows = (
     : [];
 
   return [
-    ...COMMON_ATTRIBUTE_KEYS.map(
-      (key): [string, string] => [
-        ATTRIBUTE_LABELS[key] ?? key,
-        formatAttributeValue(detail.attrs[key]),
-      ],
-    ),
-    ...categoryKeys.map(
-      (key): [string, string] => [
-        ATTRIBUTE_LABELS[key] ?? key,
-        formatAttributeValue(detail.attrs[key]),
-      ],
-    ),
+    ...COMMON_ATTRIBUTE_KEYS.map((key): [string, string] => [
+      ATTRIBUTE_LABELS[key] ?? key,
+      formatAttributeValue(detail.attrs[key]),
+    ]),
+    ...categoryKeys.map((key): [string, string] => [
+      ATTRIBUTE_LABELS[key] ?? key,
+      formatAttributeValue(detail.attrs[key]),
+    ]),
   ];
 };
 
@@ -80,7 +88,9 @@ const CatalogRow = ({ item, onOpenDetail }: CatalogRowProps) => {
           {item.sku}
         </p>
       </div>
-      <p className="truncate text-xs text-neutral-500">{item.brand ?? 'null'}</p>
+      <p className="truncate text-xs text-neutral-500">
+        {item.brand ?? 'null'}
+      </p>
       <p className="text-sm font-extrabold text-neutral-800">
         {formatPrice(item.price)}
       </p>
@@ -110,9 +120,6 @@ const SkuDetailView = ({ item, onBack }: SkuDetailViewProps) => {
 
   useEffect(() => {
     let isCancelled = false;
-    setDetail(undefined);
-    setLoadError(undefined);
-    setIsLoading(true);
     fetchSkuDetail(item.sku)
       .then((result) => {
         if (!isCancelled) setDetail(result);
@@ -408,7 +415,11 @@ export const CatalogPanel = () => {
           </div>
         </>
       ) : (
-        <SkuDetailView item={detailItem} onBack={handleBackToResults} />
+        <SkuDetailView
+          item={detailItem}
+          key={detailItem.sku}
+          onBack={handleBackToResults}
+        />
       )}
     </section>
   );

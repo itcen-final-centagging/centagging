@@ -12,7 +12,7 @@ import type {
 } from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
 
-const CATEGORIES = ['소파', '테이블', '의자', '수납', '조명'];
+const CATEGORIES = ['소파', '의자', '테이블·식탁·책상', '서랍·수납장', '침대'];
 const COLORS = ['그레이', '베이지', '화이트', '블랙', '브라운'];
 const MATERIALS = ['패브릭', '가죽', '원목', '메탈', '플라스틱'];
 const STYLE_TAGS = [
@@ -92,7 +92,9 @@ export const ReviewPanel = () => {
   if (confirmedSelections.length === 0) return null;
 
   const currentIndex = Math.max(
-    confirmedSelections.findIndex(({ object }) => object.id === currentObjectId),
+    confirmedSelections.findIndex(
+      ({ object }) => object.id === currentObjectId,
+    ),
     0,
   );
   const { object: currentObject, sku: currentSku } =
@@ -115,7 +117,10 @@ export const ReviewPanel = () => {
       const base =
         currentValues[currentObject.id] ??
         buildDefaultValues(currentObject, currentSku);
-      return { ...currentValues, [currentObject.id]: { ...base, [key]: value } };
+      return {
+        ...currentValues,
+        [currentObject.id]: { ...base, [key]: value },
+      };
     });
   };
 
