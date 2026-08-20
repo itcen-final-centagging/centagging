@@ -12,7 +12,6 @@ import {
   type ApprovalStatus,
 } from '@/features/approvals/api/approvals';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { cn } from '@/lib/utils';
 
 const statuses: Array<{ label: string; value: ApprovalStatus | 'ALL' }> = [
@@ -257,7 +256,7 @@ export const ApprovalPage = () => {
                       {item.productName}
                     </span>
                     <span className="mt-1 block font-mono text-[11px] text-text-tertiary">
-                      {item.skuCode} · 객체 {item.objectIndex + 1}
+                      {item.skuCode} · 객체 {item.objectIdx + 1}
                     </span>
                   </span>
                   <span
@@ -320,20 +319,46 @@ export const ApprovalPage = () => {
                   <p className="text-xs font-bold text-text-secondary">
                     원본의 선택 객체
                   </p>
-                  <div className="mt-3 flex min-h-52 items-center justify-center overflow-hidden rounded-lg bg-bg-primary">
+                  <div className="mt-3 flex min-h-52 items-center justify-center rounded-lg bg-bg-primary">
                     {detail.sceneImage.imageUrl ? (
-                      <img
-                        alt={detail.sceneImage.originName}
-                        className="max-h-72 w-full object-contain"
-                        src={detail.sceneImage.imageUrl}
-                      />
+                      <div className="relative inline-block">
+                        <img
+                          alt={detail.sceneImage.originName}
+                          className="block max-h-72 max-w-full rounded-lg"
+                          src={detail.sceneImage.imageUrl}
+                        />
+                        <div
+                          className="detection-box pointer-events-none"
+                          style={{
+                            height: `${Math.max(
+                              1,
+                              (detail.object.bbox.ymax -
+                                detail.object.bbox.ymin) /
+                                10,
+                            )}%`,
+                            left: `${detail.object.bbox.xmin / 10}%`,
+                            top: `${detail.object.bbox.ymin / 10}%`,
+                            width: `${Math.max(
+                              1,
+                              (detail.object.bbox.xmax -
+                                detail.object.bbox.xmin) /
+                                10,
+                            )}%`,
+                          }}
+                        >
+                          <span>
+                            {detail.object.category ??
+                              `객체 ${detail.object.objectIdx + 1}`}
+                          </span>
+                        </div>
+                      </div>
                     ) : (
                       <ImageOff className="size-8 text-text-quaternary" />
                     )}
                   </div>
                   <p className="mt-3 text-xs font-semibold text-text-secondary">
                     {detail.object.category ?? '카테고리 미지정'} · 객체{' '}
-                    {detail.object.objectIndex + 1}
+                    {detail.object.objectIdx + 1}
                   </p>
                 </div>
                 <div className="rounded-xl bg-bg-tertiary p-4">
@@ -341,10 +366,15 @@ export const ApprovalPage = () => {
                     연결할 SKU 이미지
                   </p>
                   <div className="mt-3 flex min-h-52 items-center justify-center rounded-lg bg-bg-primary">
-                    <FurnitureArtwork
-                      imageUrl={detail.sku.imageUrl}
-                      kind={null}
-                    />
+                    {detail.sku.imageUrl ? (
+                      <img
+                        alt={detail.sku.productName}
+                        className="max-h-72 w-full object-contain p-2"
+                        src={detail.sku.imageUrl}
+                      />
+                    ) : (
+                      <ImageOff className="size-8 text-text-quaternary" />
+                    )}
                   </div>
                   <p className="mt-3 text-xs font-semibold text-text-secondary">
                     유사도{' '}
