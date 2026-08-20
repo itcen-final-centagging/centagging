@@ -26,8 +26,8 @@ class CroppedObject:
     Attributes:
         crop_index: ``scene_image.object_metadata`` 배열의 인덱스입니다.
         bbox: 응답 스키마에 그대로 넣을 정규화 좌표입니다.
-        image: 임베딩 호출에 사용할 PIL 이미지입니다.
-        image_bytes: XAI 채점에 사용할 JPEG 바이트입니다.
+        image: 속성 추출에 사용할 PIL 이미지입니다.
+        image_bytes: 임베딩과 XAI 채점에 사용할 JPEG 바이트입니다.
     """
 
     crop_index: int
