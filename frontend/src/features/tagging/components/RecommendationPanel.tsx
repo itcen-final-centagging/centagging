@@ -212,8 +212,11 @@ export const RecommendationPanel = () => {
                   추천
                 </span>
               </div>
+              {/* 사이즈(attrs.size)는 카테고리에 따라 없을 수 있어, 값이 있을 때만 잇습니다. */}
               <p className="mt-1 font-mono text-xs text-text-tertiary">
-                {focusedCandidate.sku} · {focusedCandidate.size ?? 'null'}
+                {focusedCandidate.size
+                  ? `${focusedCandidate.sku} · ${focusedCandidate.size}`
+                  : focusedCandidate.sku}
               </p>
             </div>
             <div className="text-left sm:text-right">
