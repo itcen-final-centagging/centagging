@@ -30,6 +30,9 @@ from app.services.prompt.xai_prompt.xai_prompt import XAI_PROMPT
 
 _LOGGER = logging.getLogger(__name__)
 
+XAI_CONCURRENCY = 5
+
+THINKING_BUDGET = 0
 
 class ScoringCandidate(BaseModel):
     """채점 대상 SKU 후보 1건입니다."""
@@ -106,7 +109,7 @@ class RubricScoreResult(BaseModel):
 
 
 class XaiScoringService:
-    """모든 크롭·후보를 한 번의 VLM 요청으로 채점하는 서비스입니다."""
+    """크롭 단위 VLM 요청을 동시에 보내 루브릭으로 채점하는 서비스입니다."""
 
     def __init__(self, settings: config.Settings) -> None:
         """Gemini 설정으로 XAI 채점기를 초기화합니다.
@@ -116,6 +119,7 @@ class XaiScoringService:
         """
         self.settings = settings
         self._client: genai.Client | None = None
+        self._score_semaphore = asyncio.Semaphore(XAI_CONCURRENCY)
 
     def _get_client(self) -> genai.Client:
         if not genai_client.is_configured(self.settings):
@@ -133,8 +137,9 @@ class XaiScoringService:
     ) -> dict[int, XaiObjectResult]:
         """탐지 객체별 XAI 결과를 계산해 반환합니다.
 
-        채점에 실패해도 임베딩 유사도 기반 응답이 유지되도록, 예외를
-        기록만 하고 입력 객체를 그대로 돌려줍니다.
+        크롭마다 별도의 채점 요청을 동시에 보냅니다. 채점에 실패한 크롭은
+        임베딩 유사도 기반 후보를 그대로 유지하며, 한 크롭의 실패가 다른
+        크롭의 결과에 영향을 주지 않습니다.
 
         Args:
             crops: 크롭 이미지 바이트를 담은 크롭 목록입니다.
@@ -154,22 +159,12 @@ class XaiScoringService:
             )
             return {}
 
-        try:
-            score_result = await asyncio.to_thread(
-                self.score_all, scoring_crops
-            )
-        except GeminiRateLimitError:
-            _LOGGER.warning(
-                "Gemini 요청 한도 초과, 임베딩 유사도로 대체합니다."
-            )
-            return {}
-        # 채점 실패로 추천 전체가 실패하지 않도록 폴백합니다.
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.exception("루브릭 채점 실패, 임베딩 유사도로 대체합니다.")
+        crop_scores = await self._score_crops_concurrently(scoring_crops)
+        if not crop_scores:
             return {}
 
         # 응답 순서가 요청 순서와 다를 수 있으므로 crop_index로 색인합니다.
-        scores = {crop.crop_index: crop for crop in score_result.crops}
+        scores = {crop.crop_index: crop for crop in crop_scores}
         requested_indexes = {item.object_idx for item in detected_objects}
         returned_indexes = set(scores)
         missing_indexes = requested_indexes - returned_indexes
@@ -187,6 +182,87 @@ class XaiScoringService:
             for crop_index, crop_score in scores.items()
             if crop_index in requested_indexes
         }
+
+    async def _score_crops_concurrently(
+        self,
+        scoring_crops: list[ScoringCrop],
+    ) -> list[CropScore]:
+        """크롭별 채점 요청을 동시에 보내고 성공한 결과만 모읍니다.
+
+        Args:
+            scoring_crops: 크롭별 이미지와 SKU 후보 이미지 묶음입니다.
+
+        Returns:
+            채점에 성공한 크롭의 결과 목록입니다.
+        """
+        results = await asyncio.gather(
+            *(self._score_one_crop(crop) for crop in scoring_crops)
+        )
+        return [crop_score for result in results for crop_score in result]
+
+    async def _score_one_crop(self, crop: ScoringCrop) -> list[CropScore]:
+        """크롭 1건을 채점합니다. 동시 호출 수를 세마포어로 제한합니다.
+
+        크롭 1건의 실패가 나머지 크롭 결과까지 없애지 않도록, 예외는
+        기록만 하고 빈 목록으로 폴백합니다.
+
+        Args:
+            crop: 채점할 크롭과 그 SKU 후보 묶음입니다.
+
+        Returns:
+            채점 결과이며, 실패하면 빈 목록입니다.
+        """
+        async with self._score_semaphore:
+            try:
+                score_result = await asyncio.to_thread(self.score_all, [crop])
+            except GeminiRateLimitError:
+                _LOGGER.warning(
+                    "Gemini 요청 한도 초과, crop_index=%s는 "
+                    "임베딩 유사도로 대체합니다.",
+                    crop.crop_index,
+                )
+                return []
+            # 채점 실패로 추천 전체가 실패하지 않도록 폴백합니다.
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception(
+                    "루브릭 채점 실패, crop_index=%s는 "
+                    "임베딩 유사도로 대체합니다.",
+                    crop.crop_index,
+                )
+                return []
+
+        return self._align_crop_index(crop, list(score_result.crops))
+
+    @staticmethod
+    def _align_crop_index(
+        crop: ScoringCrop,
+        crop_scores: list[CropScore],
+    ) -> list[CropScore]:
+        """단일 크롭 응답의 crop_index를 요청 값으로 맞춥니다.
+
+        요청에 크롭이 하나뿐이면 결과의 소속이 명확하므로, 모델이 0부터
+        새로 매겨 돌려주더라도 요청한 인덱스로 교정합니다. 교정하지 않으면
+        인덱스 불일치로 정상 채점 결과가 버려집니다.
+
+        Args:
+            crop: 채점을 요청한 크롭입니다.
+            crop_scores: 모델이 돌려준 크롭 결과 목록입니다.
+
+        Returns:
+            crop_index를 요청 값에 맞춘 크롭 결과 목록입니다.
+        """
+        if len(crop_scores) != 1:
+            return crop_scores
+
+        crop_score = crop_scores[0]
+        if crop_score.crop_index != crop.crop_index:
+            _LOGGER.warning(
+                "XAI 응답 crop_index를 교정합니다: returned=%s requested=%s",
+                crop_score.crop_index,
+                crop.crop_index,
+            )
+            crop_score.crop_index = crop.crop_index
+        return crop_scores
 
     async def _build_scoring_crops(
         self,
@@ -271,7 +347,10 @@ class XaiScoringService:
         )
 
     def score_all(self, crops: list[ScoringCrop]) -> RubricScoreResult:
-        """모든 크롭과 SKU 후보를 단 한 번의 요청으로 채점합니다.
+        """전달받은 크롭과 SKU 후보를 한 번의 요청으로 채점합니다.
+
+        평소에는 ``_score_one_crop``이 크롭 1건씩 넘겨 호출하지만, 여러
+        크롭을 한 번에 채점하는 호출도 그대로 지원합니다.
 
         Args:
             crops: 크롭별 이미지와 SKU 후보 이미지 묶음입니다.
@@ -325,6 +404,9 @@ class XaiScoringService:
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=RubricScoreResult,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_budget=THINKING_BUDGET
+                    ),
                 ),
             )
             if not response.text:

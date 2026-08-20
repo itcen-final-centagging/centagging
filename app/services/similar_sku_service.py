@@ -162,7 +162,7 @@ class SimilarSkuService:
         """
         async with self._embed_semaphore:
             return await asyncio.to_thread(
-                self.gemini_service.embed_image, crop.image
+                self.gemini_service.embed_image, crop.image_bytes
             )
 
     def _to_sku_candidate(self, sku: "SimilarSku") -> SkuCandidate:
