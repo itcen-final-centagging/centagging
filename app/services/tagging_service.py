@@ -149,18 +149,31 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         category_by_idx: dict[int, str],
     ) -> dict[int, FurnitureAttributeResult | None]:
         """크롭별 카테고리 규격에 맞춰 속성을 추출합니다."""
+        extraction_targets = []
         attributes_by_idx: dict[int, FurnitureAttributeResult | None] = {}
         for crop in crops:
             category = category_by_idx.get(crop.crop_index, "")
             if not category:
                 attributes_by_idx[crop.crop_index] = None
                 continue
+            extraction_targets.append((crop, category))
 
-            attributes_by_idx[crop.crop_index] = await asyncio.to_thread(
-                self.gemini_service.extract_furniture_attributes,
-                crop.image,
-                category,
+        extraction_results = await asyncio.gather(
+            *(
+                asyncio.to_thread(
+                    self.gemini_service.extract_furniture_attributes,
+                    crop.image,
+                    category,
+                )
+                for crop, category in extraction_targets
             )
+        )
+        attributes_by_idx.update(
+            (crop.crop_index, result)
+            for (crop, _), result in zip(
+                extraction_targets, extraction_results
+            )
+        )
         return attributes_by_idx
 
     @staticmethod
