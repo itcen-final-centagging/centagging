@@ -25,6 +25,7 @@ from app.services.furniture_attribute_rules import (
     build_attribute_response_schema,
     validate_attribute_result,
 )
+from app.services.genai_retry import call_with_rate_limit_retry
 from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
     FURNITURE_ATTRIBUTE_PROMPT,
 )
@@ -186,13 +187,16 @@ class GeminiService:
                 category_context,
             ]
 
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=GeminiModelDetectionResult,
+            response = call_with_rate_limit_retry(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=GeminiModelDetectionResult,
+                    ),
                 ),
+                operation_name="detect_furniture",
             )
             if not response.text:
                 raise GeminiResponseInvalidError(
@@ -247,6 +251,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 탐지 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini authentication failed."
@@ -292,13 +300,18 @@ class GeminiService:
             ]
 
             # FurnitureAttributeResult를 Gemini SDK에 직접 전달 X
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=build_attribute_response_schema(category),
+            response = call_with_rate_limit_retry(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=(
+                            build_attribute_response_schema(category)
+                        ),
+                    ),
                 ),
+                operation_name="extract_furniture_attributes",
             )
 
             if not response.text:
@@ -319,6 +332,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 속성 추출 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini 인증이 실패했습니다."

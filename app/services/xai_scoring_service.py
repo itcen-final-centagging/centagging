@@ -22,6 +22,7 @@ from app.services.gemini_service import (
     GeminiRateLimitError,
     GeminiResponseInvalidError,
 )
+from app.services.genai_retry import call_with_rate_limit_retry
 from app.services.image_processing_service import (
     CroppedObject,
     read_sku_image_bytes,
@@ -30,7 +31,7 @@ from app.services.prompt.xai_prompt.xai_prompt import XAI_PROMPT
 
 _LOGGER = logging.getLogger(__name__)
 
-XAI_CONCURRENCY = 5
+XAI_CONCURRENCY = 1
 
 THINKING_BUDGET = 0
 
@@ -398,16 +399,19 @@ class XaiScoringService:
                 ]
 
         try:
-            response = client.models.generate_content(
-                model=self.settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=RubricScoreResult,
-                    thinking_config=types.ThinkingConfig(
-                        thinking_budget=THINKING_BUDGET
+            response = call_with_rate_limit_retry(
+                lambda: client.models.generate_content(
+                    model=self.settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=RubricScoreResult,
+                        thinking_config=types.ThinkingConfig(
+                            thinking_budget=THINKING_BUDGET
+                        ),
                     ),
                 ),
+                operation_name="score_sku_candidates",
             )
             if not response.text:
                 raise GeminiResponseInvalidError(
