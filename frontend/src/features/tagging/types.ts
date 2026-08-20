@@ -1,3 +1,5 @@
+import type { ApprovalStatus } from '@/features/approvals/api/approvals';
+
 export type AnalysisScenario = 'detected' | 'not-detected';
 
 export type WorkflowStage =
@@ -112,13 +114,19 @@ export interface ConfirmedSkuSelection {
 export interface TaggingValues {
   category: string;
   color: string;
-  material: string;
+  /**
+   * 카테고리별 소재 속성입니다. 키는 카탈로그 스펙의 속성명
+   * (material / top_material / frame_material 등), 값은 선택한 허용값입니다.
+   */
+  materials: Record<string, string>;
   mood: string;
   styleTags: string[];
   subCategory: string;
 }
 
 export interface TaggingHistory {
+  /** approval 테이블의 최신 검수 상태입니다. 승인 요청이 없으면 null입니다. */
+  approvalStatus: ApprovalStatus | null;
   id: string;
   imageName: string;
   objectName: string;

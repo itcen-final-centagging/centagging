@@ -25,6 +25,9 @@ class HistorySceneImage(pydantic.BaseModel):
     bbox: HistoryBoundingBox | None = None
 
 
+ApprovalStatus = typing.Literal["PENDING", "ACTIVE", "REJECTED"]
+
+
 class TaggingHistoryListItem(pydantic.BaseModel):
     """태깅 이력 목록의 결과 한 건입니다."""
 
@@ -35,6 +38,9 @@ class TaggingHistoryListItem(pydantic.BaseModel):
     similarity_score: int | None
     created_by: str
     created_at: datetime.datetime
+    # approval 테이블의 검수 상태입니다. 같은 결과에 승인 요청이 여러 번
+    # 생기면 가장 최근 요청의 상태를 쓰고, 요청이 없으면 None입니다.
+    approval_status: ApprovalStatus | None = None
     style_tags: list[str] = pydantic.Field(default_factory=list)
     scene_image: HistorySceneImage
 
