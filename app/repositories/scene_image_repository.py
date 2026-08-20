@@ -54,30 +54,3 @@ async def add_detected_object_metadata(
     """
     scene_image = await get_scene_image(session, scene_id)
     scene_image.object_metadata = object_metadata
-
-
-async def update_scene_object_metadata(
-    session: AsyncSession,
-    scene_image_id: int,
-    objects: list[dict[str, typing.Any]],
-) -> SceneImage:
-    """편집된 탐지 객체 목록을 장면 이미지에 저장합니다.
-
-    ``object_idx``는 object_metadata 배열의 위치와 항상 일치하도록 서버에서
-    다시 부여합니다. 이후 SKU 추천과 확정 API가 같은 인덱스를 사용합니다.
-    """
-    scene_image = await get_scene_image(session, scene_image_id)
-    scene_image.object_metadata = [
-        {
-            "object_idx": object_idx,
-            "bbox_coord": object["bbox_coord"],
-            "category": object["category"],
-            "sub_category": None,
-            "attrs": {},
-        }
-        for object_idx, object in enumerate(objects)
-    ]
-    scene_image.analysis_status = "detected"
-    scene_image.analysis_error = None
-    await session.commit()
-    return scene_image

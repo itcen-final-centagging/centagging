@@ -112,6 +112,7 @@ test('analysis polls its AI job until detection succeeds', async (t) => {
     },
     name: 'chair',
     objectIdx: 0,
+    xaiAttrs: {},
   });
 });
 
@@ -267,7 +268,15 @@ test('save request uses its backend contract without refreshing history', async 
   await saveTaggingReview({
     matching: [
       {
-        object: { bbox: [100, 200, 800, 900], objectIdx: 1 },
+        object: {
+          bbox: [100, 200, 800, 900],
+          metadata: {
+            attributes: { has_backrest: 'yes' },
+            subCategory: 'office chair',
+          },
+          objectIdx: 1,
+          xaiAttrs: { material: 'mesh' },
+        },
         objectIdx: 1,
         selectedSku: {
           category: 'chair',
@@ -303,7 +312,15 @@ test('save request uses its backend contract without refreshing history', async 
         },
       },
       {
-        object: { bbox: [50, 60, 400, 500], objectIdx: 2 },
+        object: {
+          bbox: [50, 60, 400, 500],
+          metadata: {
+            attributes: { leg_type: 'four legs' },
+            subCategory: 'dining table',
+          },
+          objectIdx: 2,
+          xaiAttrs: { material: 'oak' },
+        },
         objectIdx: 2,
         selectedSku: {
           category: 'table',
@@ -347,9 +364,16 @@ test('save request uses its backend contract without refreshing history', async 
     tagging_results: [
       {
         match_rank: 2,
+        match_source: 'RECOMMEND',
         object_idx: 1,
+        object_index: 1,
         object_metadata: {
-          attrs: { color: 'white', material: 'mesh', style: 'modern' },
+          attrs: {
+            color: 'white',
+            has_backrest: 'yes',
+            material: 'mesh',
+            style: 'modern',
+          },
           bbox_coord: { xmax: 900, xmin: 200, ymax: 800, ymin: 100 },
           category: 'chair',
           object_idx: 1,
@@ -357,6 +381,7 @@ test('save request uses its backend contract without refreshing history', async 
         },
         similarity_score: 92,
         sku_id: 50,
+        sku_image_id: null,
         vlm_mood: {
           summary: 'A warm living room.',
           tags: ['modern'],
@@ -370,13 +395,21 @@ test('save request uses its backend contract without refreshing history', async 
             },
           ],
           summary: 'The structure and color are similar.',
+          xai_attrs: { material: 'mesh' },
         },
       },
       {
         match_rank: 1,
+        match_source: 'RECOMMEND',
         object_idx: 2,
+        object_index: 2,
         object_metadata: {
-          attrs: { color: 'brown', material: 'oak', style: 'natural' },
+          attrs: {
+            color: 'brown',
+            leg_type: 'four legs',
+            material: 'oak',
+            style: 'natural',
+          },
           bbox_coord: { xmax: 500, xmin: 60, ymax: 400, ymin: 50 },
           category: 'table',
           object_idx: 2,
@@ -384,6 +417,7 @@ test('save request uses its backend contract without refreshing history', async 
         },
         similarity_score: 88,
         sku_id: 71,
+        sku_image_id: null,
         vlm_mood: {
           summary: 'A compact dining area.',
           tags: ['natural'],
@@ -397,6 +431,7 @@ test('save request uses its backend contract without refreshing history', async 
             },
           ],
           summary: 'The table shape is a close match.',
+          xai_attrs: { material: 'oak' },
         },
       },
     ],
@@ -417,7 +452,7 @@ test('recommendation polls its AI job and keeps its XAI result', async (t) => {
     const url = String(input);
     requests.push({ init, url });
     const data =
-      url === '/tagging/scenes/7/recommendations'
+      url === '/tagging/scenes/7'
         ? { job_id: 'job-789', scene_image_id: 7, status: 'PENDING' }
         : {
             error_message: null,
@@ -444,6 +479,9 @@ test('recommendation polls its AI job and keeps its XAI result', async (t) => {
                           },
                         ],
                         summary: 'The structure and color are similar.',
+                        xai_attrs: {
+                          color: 'brown',
+                        },
                         vlm_mood: {
                           summary: 'A warm living room.',
                           tags: ['natural'],
@@ -471,14 +509,34 @@ test('recommendation polls its AI job and keeps its XAI result', async (t) => {
     globalThis.setTimeout = originalSetTimeout;
   });
 
-  const [candidate] = await fetchRecommendations('7', 1);
+  const [candidate] = await fetchRecommendations('7', 1, [
+    {
+      bbox: [100, 200, 700, 800],
+      category: 'chair',
+      name: 'chair',
+      objectIdx: 1,
+    },
+  ]);
 
   assert.deepEqual(
     requests.map((request) => request.url),
-    ['/tagging/scenes/7/recommendations', '/ai-jobs/job-789'],
+    ['/tagging/scenes/7', '/ai-jobs/job-789'],
   );
   assert.equal(requests[0].init.method, 'POST');
+  assert.deepEqual(JSON.parse(requests[0].init.body), {
+    objects: [
+      {
+        bbox_coord: { xmax: 800, xmin: 200, ymax: 700, ymin: 100 },
+        category: 'chair',
+        object_idx: 1,
+      },
+    ],
+  });
   assert.equal(candidate.matchRank, 1);
   assert.equal(candidate.score, 92);
-  assert.equal(candidate.xaiResult.summary, 'The structure and color are similar.');
+  assert.equal(
+    candidate.xaiResult.summary,
+    'The structure and color are similar.',
+  );
+  assert.deepEqual(candidate.xaiResult.xaiAttrs, { color: 'brown' });
 });

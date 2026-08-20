@@ -15,6 +15,7 @@ from app.schemas.furniture_detection import (
     DetectedObjectResponse,
 )
 from app.schemas.gemini_detection import GeminiDetectionResult
+from app.schemas.tagging import EditedSceneObject
 from app.services import furniture_detection_service
 from app.services.gemini_service import GeminiService
 from app.services.similar_sku_service import SimilarSkuService
@@ -69,19 +70,8 @@ def _build_detected_objects(
     ]
 
 
-def _store_detection_result(
-    scene: SceneImage,
-    detections: list[DetectedObjectResponse],
-) -> None:
-    """장면 이미지 엔티티에 탐지 객체와 성공 상태를 기록합니다."""
-    scene.object_metadata = [
-        {
-            "object_idx": detection.object_idx,
-            "category": detection.category,
-            "bbox_coord": detection.bbox_coord.model_dump(),
-        }
-        for detection in detections
-    ]
+def _mark_detection_succeeded(scene: SceneImage) -> None:
+    """장면 이미지의 탐지 완료 상태만 기록합니다."""
     scene.analysis_status = "detected"
     scene.analysis_error = None
 
@@ -103,7 +93,7 @@ async def _detect_scene(
         settings,
     )
     detections = _build_detected_objects(detection_result)
-    _store_detection_result(scene, detections)
+    _mark_detection_succeeded(scene)
     await session.flush()
 
     return {
@@ -119,12 +109,15 @@ def _build_tagging_service(
     settings: Settings,
 ) -> TaggingService:
     """Worker가 SKU 추천에 사용할 태깅 서비스를 조립합니다."""
+    gemini_service = GeminiService(settings=settings)
+
     return TaggingService(
         session=session,
         settings=settings,
+        gemini_service=gemini_service,
         similar_sku_service=SimilarSkuService(
             session=session,
-            gemini_service=GeminiService(settings=settings),
+            gemini_service=gemini_service,
             settings=settings,
         ),
         xai_scoring_service=XaiScoringService(settings=settings),
@@ -137,16 +130,18 @@ async def _recommend_sku(
     settings: Settings,
 ) -> dict[str, object]:
     """장면의 탐지 객체에 대한 SKU 추천 결과를 작업 결과로 만듭니다."""
-    object_idxs = job.input_payload.get("object_idxs")
-    if not isinstance(object_idxs, list) or not object_idxs or not all(
-        isinstance(object_idx, int) for object_idx in object_idxs
-    ):
-        object_idxs = None
+    raw_objects = job.input_payload.get("objects")
+    if not isinstance(raw_objects, list) or not raw_objects:
+        raise ValueError("SKU 추천 작업에 편집 객체 목록이 없습니다.")
+    if not all(isinstance(item, dict) for item in raw_objects):
+        raise ValueError("SKU 추천 작업의 객체 입력 형식이 올바르지 않습니다.")
+
+    objects = [EditedSceneObject.model_validate(item) for item in raw_objects]
 
     result = await _build_tagging_service(
         session,
         settings,
-    ).get_sku_candidates(job.scene_image_id, object_idxs=object_idxs)
+    ).get_sku_candidates(job.scene_image_id, objects=objects)
     return result.model_dump(mode="json")
 
 

@@ -6,7 +6,7 @@ import type {
   TaggingHistory,
   TaggingValues,
   VlmMood,
-  XaiResult,
+  XaiCriterion,
 } from '../types';
 
 type ApiBoundingBox = {
@@ -57,17 +57,36 @@ type DevCandidate = {
   similarity_score: number;
   sku_code: string;
   sub_category: string | null;
-  xai_result: XaiResult & { vlm_mood: VlmMood };
+  xai_result: {
+    criteria: XaiCriterion[];
+    summary: string;
+    vlm_mood: VlmMood;
+    xai_attrs?: Record<string, string>;
+  };
+};
+
+type DevRecommendationObject = {
+  object_idx: number;
+  category: string;
+  sub_category: string | null;
+  bbox_coord: ApiBoundingBox;
+  confidence: number;
+  attrs: Record<string, string>;
+  xai_attrs?: Record<string, string>;
+  sku_candidates: DevCandidate[];
+};
+
+type RecommendationObject = Omit<DevRecommendationObject, 'sku_candidates'> & {
+  sku_candidates: SkuCandidate[];
 };
 
 type DevRecommendationData = {
-  objects: Array<{
-    object_idx: number;
-    sku_candidates: DevCandidate[];
-  }>;
+  objects: DevRecommendationObject[];
 };
 
-type EditedSceneObject = Pick<FurnitureObject, 'bbox' | 'category' | 'name'>;
+type EditedSceneObject = Pick<FurnitureObject, 'bbox' | 'category' | 'name'> & {
+  objectIdx: number;
+};
 
 type ApiSkuSearchItem = {
   brand: string | null;
@@ -119,7 +138,7 @@ const API_BASE_URL =
     '',
   ) ?? '';
 const JOB_POLL_INTERVAL_MS = 1000;
-const JOB_POLL_TIMEOUT_MS = 120_000;
+const JOB_POLL_TIMEOUT_MS = 600_000;
 
 const sleep = async (milliseconds: number): Promise<void> =>
   new Promise((resolve) => {
@@ -168,8 +187,7 @@ const NULL_TAG_VALUE = 'null';
 const reviewedText = (
   value: string | undefined,
   fallback: string | null | undefined,
-): string =>
-  value && value !== NULL_TAG_VALUE ? value : (fallback ?? '');
+): string => (value && value !== NULL_TAG_VALUE ? value : (fallback ?? ''));
 
 const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
   tags?.filter((tag) => tag !== NULL_TAG_VALUE);
@@ -221,6 +239,7 @@ const toDevCandidate = (
   xaiResult: {
     criteria: candidate.xai_result.criteria,
     summary: candidate.xai_result.summary,
+    xaiAttrs: candidate.xai_result.xai_attrs ?? {},
   },
 });
 
@@ -390,6 +409,7 @@ export const analyzeImage = async (
       },
       name: detection.category,
       objectIdx: detection.object_idx,
+      xaiAttrs: {},
     })),
   };
 };
@@ -397,28 +417,23 @@ export const analyzeImage = async (
 export const fetchRecommendations = async (
   sceneImageId: string,
   objectIdx: number,
+  objects: EditedSceneObject[],
 ): Promise<SkuCandidate[]> => {
   const candidatesByObjectIndex =
-    await fetchObjectRecommendations(sceneImageId);
+    await fetchObjectRecommendations(sceneImageId, objects);
   return candidatesByObjectIndex.get(objectIdx) ?? [];
 };
 
 /** 수정 완료된 장면의 모든 객체에 대한 SKU 후보를 한 번에 불러옵니다. */
 export const fetchObjectRecommendations = async (
   sceneImageId: string,
+  objects: EditedSceneObject[],
 ): Promise<Map<number, SkuCandidate[]>> => {
-  const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
-    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}/recommendations`,
-    { method: 'POST' },
-  );
-  const recommendationResult = await waitForAiJob<DevRecommendationData>(
-    accepted.data.job_id,
-  );
-
+  const recommendations = await updateSceneObjects(sceneImageId, objects);
   return new Map(
-    recommendationResult.objects.map((object) => [
-      object.object_idx,
-      object.sku_candidates.map(toDevCandidate),
+    [...recommendations].map(([objectIndex, object]) => [
+      objectIndex,
+      object.sku_candidates,
     ]),
   );
 };
@@ -430,8 +445,8 @@ export const fetchObjectRecommendations = async (
 export const updateSceneObjects = async (
   sceneImageId: string,
   objects: EditedSceneObject[],
-): Promise<void> => {
-  await requestJson(
+): Promise<Map<number, RecommendationObject>> => {
+  const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(sceneImageId)}`,
     {
       body: JSON.stringify({
@@ -440,12 +455,26 @@ export const updateSceneObjects = async (
           return {
             bbox_coord: { xmax, xmin, ymax, ymin },
             category: object.category ?? object.name,
+            object_idx: object.objectIdx,
           };
         }),
       }),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     },
+  );
+  const recommendationResult = await waitForAiJob<DevRecommendationData>(
+    accepted.data.job_id,
+  );
+
+  return new Map<number, RecommendationObject>(
+    recommendationResult.objects.map((object) => [
+      object.object_idx,
+      {
+        ...object,
+        sku_candidates: object.sku_candidates.map(toDevCandidate),
+      },
+    ]),
   );
 };
 
@@ -514,6 +543,7 @@ export const saveTaggingReview = async (
               object_index: objectIdx,
               object_metadata: {
                 attrs: {
+                  ...object.metadata.attributes,
                   color: reviewedText(values?.color, selectedSku.color),
                   material: reviewedText(
                     values?.material,
@@ -524,7 +554,7 @@ export const saveTaggingReview = async (
                 bbox_coord: { xmax, xmin, ymax, ymin },
                 category: reviewedText(values?.category, selectedSku.category),
                 object_idx: objectIdx,
-                sub_category: selectedSku.subCategory ?? '',
+                sub_category: object.metadata.subCategory ?? '',
               },
               similarity_score:
                 selectedSku.score === null
@@ -541,7 +571,12 @@ export const saveTaggingReview = async (
                   ? styleTags
                   : (selectedSku.vlmMood?.tags ?? []),
               },
-              xai_result: selectedSku.xaiResult,
+              xai_result: {
+                criteria: selectedSku.xaiResult?.criteria ?? [],
+                summary: selectedSku.xaiResult?.summary ?? '',
+                xai_attrs:
+                  object.xaiAttrs ?? selectedSku.xaiResult?.xaiAttrs ?? {},
+              },
             };
           },
         ),
