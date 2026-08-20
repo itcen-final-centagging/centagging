@@ -18,10 +18,8 @@ const CATEGORY_SUGGESTIONS = [
   '소파',
   '의자',
   '테이블·식탁·책상',
-  '수납장',
+  '서랍·수납장',
   '침대',
-  '조명',
-  '기타 가구',
 ];
 const RESULTS_PER_PAGE = 5;
 
@@ -188,7 +186,7 @@ export const DetectionPanel = () => {
                     <span className="shrink-0 rounded-full bg-success-50 px-2 py-1 text-[11px] font-bold text-success-600">
                       {object.confidence === null
                         ? '신뢰도 미제공'
-                        : `${object.confidence*100}%`}
+                        : `${object.confidence * 100}%`}
                     </span>
                   </span>
                 </button>
