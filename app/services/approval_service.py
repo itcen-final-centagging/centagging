@@ -24,11 +24,10 @@ class AlreadyReviewedError(RuntimeError):
 
 @dataclasses.dataclass(frozen=True)
 class _ApprovalReview:
-    """승인·반려에서 함께 갱신하는 상태 전이 값입니다."""
+    """승인·반려에서 갱신하는 상태 전이 값입니다."""
 
     approval_status: approval_schema.ApprovalStatus
     reject_reason: str | None
-    tagging_status: typing.Literal["ACTIVE", "DEACTIVE"]
 
 
 _SELECT_LIST = sqlalchemy.text("""
@@ -135,13 +134,6 @@ _UPDATE_APPROVAL = sqlalchemy.text("""
        AND status = 'PENDING'
     RETURNING request_id
     """)
-
-_UPDATE_TAGGING_RESULT = sqlalchemy.text("""
-    UPDATE tagging_result
-       SET status = :status
-     WHERE result_id = :tagging_result_id
-    """)
-
 
 class ApprovalService:
     """태깅 확정 결과를 SKU 스타일링 이미지로 승인·반려합니다."""
@@ -267,10 +259,8 @@ class ApprovalService:
         await self._review(
             request_id=request_id,
             reviewer_id=reviewer_id,
-            tagging_result_id=int(row["tagging_result_id"]),
             review=_ApprovalReview(
                 approval_status="ACTIVE",
-                tagging_status="ACTIVE",
                 reject_reason=None,
             ),
         )
@@ -296,15 +286,13 @@ class ApprovalService:
         reviewer_id: int,
         reviewer_name: str,
     ) -> approval_schema.RejectResponse:
-        """승인 요청을 반려하고 태깅 결과를 비활성 상태로 전환합니다."""
+        """승인 요청을 반려 상태로 전환합니다."""
         row = await self._get_pending_for_update(request_id)
         await self._review(
             request_id=request_id,
             reviewer_id=reviewer_id,
-            tagging_result_id=int(row["tagging_result_id"]),
             review=_ApprovalReview(
                 approval_status="REJECTED",
-                tagging_status="DEACTIVE",
                 reject_reason=reject_reason.strip(),
             ),
         )
@@ -338,7 +326,6 @@ class ApprovalService:
         *,
         request_id: int,
         reviewer_id: int,
-        tagging_result_id: int,
         review: _ApprovalReview,
     ) -> None:
         updated = await self.session.execute(
@@ -353,13 +340,6 @@ class ApprovalService:
         if updated.scalar_one_or_none() is None:
             await self.session.rollback()
             raise AlreadyReviewedError(request_id)
-        await self.session.execute(
-            _UPDATE_TAGGING_RESULT,
-            {
-                "status": review.tagging_status,
-                "tagging_result_id": tagging_result_id,
-            },
-        )
         await self.session.commit()
 
     def _save_crop(self, row: sqlalchemy.RowMapping) -> str:
