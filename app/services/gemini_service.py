@@ -82,6 +82,16 @@ class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
 
 
+def _contains_hangul(text: str) -> bool:
+    """문자열에 한글 음절이 포함되어 있는지 반환합니다."""
+    return any("\uac00" <= char <= "\ud7a3" for char in text)
+
+
+def _fallback_evidence(category: str) -> str:
+    """탐지 근거가 한글이 아닐 때 사용할 기본 문장을 반환합니다."""
+    return f"이미지에서 {category} 형태가 확인됩니다."
+
+
 class GeminiService:
     """VLM 및 임베딩 모델을 실제 Gemini API로 호출합니다."""
 
@@ -191,6 +201,25 @@ class GeminiService:
 
             result = GeminiModelDetectionResult.model_validate_json(
                 response.text
+            )
+
+            normalized_detections = []
+
+            for detection in result.detections:
+                evidence = detection.evidence
+
+                if not _contains_hangul(evidence):
+                    logging.getLogger(__name__).warning(
+                        "Gemini evidence가 한글이 아니어서 fallback을 사용합니다."
+                    )
+                    evidence = _fallback_evidence(detection.category)
+
+                normalized_detections.append(
+                    detection.model_copy(update={"evidence": evidence})
+                )
+
+            result = result.model_copy(
+                update={"detections": normalized_detections}
             )
 
             invalid_categories = [

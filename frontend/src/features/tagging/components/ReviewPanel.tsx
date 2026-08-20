@@ -100,7 +100,9 @@ export const ReviewPanel = () => {
   if (confirmedSelections.length === 0) return null;
 
   const currentIndex = Math.max(
-    confirmedSelections.findIndex(({ object }) => object.id === currentObjectId),
+    confirmedSelections.findIndex(
+      ({ object }) => object.id === currentObjectId,
+    ),
     0,
   );
   const { object: currentObject, sku: currentSku } =
@@ -145,7 +147,10 @@ export const ReviewPanel = () => {
       const base =
         currentValues[currentObject.id] ??
         buildDefaultValues(currentObject, currentSku);
-      return { ...currentValues, [currentObject.id]: { ...base, [key]: value } };
+      return {
+        ...currentValues,
+        [currentObject.id]: { ...base, [key]: value },
+      };
     });
   };
 
