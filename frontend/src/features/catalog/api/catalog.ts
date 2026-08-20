@@ -11,7 +11,6 @@ export type CatalogSku = {
   productName: string;
   skuCode: string;
   skuId: number;
-  space: string | null;
   subCategory: string | null;
 };
 
@@ -25,7 +24,6 @@ type ApiCatalogSku = {
   product_name: string;
   sku_code: string;
   sku_id: number;
-  space: string | null;
   sub_category: string | null;
 };
 
@@ -52,7 +50,6 @@ const toCatalogSku = (item: ApiCatalogSku): CatalogSku => ({
   productName: item.product_name,
   skuCode: item.sku_code,
   skuId: item.sku_id,
-  space: item.space,
   subCategory: item.sub_category,
 });
 

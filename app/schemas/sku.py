@@ -13,7 +13,6 @@ class MetadataExtractResponse(pydantic.BaseModel):
 
     category: str | None = None
     sub_category: str | None = None
-    space: str | None = None
     attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
 
 
@@ -50,7 +49,6 @@ class SkuCatalogItem(pydantic.BaseModel):
     product_name: str
     brand: str | None = None
     price: int | None = None
-    space: str | None = None
     category: str | None = None
     sub_category: str | None = None
     attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
