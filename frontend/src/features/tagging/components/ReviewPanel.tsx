@@ -7,10 +7,11 @@ import { ImagePreview } from '@/features/tagging/components/ImagePreview';
 import {
   CATEGORIES,
   getAllowedValues,
-  getMaterialValues,
+  getMaterialAttributes,
   getSubCategories,
   withCurrentValue,
 } from '@/features/tagging/constants/catalogSpec';
+import { ATTRIBUTE_LABELS } from '@/features/tagging/constants/skuAttributes';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import type {
   FurnitureObject,
@@ -55,28 +56,51 @@ const getMetadataText = (
   return typeof value === 'string' && value ? value : fallback;
 };
 
+/**
+ * 카테고리에서 쓰는 소재 계열 속성의 초기값을 만듭니다.
+ * 탐지 객체 속성 -> SKU 카탈로그 속성 -> SKU 대표 소재 순으로 채웁니다.
+ */
+const buildDefaultMaterials = (
+  category: string | null,
+  object: FurnitureObject,
+  sku: SkuCandidate,
+): Record<string, string> =>
+  Object.fromEntries(
+    getMaterialAttributes(category).map(({ key }) => [
+      key,
+      getMetadataText(
+        object.metadata.attributes,
+        key,
+        getMetadataText(
+          sku.attrs,
+          key,
+          key === 'material' ? (sku.material ?? 'null') : 'null',
+        ),
+      ),
+    ]),
+  );
+
 /** 아직 검수하지 않은 객체에 보여줄 초기 태깅 값을 만듭니다. */
 const buildDefaultValues = (
   object: FurnitureObject,
   sku: SkuCandidate,
-): TaggingValues => ({
-  category: object.metadata.category ?? sku.category ?? 'null',
-  color: getMetadataText(
-    object.metadata.attributes,
-    'color',
-    sku.color ?? 'null',
-  ),
-  material: getMetadataText(
-    object.metadata.attributes,
-    'material',
-    sku.material ?? 'null',
-  ),
-  // 공간 분위기는 crop 이미지를 VLM이 해석한 결과를 기본값으로 씁니다.
-  mood: sku.vlmMood?.summary ?? object.metadata.description ?? '',
-  // 스타일 태그도 VLM이 crop에서 추출한 태그를 기본 선택으로 둡니다.
-  styleTags: getVlmStyleTags(sku),
-  subCategory: object.metadata.subCategory ?? sku.subCategory ?? 'null',
-});
+): TaggingValues => {
+  const category = object.metadata.category ?? sku.category ?? 'null';
+  return {
+    category,
+    color: getMetadataText(
+      object.metadata.attributes,
+      'color',
+      sku.color ?? 'null',
+    ),
+    materials: buildDefaultMaterials(category, object, sku),
+    // 공간 분위기는 crop 이미지를 VLM이 해석한 결과를 기본값으로 씁니다.
+    mood: sku.vlmMood?.summary ?? object.metadata.description ?? '',
+    // 스타일 태그도 VLM이 crop에서 추출한 태그를 기본 선택으로 둡니다.
+    styleTags: getVlmStyleTags(sku),
+    subCategory: object.metadata.subCategory ?? sku.subCategory ?? 'null',
+  };
+};
 
 export const ReviewPanel = () => {
   const {
@@ -129,9 +153,15 @@ export const ReviewPanel = () => {
     getAllowedValues(values.category, 'color'),
     values.color,
   );
-  const materialOptions = withCurrentValue(
-    getMaterialValues(values.category),
-    values.material,
+  // 소재 계열 속성은 카테고리 정의에 있는 만큼(상판 소재·프레임 소재 등)
+  // 각각 별도 드롭다운으로 노출합니다.
+  const materialAttributes = getMaterialAttributes(values.category).map(
+    ({ key, values: allowedValues }) => ({
+      key,
+      label: ATTRIBUTE_LABELS[key] ?? key,
+      options: withCurrentValue(allowedValues, values.materials[key]),
+      value: values.materials[key] ?? 'null',
+    }),
   );
   const reviewedCount = confirmedSelections.filter(
     ({ object }) => reviewedIds[object.id],
@@ -154,6 +184,22 @@ export const ReviewPanel = () => {
     });
   };
 
+  /** 소재 계열 속성 한 건만 갱신합니다. */
+  const handleChangeMaterial = (key: string, value: string): void => {
+    setValuesByObject((currentValues) => {
+      const base =
+        currentValues[currentObject.id] ??
+        buildDefaultValues(currentObject, currentSku);
+      return {
+        ...currentValues,
+        [currentObject.id]: {
+          ...base,
+          materials: { ...base.materials, [key]: value },
+        },
+      };
+    });
+  };
+
   /**
    * 대분류가 바뀌면 이전 카테고리 기준으로 고른 소분류·소재는 더 이상
    * 허용값이 아니므로 함께 초기화합니다.
@@ -169,7 +215,9 @@ export const ReviewPanel = () => {
         [currentObject.id]: {
           ...base,
           category,
-          material: 'null',
+          materials: Object.fromEntries(
+            getMaterialAttributes(category).map(({ key }) => [key, 'null']),
+          ),
           subCategory: 'null',
         },
       };
@@ -410,24 +458,26 @@ export const ReviewPanel = () => {
               ))}
             </select>
           </label>
-          <label className="text-sm font-bold text-neutral-700">
-            주요 소재
-            <select
-              className="mt-2 h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm font-normal outline-none focus:border-primary focus:ring-3 focus:ring-primary-50"
-              onChange={(event) =>
-                handleChangeValue('material', event.target.value)
-              }
-              value={values.material}
-            >
-              {/* 값이 없을 때만 보이는 안내 문구입니다. 목록에는 노출하지 않습니다. */}
-              <option disabled hidden value="null">
-                선택 필요
-              </option>
-              {materialOptions.map((material) => (
-                <option key={material}>{material}</option>
-              ))}
-            </select>
-          </label>
+          {materialAttributes.map(({ key, label, options, value }) => (
+            <label className="text-sm font-bold text-neutral-700" key={key}>
+              {label}
+              <select
+                className="mt-2 h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm font-normal outline-none focus:border-primary focus:ring-3 focus:ring-primary-50"
+                onChange={(event) =>
+                  handleChangeMaterial(key, event.target.value)
+                }
+                value={value}
+              >
+                {/* 값이 없을 때만 보이는 안내 문구입니다. 목록에는 노출하지 않습니다. */}
+                <option disabled hidden value="null">
+                  선택 필요
+                </option>
+                {options.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+          ))}
         </div>
         <fieldset className="mt-5">
           <legend className="text-sm font-bold text-neutral-700">

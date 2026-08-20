@@ -1,5 +1,6 @@
 import { requestJson, type ApiSuccessResponse } from '../../../lib/api-request';
 
+import type { ApprovalStatus } from '../../approvals/api/approvals';
 import type {
   FurnitureObject,
   SkuCandidate,
@@ -109,6 +110,7 @@ type ApiHistoryListItem = {
   similarity_score: number | null;
   created_by: string;
   created_at: string;
+  approval_status: ApprovalStatus | null;
   style_tags: string[];
   scene_image: {
     image_url: string;
@@ -191,6 +193,21 @@ const reviewedText = (
 
 const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
   tags?.filter((tag) => tag !== NULL_TAG_VALUE);
+
+/**
+ * 카테고리별 소재 속성(material / top_material / frame_material 등)을
+ * attrs에 그대로 실어 보냅니다. 검수 값이 없으면 SKU 소재를 기본값으로 씁니다.
+ */
+const reviewedMaterials = (
+  materials: Record<string, string> | undefined,
+  fallback: string | null | undefined,
+): Record<string, string> => {
+  const entries = Object.entries(materials ?? {}).filter(
+    ([, value]) => value && value !== NULL_TAG_VALUE,
+  );
+  if (entries.length > 0) return Object.fromEntries(entries);
+  return { material: fallback ?? '' };
+};
 
 const resolveAssetUrl = (value: unknown): string | null => {
   const path = nullableText(value);
@@ -347,6 +364,7 @@ export const toCandidateFromDetail = (detail: SkuDetail): SkuCandidate => ({
 });
 
 const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
+  approvalStatus: item.approval_status ?? null,
   id: String(item.result_id),
   imageName: item.scene_image.origin_name,
   objectName: item.object_name ?? '',
@@ -356,7 +374,7 @@ const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
   tags: {
     category: '',
     color: '',
-    material: '',
+    materials: {},
     mood: '',
     styleTags: item.style_tags,
     subCategory: '',
@@ -537,18 +555,19 @@ export const saveTaggingReview = async (
           ({ object, objectIdx, selectedSku, values }) => {
             const [ymin, xmin, ymax, xmax] = object.bbox;
             const styleTags = reviewedTags(values?.styleTags);
+            const matchSource = toMatchSource(selectedSku);
+            // 검색으로 직접 고른 SKU는 AI 추천 근거가 없으므로 순위·유사도·XAI를
+            // 모두 null로 보냅니다(백엔드 ck_result_source 제약과 같은 규칙).
+            const isRecommended = matchSource === 'RECOMMEND';
             return {
-              match_rank: selectedSku.matchRank,
+              match_rank: isRecommended ? selectedSku.matchRank : null,
               object_idx: objectIdx,
-              match_source: toMatchSource(selectedSku),
+              match_source: matchSource,
               object_metadata: {
                 attrs: {
                   ...object.metadata.attributes,
+                  ...reviewedMaterials(values?.materials, selectedSku.material),
                   color: reviewedText(values?.color, selectedSku.color),
-                  material: reviewedText(
-                    values?.material,
-                    selectedSku.material,
-                  ),
                   style: reviewedText(styleTags?.[0], selectedSku.style),
                 },
                 bbox_coord: { xmax, xmin, ymax, ymin },
@@ -560,9 +579,9 @@ export const saveTaggingReview = async (
                 ),
               },
               similarity_score:
-                selectedSku.score === null
-                  ? null
-                  : Math.round(selectedSku.score),
+                isRecommended && selectedSku.score !== null
+                  ? Math.round(selectedSku.score)
+                  : null,
               sku_id: selectedSku.skuId,
               sku_image_id: selectedSku.skuImageId ?? null,
               vlm_mood: {
@@ -574,12 +593,14 @@ export const saveTaggingReview = async (
                 // 때만 VLM이 추출한 원본 태그를 그대로 사용합니다.
                 tags: styleTags ?? selectedSku.vlmMood?.tags ?? [],
               },
-              xai_result: {
-                criteria: selectedSku.xaiResult?.criteria ?? [],
-                summary: selectedSku.xaiResult?.summary ?? '',
-                xai_attrs:
-                  object.xaiAttrs ?? selectedSku.xaiResult?.xaiAttrs ?? {},
-              },
+              xai_result: isRecommended
+                ? {
+                    criteria: selectedSku.xaiResult?.criteria ?? [],
+                    summary: selectedSku.xaiResult?.summary ?? '',
+                    xai_attrs:
+                      object.xaiAttrs ?? selectedSku.xaiResult?.xaiAttrs ?? {},
+                  }
+                : null,
             };
           },
         ),

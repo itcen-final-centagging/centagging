@@ -678,6 +678,7 @@ HISTORY_LIST_SUCCESS_RESPONSE = {
                             "similarity_score": 92,
                             "created_by": "일반 사용자",
                             "created_at": "2026-08-18T10:31:07+09:00",
+                            "approval_status": "ACTIVE",
                             "style_tags": ["내추럴", "모던"],
                             "scene_image": {
                                 "image_url": (
@@ -701,6 +702,7 @@ HISTORY_LIST_SUCCESS_RESPONSE = {
                             "similarity_score": 85,
                             "created_by": "일반 사용자",
                             "created_at": "2026-08-18T10:31:07+09:00",
+                            "approval_status": "PENDING",
                             "style_tags": ["내추럴"],
                             "scene_image": {
                                 "image_url": (
