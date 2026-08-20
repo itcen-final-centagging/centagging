@@ -6,6 +6,7 @@ export type WorkflowStage =
   | 'detect'
   | 'not-found'
   | 'redetecting'
+  | 'recommending'
   | 'recommend'
   | 'catalog'
   | 'review'
@@ -37,6 +38,7 @@ export interface FurnitureObject {
   metadata: ExtractedMetadata;
   name: string;
   objectIdx: number;
+  xaiAttrs?: Record<string, string>;
 }
 
 export interface ExtractedMetadata {
@@ -68,6 +70,7 @@ export interface XaiCriterion {
 export interface XaiResult {
   criteria: XaiCriterion[];
   summary: string;
+  xaiAttrs?: Record<string, string>;
 }
 
 export interface VlmMood {
@@ -112,6 +115,7 @@ export interface TaggingValues {
   material: string;
   mood: string;
   styleTags: string[];
+  subCategory: string;
 }
 
 export interface TaggingHistory {

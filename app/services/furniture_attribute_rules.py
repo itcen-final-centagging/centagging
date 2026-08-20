@@ -1,10 +1,17 @@
 """가구 속성 추출 결과의 허용값 구성과 검증을 제공합니다."""
 
+import unicodedata
+
 from app.core import catalog_spec
 from app.schemas.furniture_attribute import FurnitureAttributeResult
 
 HAS_ATTRIBUTE_VALUES = ["있음", "없음", "모름"]
 VISUAL_COMMON_ATTRIBUTES = ("color", "style", "pattern")
+
+
+def _normalize_text(value: str) -> str:
+    """Gemini가 반환할 수 있는 유니코드 정규화 차이를 제거합니다."""
+    return unicodedata.normalize("NFC", value.strip())
 
 
 def build_allowed_attribute_schema(category: str) -> dict[str, object]:
@@ -36,11 +43,60 @@ def build_allowed_attribute_schema(category: str) -> dict[str, object]:
     }
 
 
+def build_attribute_response_schema(
+    category: str,
+) -> dict[str, object]:
+    """Gemini 속성 추출 응답에 사용할 고정 스키마를 구성합니다."""
+    allowed_schema = build_allowed_attribute_schema(category)
+    attribute_groups = allowed_schema["attributes"]
+    if not isinstance(attribute_groups, dict):
+        raise ValueError("속성 허용 규격이 올바르지 않습니다.")
+
+    common_attributes = attribute_groups.get("common")
+    category_attributes = attribute_groups.get("category_specific")
+    if not isinstance(common_attributes, dict):
+        raise ValueError("공통 속성 허용 규격이 올바르지 않습니다.")
+    if not isinstance(category_attributes, dict):
+        raise ValueError("카테고리 속성 허용 규격이 올바르지 않습니다.")
+    allowed_attributes = {
+        **common_attributes,
+        **category_attributes,
+    }
+
+    attribute_properties = {
+        attribute: {
+            "type": "STRING",
+            "enum": values,
+        }
+        for attribute, values in allowed_attributes.items()
+    }
+
+    return {
+        "type": "OBJECT",
+        "properties": {
+            "category": {
+                "type": "STRING",
+                "enum": [category],
+            },
+            "sub_category": {
+                "type": "STRING",
+            },
+            "attributes": {
+                "type": "OBJECT",
+                "properties": attribute_properties,
+            },
+        },
+        "required": ["category", "attributes"],
+    }
+
+
 def validate_attribute_result(
     expected_category: str, result: FurnitureAttributeResult
 ) -> FurnitureAttributeResult:
     """추출 결과가 카탈로그 속성 규격에 맞는지 검증합니다."""
-    if result.category != expected_category:
+    normalized_expected_category = _normalize_text(expected_category)
+    normalized_result_category = _normalize_text(result.category)
+    if normalized_result_category != normalized_expected_category:
         raise ValueError(
             "요청 카테고리와 추출 카테고리가 다릅니다: "
             f"{expected_category} != {result.category}"
@@ -52,10 +108,19 @@ def validate_attribute_result(
     if not isinstance(sub_category_options, list):
         raise ValueError("소분류 허용 규격이 올바르지 않습니다.")
 
-    sub_category = result.sub_category
-
-    if sub_category is not None and sub_category not in sub_category_options:
-        sub_category = None
+    normalized_sub_category_options = {
+        _normalize_text(option): option for option in sub_category_options
+    }
+    normalized_sub_category = (
+        _normalize_text(result.sub_category)
+        if result.sub_category is not None
+        else None
+    )
+    sub_category = (
+        normalized_sub_category_options.get(normalized_sub_category)
+        if normalized_sub_category is not None
+        else None
+    )
 
     normalized_attributes = normalize_attributes(
         expected_category, result.attributes
@@ -63,6 +128,7 @@ def validate_attribute_result(
 
     return result.model_copy(
         update={
+            "category": expected_category,
             "sub_category": sub_category,
             "attributes": normalized_attributes,
         }
@@ -93,14 +159,20 @@ def normalize_attributes(
     normalized_attributes: dict[str, str] = {}
 
     for attribute, value in attributes.items():
-        allowed_values = allowed_attributes.get(attribute)
+        normalized_attribute = _normalize_text(attribute)
+        normalized_value = _normalize_text(value)
+        allowed_values = allowed_attributes.get(normalized_attribute)
 
         if not isinstance(allowed_values, list):
             continue
 
-        if value not in allowed_values:
+        normalized_allowed_values = {
+            _normalize_text(str(allowed_value))
+            for allowed_value in allowed_values
+        }
+        if normalized_value not in normalized_allowed_values:
             continue
 
-        normalized_attributes[attribute] = value
+        normalized_attributes[normalized_attribute] = normalized_value
 
     return normalized_attributes

@@ -5,7 +5,7 @@ export type ApprovalStatus = 'PENDING' | 'ACTIVE' | 'REJECTED';
 
 export type ApprovalListItem = {
   category: string | null;
-  objectIndex: number;
+  objectIdx: number;
   originName: string;
   productName: string;
   requestId: number;
@@ -27,7 +27,7 @@ export type ApprovalDetail = {
   object: {
     bbox: { xmax: number; xmin: number; ymax: number; ymin: number };
     category: string | null;
-    objectIndex: number;
+    objectIdx: number;
   };
   rejectReason: string | null;
   requestId: number;

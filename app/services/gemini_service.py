@@ -8,6 +8,7 @@ import json
 import logging
 import time
 import typing
+from collections.abc import Mapping
 
 from google.genai import errors, types
 from PIL import Image
@@ -22,8 +23,10 @@ from app.schemas.gemini_detection import (
 from app.schemas.sku_rerank import SkuRerankResult
 from app.services.furniture_attribute_rules import (
     build_allowed_attribute_schema,
+    build_attribute_response_schema,
     validate_attribute_result,
 )
+from app.services.genai_retry import call_with_rate_limit_retry
 from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
     FURNITURE_ATTRIBUTE_PROMPT,
 )
@@ -82,6 +85,16 @@ class GeminiVerificationResult(typing.TypedDict):
 
 class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
+
+
+def _contains_hangul(text: str) -> bool:
+    """문자열에 한글 음절이 포함되어 있는지 반환합니다."""
+    return any("\uac00" <= char <= "\ud7a3" for char in text)
+
+
+def _fallback_evidence(category: str) -> str:
+    """탐지 근거가 한글이 아닐 때 사용할 기본 문장을 반환합니다."""
+    return f"이미지에서 {category} 형태가 확인됩니다."
 
 
 def _build_rerank_contents(
@@ -207,13 +220,16 @@ class GeminiService:
                 category_context,
             ]
 
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=GeminiModelDetectionResult,
+            response = call_with_rate_limit_retry(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=GeminiModelDetectionResult,
+                    ),
                 ),
+                operation_name="detect_furniture",
             )
             if not response.text:
                 raise GeminiResponseInvalidError(
@@ -222,6 +238,25 @@ class GeminiService:
 
             result = GeminiModelDetectionResult.model_validate_json(
                 response.text
+            )
+
+            normalized_detections = []
+
+            for detection in result.detections:
+                evidence = detection.evidence
+
+                if not _contains_hangul(evidence):
+                    logging.getLogger(__name__).warning(
+                        "Gemini evidence가 한글이 아니어서 fallback을 사용합니다."
+                    )
+                    evidence = _fallback_evidence(detection.category)
+
+                normalized_detections.append(
+                    detection.model_copy(update={"evidence": evidence})
+                )
+
+            result = result.model_copy(
+                update={"detections": normalized_detections}
             )
 
             invalid_categories = [
@@ -249,6 +284,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 탐지 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini authentication failed."
@@ -293,13 +332,19 @@ class GeminiService:
                 attribute_context,
             ]
 
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=FurnitureAttributeResult,
+            # FurnitureAttributeResult를 Gemini SDK에 직접 전달 X
+            response = call_with_rate_limit_retry(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=(
+                            build_attribute_response_schema(category)
+                        ),
+                    ),
                 ),
+                operation_name="extract_furniture_attributes",
             )
 
             if not response.text:
@@ -320,6 +365,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 속성 추출 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini 인증이 실패했습니다."
@@ -429,11 +478,11 @@ class GeminiService:
                 "Gemini 재정렬 요청이 실패했습니다."
             ) from error
 
-    def embed_image(self, image: Image.Image) -> list[float]:
+    def embed_image(self, image: Image.Image | bytes) -> list[float]:
         """이미지를 임베딩하여 벡터 값을 반환합니다.
 
         Args:
-            image: PIL 이미지 객체입니다.
+            image: PIL 이미지 객체 또는 이미 변환된 JPEG 바이트입니다.
 
         Returns:
             임베딩 벡터(float 리스트)입니다.
@@ -450,10 +499,14 @@ class GeminiService:
         try:
             client = genai_client.create_client(self._settings)
 
-            image_format = (image.format or "PNG").upper()
-            buffer = io.BytesIO()
-            image.save(buffer, format=image_format)
-            image_bytes = buffer.getvalue()
+            if isinstance(image, bytes):
+                image_format = "JPEG"
+                image_bytes = image
+            else:
+                image_format = (image.format or "PNG").upper()
+                buffer = io.BytesIO()
+                image.save(buffer, format=image_format)
+                image_bytes = buffer.getvalue()
 
             response = client.models.embed_content(
                 model=self._settings.gemini_embedding_model,
@@ -520,3 +573,16 @@ class GeminiService:
             raise GeminiEmbeddingError(
                 f"Gemini 텍스트 임베딩에 실패했습니다: {error}"
             ) from error
+
+    def embed_with_attrs(
+        self,
+        image: Image.Image,
+        *,
+        category: str | None = None,
+        sub_category: str | None = None,
+        attrs: Mapping[str, str] | None = None,
+    ) -> list[float]:
+        """이미지와 추출 속성을 함께 임베딩합니다."""
+        raise NotImplementedError(
+            "하이브리드 임베딩 구현이 아직 연결되지 않았습니다."
+        )

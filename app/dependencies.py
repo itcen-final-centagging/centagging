@@ -112,11 +112,13 @@ def get_tagging_service(
     session: sqlalchemy_async.AsyncSession = Depends(
         database.get_database_session
     ),
+    gemini_service: GeminiService = Depends(get_gemini_service),
 ) -> TaggingService:
     """요청 범위 세션으로 태깅 오케스트레이션 서비스를 조립합니다.
 
     Args:
         session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
+        gemini_service: Gemini API 호출과 객체 속성 추출을 담당하는 서비스입니다.
 
     Returns:
         유사 SKU 조회와 XAI 채점이 주입된 TaggingService입니다.
@@ -126,9 +128,10 @@ def get_tagging_service(
     return TaggingService(
         session=session,
         settings=settings,
+        gemini_service=gemini_service,
         similar_sku_service=SimilarSkuService(
             session=session,
-            gemini_service=GeminiService(settings=settings),
+            gemini_service=gemini_service,
             settings=settings,
         ),
         xai_scoring_service=XaiScoringService(settings=settings),

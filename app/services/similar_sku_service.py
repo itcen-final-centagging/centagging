@@ -26,7 +26,7 @@ from app.services.sku_image_storage import SkuImageStorage
 EMBEDDING_DIMENSIONS = 3072
 CANDIDATE_LIMIT = 30
 DEFAULT_RESULT_LIMIT = 5
-EMBED_CONCURRENCY = 2
+EMBED_CONCURRENCY = 3
 NO_XAI_SUMMARY = "XAI 판정 결과가 없습니다."
 _HALFVEC = pgvector_sa.HALFVEC(EMBEDDING_DIMENSIONS)
 
@@ -162,7 +162,7 @@ class SimilarSkuService:
         """
         async with self._embed_semaphore:
             return await asyncio.to_thread(
-                self.gemini_service.embed_image, crop.image
+                self.gemini_service.embed_image, crop.image_bytes
             )
 
     def _to_sku_candidate(self, sku: "SimilarSku") -> SkuCandidate:

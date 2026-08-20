@@ -15,8 +15,7 @@ class CommonOpenApiTest(unittest.TestCase):
         for path, method in (
             ("/tagging", "post"),
             ("/tagging/scenes/{scene_id}", "post"),
-            ("/tagging/scenes/{scene_id}", "get"),
-            ("/tagging/scenes/{scene_id}", "put"),
+            ("/tagging/scenes/{scene_id}/recommendations", "post"),
             ("/history/results/{result_id}", "get"),
             ("/approvals", "get"),
             ("/product-image-submissions", "get"),

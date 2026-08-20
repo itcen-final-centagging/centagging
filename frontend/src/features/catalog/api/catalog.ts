@@ -1,5 +1,5 @@
 import { createAuthorizationHeaders } from '@/features/auth/api/auth';
-import { requestJson } from '@/lib/api-request';
+import { requestJson, type ApiSuccessResponse } from '@/lib/api-request';
 
 export type CatalogSku = {
   attributes: Record<string, unknown>;
@@ -11,7 +11,6 @@ export type CatalogSku = {
   productName: string;
   skuCode: string;
   skuId: number;
-  space: string | null;
   subCategory: string | null;
 };
 
@@ -25,7 +24,6 @@ type ApiCatalogSku = {
   product_name: string;
   sku_code: string;
   sku_id: number;
-  space: string | null;
   sub_category: string | null;
 };
 
@@ -52,7 +50,6 @@ const toCatalogSku = (item: ApiCatalogSku): CatalogSku => ({
   productName: item.product_name,
   skuCode: item.sku_code,
   skuId: item.sku_id,
-  space: item.space,
   subCategory: item.sub_category,
 });
 
@@ -60,9 +57,9 @@ const toCatalogSku = (item: ApiCatalogSku): CatalogSku => ({
 export const fetchCatalogSkus = async (
   session: string,
 ): Promise<CatalogSku[]> => {
-  const response = await requestJson<CatalogResponse>(
-    `${API_BASE_URL}/sku/catalog?limit=50`,
+  const response = await requestJson<ApiSuccessResponse<CatalogResponse>>(
+    `${API_BASE_URL}/sku/catalog`,
     { headers: createAuthorizationHeaders(session) },
   );
-  return response.items.map(toCatalogSku);
+  return response.data.items.map(toCatalogSku);
 };

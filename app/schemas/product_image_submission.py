@@ -42,7 +42,6 @@ class ProductImageSubmissionDetail(ProductImageSubmissionItem):
 
     proposed_brand: str | None = None
     proposed_price: int | None = None
-    proposed_space: str | None = None
     proposed_category: str | None = None
     proposed_sub_category: str | None = None
     proposed_attributes: dict[str, typing.Any] = pydantic.Field(
@@ -73,7 +72,6 @@ class ConfigureProductImageSubmissionRequest(pydantic.BaseModel):
     )
     proposed_brand: str | None = pydantic.Field(default=None, max_length=100)
     proposed_price: int | None = pydantic.Field(default=None, ge=0)
-    proposed_space: str | None = pydantic.Field(default=None, max_length=50)
     proposed_category: str | None = pydantic.Field(default=None, max_length=50)
     proposed_sub_category: str | None = pydantic.Field(
         default=None, max_length=50

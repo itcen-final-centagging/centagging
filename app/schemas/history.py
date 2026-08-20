@@ -22,7 +22,7 @@ class HistorySceneImage(pydantic.BaseModel):
 
     image_url: str
     origin_name: str
-    bbox: HistoryBoundingBox
+    bbox: HistoryBoundingBox | None = None
 
 
 class TaggingHistoryListItem(pydantic.BaseModel):
@@ -58,7 +58,7 @@ class HistoryDetectedObject(pydantic.BaseModel):
     category: str | None
     sub_category: str | None
     attrs: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
-    bbox: HistoryBoundingBox
+    bbox: HistoryBoundingBox | None = None
     vlm_mood: tagging_schema.VlmMood | None
 
 
