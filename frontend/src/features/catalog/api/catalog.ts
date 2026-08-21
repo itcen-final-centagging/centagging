@@ -1,6 +1,18 @@
 import { createAuthorizationHeaders } from '@/features/auth/api/auth';
 import { requestJson, type ApiSuccessResponse } from '@/lib/api-request';
 
+export type ExtractedSkuMetadata = {
+  attributes: Record<string, string>;
+  category: string | null;
+  subCategory: string | null;
+};
+
+type ApiExtractedSkuMetadata = {
+  attributes: Record<string, string>;
+  category: string | null;
+  sub_category: string | null;
+};
+
 export type CatalogSku = {
   attributes: Record<string, unknown>;
   brand: string | null;
@@ -62,4 +74,25 @@ export const fetchCatalogSkus = async (
     { headers: createAuthorizationHeaders(session) },
   );
   return response.data.items.map(toCatalogSku);
+};
+
+export const extractSkuMetadata = async (
+  session: string,
+  image: Blob,
+): Promise<ExtractedSkuMetadata> => {
+  const body = new FormData();
+  body.append('image', image, 'image.jpg');
+  const result = await requestJson<ApiExtractedSkuMetadata>(
+    `${API_BASE_URL}/sku/extract`,
+    {
+      body,
+      headers: createAuthorizationHeaders(session),
+      method: 'POST',
+    },
+  );
+  return {
+    attributes: result.attributes,
+    category: result.category,
+    subCategory: result.sub_category,
+  };
 };
