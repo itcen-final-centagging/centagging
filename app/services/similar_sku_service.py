@@ -257,6 +257,7 @@ class SimilarSkuService:
                 SkuImage.embedding.is_not(None),
                 SkuImage.embedding_pipeline_version
                 == self.settings.embedding_pipeline_version,
+                SkuImage.embedding_image_sha256.is_not(None),
             )
             .order_by(distance)
             .limit(CANDIDATE_LIMIT)

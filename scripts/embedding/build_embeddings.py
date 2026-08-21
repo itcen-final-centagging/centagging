@@ -6,6 +6,7 @@
     python -m scripts.embedding.build_embeddings --skip-images
     python -m scripts.embedding.build_embeddings --skip-images --force-text  텍스트만
     python -m scripts.embedding.build_embeddings --force-text --force-images
+    python -m scripts.embedding.build_embeddings --check-image-index
 
 단계:
     1. sku.json 로드
@@ -308,6 +309,14 @@ def print_summary(result: RunResult) -> None:
                 print(f"  {key_name}={key}: {message}")
 
 
+def print_image_index_status(status: db.ImageEmbeddingIndexStatus) -> None:
+    """현재 융합 파이프라인의 SKU 이미지 색인 완료 여부를 출력합니다."""
+    print("=== 융합 이미지 색인 상태 ===")
+    print(f"전체 이미지: {status.total}건")
+    print(f"현재 파이프라인 색인 완료: {status.current}건")
+    print(f"재색인 필요: {status.pending}건")
+
+
 def parse_args() -> argparse.Namespace:
     """CLI 인자를 파싱한다."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -316,6 +325,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-images", action="store_true", help="이미지 임베딩 단계 건너뛰기")
     parser.add_argument("--force-text", action="store_true", help="기존 텍스트 임베딩도 재계산")
     parser.add_argument("--force-images", action="store_true", help="기존 이미지 임베딩도 재계산")
+    parser.add_argument(
+        "--check-image-index",
+        action="store_true",
+        help="현재 융합 파이프라인 기준 SKU 이미지 색인 상태만 점검",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -327,6 +341,20 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     settings = storage.get_settings()
+    if args.check_image_index:
+        status_conn = db.connect(settings.database)
+        try:
+            status = db.fetch_image_embedding_index_status(
+                status_conn,
+                settings.embedding_pipeline_version,
+            )
+        finally:
+            status_conn.close()
+        print_image_index_status(status)
+        if status.pending:
+            raise SystemExit(1)
+        return
+
     skus = load_skus(args.limit)
 
     result = RunResult(total_skus=len(skus))

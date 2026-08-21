@@ -51,3 +51,4 @@ def test_similarity_query_filters_pipeline_version() -> None:
     sql = str(session.statement.compile(dialect=postgresql.dialect()))
     assert "sku_image.embedding_pipeline_version" in sql
     assert "embedding_pipeline_version" in sql
+    assert "sku_image.embedding_image_sha256" in sql

@@ -14,6 +14,8 @@ data/images의 이미지는 파일명에 sku_id가 아니라 sku_code를
 
 from __future__ import annotations
 
+import dataclasses
+import dataclasses
 import datetime
 from typing import Any
 
@@ -22,6 +24,15 @@ from pgvector.psycopg import register_vector
 from psycopg.types.json import Json
 
 from app.core import config
+
+
+@dataclasses.dataclass(frozen=True)
+class ImageEmbeddingIndexStatus:
+    """현재 융합 파이프라인 기준 SKU 이미지 색인 상태입니다."""
+
+    total: int
+    current: int
+    pending: int
 
 
 def connect(settings: config.DatabaseSettings) -> psycopg.Connection:
@@ -160,6 +171,41 @@ def fetch_image_embedding_states(
             """
         )
         return {row[0]: (row[1], row[2]) for row in cur.fetchall()}
+
+
+def fetch_image_embedding_index_status(
+    conn: psycopg.Connection,
+    pipeline_version: str,
+) -> ImageEmbeddingIndexStatus:
+    """현재 버전으로 검색 가능한 SKU 이미지와 재색인 대상을 집계한다."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (
+                    WHERE embedding IS NOT NULL
+                      AND embedding_pipeline_version = %s
+                      AND embedding_image_sha256 IS NOT NULL
+                ) AS current,
+                COUNT(*) FILTER (
+                    WHERE embedding IS NULL
+                       OR embedding_pipeline_version IS DISTINCT FROM %s
+                       OR embedding_image_sha256 IS NULL
+                ) AS pending
+            FROM sku_image
+            """,
+            (pipeline_version, pipeline_version),
+        )
+        row = cur.fetchone()
+    if row is None:
+        return ImageEmbeddingIndexStatus(total=0, current=0, pending=0)
+    total, current, pending = row
+    return ImageEmbeddingIndexStatus(
+        total=int(total),
+        current=int(current),
+        pending=int(pending),
+    )
 
 
 def upsert_sku_image(
