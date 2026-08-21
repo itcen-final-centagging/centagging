@@ -133,6 +133,24 @@ export const RecommendationPanel = () => {
 
       <div className="grid overflow-hidden rounded-2xl border border-border bg-bg-primary shadow-[0_1px_3px_rgba(15,23,42,0.08)] xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="border-b border-border bg-bg-tertiary/70 p-3 xl:border-b-0 xl:border-r">
+          <div className="mb-3 rounded-xl border border-primary-200 bg-primary-20 p-3">
+            <p className="text-xs font-bold text-primary-700">
+              원하는 SKU가 후보에 없나요?
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-primary-700/70">
+              전체 카탈로그에서 직접 검색해 추가할 수 있어요.
+            </p>
+            <Button
+              className="mt-2.5"
+              fullWidth
+              onClick={handleCatalogSearchOpen}
+              size="md"
+              startDecorator={<Search size={16} />}
+              variant="primary-outlined"
+            >
+              전체 카탈로그 검색
+            </Button>
+          </div>
           <p className="px-2 pb-2 text-xs font-bold text-text-secondary">
             후보 목록
           </p>
@@ -170,11 +188,9 @@ export const RecommendationPanel = () => {
                       <span className="mt-1 block truncate text-xs font-extrabold text-text-primary">
                         {candidate.name}
                       </span>
-                      {candidate.score === null ? (
-                        <span className="mt-2 inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-500">
-                          검색으로 추가됨
-                        </span>
-                      ) : (
+                      {/* 카탈로그 검색으로 추가한 SKU는 최상단 위치로 구분되므로
+                          점수 막대 대신 브랜드·가격 등 참고 정보를 보여줍니다. */}
+                      {candidate.score !== null ? (
                         <span className="mt-2 flex items-center gap-2">
                           <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
                             <span
@@ -186,23 +202,13 @@ export const RecommendationPanel = () => {
                             {candidate.score}점
                           </span>
                         </span>
-                      )}
+                      ) : null}
                     </span>
                   </div>
                 </button>
               );
             })}
           </div>
-          <Button
-            className="mt-3"
-            fullWidth
-            onClick={handleCatalogSearchOpen}
-            size="sm"
-            startDecorator={<Search size={15} />}
-            variant="neutral-outlined"
-          >
-            전체 카탈로그 검색
-          </Button>
         </aside>
 
         <article className="min-w-0 p-5 sm:p-6">
@@ -225,22 +231,18 @@ export const RecommendationPanel = () => {
                   : focusedCandidate.sku}
               </p>
             </div>
-            <div className="text-left sm:text-right">
-              {focusedCandidate.score === null ? (
-                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-bold text-neutral-500">
-                  검색으로 추가된 SKU
-                </span>
-              ) : (
-                <>
-                  <p className="text-2xl font-extrabold tracking-[-0.04em] text-emerald-700">
-                    {focusedCandidate.score}점
-                  </p>
-                  <p className="text-[11px] font-semibold text-text-tertiary">
-                    최종 매칭 점수
-                  </p>
-                </>
-              )}
-            </div>
+            {/* 카탈로그 검색으로 추가한 SKU는 후보 목록 최상단 위치로 이미
+                구분되므로 별도 표시 없이 점수가 있을 때만 노출합니다. */}
+            {focusedCandidate.score !== null ? (
+              <div className="text-left sm:text-right">
+                <p className="text-2xl font-extrabold tracking-[-0.04em] text-emerald-700">
+                  {focusedCandidate.score}점
+                </p>
+                <p className="text-[11px] font-semibold text-text-tertiary">
+                  최종 매칭 점수
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div

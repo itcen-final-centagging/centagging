@@ -340,21 +340,43 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       if (!selectedObject) return;
       const targetObjectId = selectedObject.id;
 
-      const appendSku = (object: FurnitureObject): FurnitureObject => ({
+      // 이미 후보 목록에 있는 SKU(AI 추천 후보 또는 이전에 검색으로 추가한
+      // 후보 포함)를 다시 선택하면 알려주고 중복 추가하지 않습니다.
+      const isDuplicate = selectedObject.candidates.some(
+        (candidate) => candidate.sku === sku.sku,
+      );
+      if (isDuplicate) {
+        alert('이미 후보 목록에 있는 SKU입니다.');
+        return;
+      }
+
+      // 카탈로그 검색으로 선택한 SKU는 항상 후보 목록 최상단에 하나만
+      // 유지합니다. 이전에 검색으로 추가한 선택(matchRank가 없는 후보)은
+      // 새로 선택한 SKU로 교체하고, AI 추천 후보(matchRank가 있는 후보)는
+      // 그대로 둡니다.
+      const replaceSearchSelection = (
+        object: FurnitureObject,
+      ): FurnitureObject => ({
         ...object,
         candidates: [
-          ...object.candidates.filter((candidate) => candidate.sku !== sku.sku),
           sku,
+          ...object.candidates.filter(
+            (candidate) => candidate.matchRank !== null,
+          ),
         ],
       });
 
       setDetectedObjects((objects) =>
         objects.map((object) =>
-          object.id === targetObjectId ? appendSku(object) : object,
+          object.id === targetObjectId
+            ? replaceSearchSelection(object)
+            : object,
         ),
       );
       setSelectedObject((object) =>
-        object && object.id === targetObjectId ? appendSku(object) : object,
+        object && object.id === targetObjectId
+          ? replaceSearchSelection(object)
+          : object,
       );
       selectSku(sku);
       setStage('recommend');
