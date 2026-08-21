@@ -1,19 +1,26 @@
 """관리자 제품 이미지 등록 요청의 상태 전이와 SKU 반영을 처리합니다."""
 
 import asyncio
-import datetime
+import hashlib
+import io
 import json
+import logging
 import typing
 
 import sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
+from PIL import Image
 
 from app.core import config
 from app.models import sku as sku_models
 from app.schemas import product_image_submission as submission_schema
 from app.services import image_processing_service, sku_service
+from app.services.fused_metadata import build_metadata_text
 from app.services.gemini_service import GeminiService
+from app.services.image_preprocessing_service import preprocess_for_embedding
 from app.services.sku_image_storage import SkuImageStorage
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SubmissionNotFoundError(RuntimeError):
@@ -357,19 +364,6 @@ class ProductImageSubmissionService:
         if row["status"] != "PENDING":
             raise SubmissionStateError(submission_id)
 
-        image_bytes = image_processing_service.read_sku_image_bytes(
-            str(row["image_url"]),
-            self.settings.sku_image_root,
-            self.settings.image_storage_root,
-        )
-        if image_bytes is None:
-            raise image_processing_service.InvalidImageError(
-                "등록 이미지를 읽을 수 없습니다."
-            )
-        embedding = await asyncio.to_thread(
-            self.gemini_service.embed_image, image_bytes
-        )
-
         text_embedding: list[float] | None = None
         if row["target_type"] != "EXISTING":
             text_embedding = await asyncio.to_thread(
@@ -399,8 +393,6 @@ class ProductImageSubmissionService:
                 sku_id=final_sku_id,
                 image_url=str(row["image_url"]),
                 image_type=str(row["image_type"]),
-                embedding=embedding,
-                indexed_at=datetime.datetime.now(datetime.timezone.utc),
             )
             self.session.add(sku_image)
             await self.session.flush()
@@ -417,7 +409,67 @@ class ProductImageSubmissionService:
         except sqlalchemy.exc.IntegrityError as error:
             await self.session.rollback()
             raise SubmissionSkuCodeConflictError(submission_id) from error
+        await self._index_approved_sku_image(sku_image, final_sku_id)
         return self._to_detail(await self._get_detail(submission_id))
+
+    async def _index_approved_sku_image(
+        self,
+        sku_image: sku_models.SkuImage,
+        sku_id: int,
+    ) -> None:
+        """승인된 이미지의 융합 임베딩을 만들고 실패 시 미색인으로 남깁니다."""
+        try:
+            sku = await self.session.get(sku_models.SkuCatalog, sku_id)
+            if sku is None:
+                raise RuntimeError(
+                    f"승인 SKU를 찾을 수 없습니다: sku_id={sku_id}"
+                )
+            image_bytes = image_processing_service.read_sku_image_bytes(
+                sku_image.image_url,
+                self.settings.sku_image_root,
+                self.settings.image_storage_root,
+            )
+            if image_bytes is None:
+                raise RuntimeError("승인된 SKU 이미지를 읽을 수 없습니다.")
+            image = await asyncio.to_thread(
+                image_processing_service.decode_image,
+                image_bytes,
+            )
+            processed_image = await asyncio.to_thread(
+                preprocess_for_embedding,
+                image,
+                self.settings,
+            )
+            metadata_text = build_metadata_text(
+                category=sku.category,
+                sub_category=sku.sub_category,
+                product_name=sku.product_name,
+                brand=sku.brand,
+                price=sku.price,
+                attributes=sku.attributes,
+            )
+            embedding = await asyncio.to_thread(
+                self.gemini_service.embed_fused,
+                processed_image.image,
+                metadata_text,
+            )
+            sku_image.embedding = embedding
+            sku_image.embedding_pipeline_version = (
+                self.settings.embedding_pipeline_version
+            )
+            sku_image.embedding_image_sha256 = _image_sha256(
+                processed_image.image
+            )
+            sku_image.indexed_at = sqlalchemy.func.now()
+            await self.session.commit()
+        except (
+            Exception
+        ):  # noqa: BLE001 - 승인 상태는 보존하고 배치 재색인을 허용한다
+            await self.session.rollback()
+            _LOGGER.exception(
+                "승인 SKU 이미지 융합 임베딩 생성 실패: sku_image_id=%s",
+                sku_image.sku_image_id,
+            )
 
     async def reject(
         self,
@@ -552,6 +604,13 @@ class ProductImageSubmissionService:
 def _as_attributes(value: object) -> dict[str, typing.Any]:
     """DB JSONB 값을 API 스키마에 맞는 속성 객체로 정규화합니다."""
     return value if isinstance(value, dict) else {}
+
+
+def _image_sha256(image: Image.Image) -> str:
+    """전처리 이미지의 고정 PNG 표현을 재색인 식별자로 해시합니다."""
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=False)
+    return hashlib.sha256(buffer.getvalue()).hexdigest()
 
 
 def _build_registration_text(row: sqlalchemy.RowMapping) -> str:

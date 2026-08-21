@@ -6,6 +6,7 @@
     python -m scripts.embedding.build_embeddings --skip-images
     python -m scripts.embedding.build_embeddings --skip-images --force-text  텍스트만
     python -m scripts.embedding.build_embeddings --force-text --force-images
+    python -m scripts.embedding.build_embeddings --check-image-index
 
 단계:
     1. sku.json 로드
@@ -14,11 +15,13 @@
        sku_catalog.text_embedding에 저장
     4. 이미지 임베딩: data/images의
        {goods_id}_{sku_code}_{color}_{type}_{sequence}.{ext} 파일을
-       Gemini로 임베딩해 sku_image에 적재한다. type 토큰(m/a)이
+       전처리한 RGB·그레이 이미지와 SKU 메타데이터를 한 요청으로
+       Gemini에 임베딩해 sku_image.embedding에 적재한다. type 토큰(m/a)이
        image_type(MAIN/ANGLE)이 되고, sku_code로 sku_id를 찾아 연관
        관계를 맺는다. SKU당 이미지가 여러 장이어도 전부 처리한다.
 
-기존에 임베딩이 이미 있는 SKU는 기본적으로 건너뛴다(--force-* 로 재계산 가능).
+같은 파이프라인 버전·보정 이미지 해시를 가진 SKU 이미지는 기본적으로
+건너뛴다(--force-* 로 재계산 가능).
 한 건이 실패해도 전체가 멈추지 않고, 실패 목록을 마지막에 정리해서 보여준다.
 """
 
@@ -26,10 +29,15 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
+import io
 import json
+from typing import Any
 
 from PIL import Image
 
+from app.services.fused_metadata import build_metadata_text
+from app.services.image_preprocessing_service import preprocess_for_embedding
 from scripts.embedding import db, gemini_embed, storage
 from scripts.embedding.text_builder import build_embedding_text
 
@@ -158,11 +166,12 @@ def embed_texts(
 def embed_images(
     conn,
     settings,
+    skus: list[dict[str, Any]],
     result: RunResult,
     dry_run: bool,
     force: bool,
 ) -> None:
-    """data/images의 이미지를 임베딩해 sku_image에 적재한다.
+    """SKU 메타데이터와 전처리 이미지를 융합해 sku_image에 적재한다.
 
     파일명에서 sku_code/color/image_type/sequence를 읽고, sku_code로
     sku_id를 찾는다(upsert_metadata가 먼저 실행돼 있어야 한다). 파일명
@@ -174,7 +183,10 @@ def embed_images(
     images = storage.list_incoming_images()
 
     sku_id_by_code = {} if dry_run else db.fetch_sku_ids_by_code(conn)
-    already_done = set() if force or dry_run else db.fetch_embedded_image_urls(conn)
+    sku_by_code = {sku["sku_code"]: sku for sku in skus}
+    embedding_states = (
+        {} if force or dry_run else db.fetch_image_embedding_states(conn)
+    )
     embedder = None if dry_run else gemini_embed.make_image_embedder(settings)
 
     for image in images:
@@ -183,6 +195,8 @@ def embed_images(
         if dry_run:
             result.image_embedded += 1
             continue
+
+        assert embedder is not None
 
         sku_id = sku_id_by_code.get(image.sku_code)
         if sku_id is None:
@@ -193,14 +207,35 @@ def embed_images(
             )
             continue
 
-        if relative_url in already_done:
-            result.image_skipped_existing += 1
+        sku = sku_by_code.get(image.sku_code)
+        if sku is None:
+            result.image_skipped_unknown_sku += 1
+            print(
+                f"[건너뜀][이미지 임베딩] sku_code={image.sku_code}: "
+                "sku.json에 없는 sku_code입니다 "
+                f"({relative_url})"
+            )
             continue
 
         try:
             with Image.open(image.path) as pil_image:
                 pil_image.load()
-                embedding = embedder.embed_image(pil_image)
+                processed_image = preprocess_for_embedding(
+                    pil_image,
+                    settings,
+                ).image
+
+            image_sha256 = _embedding_image_sha256(processed_image)
+            if (
+                not force
+                and embedding_states.get(relative_url)
+                == (settings.embedding_pipeline_version, image_sha256)
+            ):
+                result.image_skipped_existing += 1
+                continue
+
+            metadata_text = _build_sku_metadata_text(sku)
+            embedding = embedder.embed_fused(processed_image, metadata_text)
 
             inserted = db.upsert_sku_image(
                 conn,
@@ -208,7 +243,8 @@ def embed_images(
                 relative_url,
                 image.image_type,
                 embedding,
-                overwrite=force,
+                pipeline_version=settings.embedding_pipeline_version,
+                image_sha256=image_sha256,
             )
             conn.commit()
             if inserted:
@@ -223,6 +259,25 @@ def embed_images(
                 f"[실패][이미지 임베딩] sku_code={image.sku_code} "
                 f"({relative_url}): {message}"
             )
+
+
+def _build_sku_metadata_text(sku: dict[str, Any]) -> str:
+    """sku.json 항목을 SKU 융합 임베딩용 메타데이터로 조립한다."""
+    return build_metadata_text(
+        category=sku.get("category"),
+        sub_category=sku.get("sub_category"),
+        product_name=sku.get("product_name"),
+        brand=sku.get("brand"),
+        price=sku.get("price"),
+        attributes=sku.get("attributes"),
+    )
+
+
+def _embedding_image_sha256(image: Image.Image) -> str:
+    """전처리된 RGB 이미지를 고정 PNG 표현으로 해시한다."""
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=False)
+    return hashlib.sha256(buffer.getvalue()).hexdigest()
 
 
 def print_summary(result: RunResult) -> None:
@@ -254,6 +309,14 @@ def print_summary(result: RunResult) -> None:
                 print(f"  {key_name}={key}: {message}")
 
 
+def print_image_index_status(status: db.ImageEmbeddingIndexStatus) -> None:
+    """현재 융합 파이프라인의 SKU 이미지 색인 완료 여부를 출력합니다."""
+    print("=== 융합 이미지 색인 상태 ===")
+    print(f"전체 이미지: {status.total}건")
+    print(f"현재 파이프라인 색인 완료: {status.current}건")
+    print(f"재색인 필요: {status.pending}건")
+
+
 def parse_args() -> argparse.Namespace:
     """CLI 인자를 파싱한다."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -262,6 +325,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-images", action="store_true", help="이미지 임베딩 단계 건너뛰기")
     parser.add_argument("--force-text", action="store_true", help="기존 텍스트 임베딩도 재계산")
     parser.add_argument("--force-images", action="store_true", help="기존 이미지 임베딩도 재계산")
+    parser.add_argument(
+        "--check-image-index",
+        action="store_true",
+        help="현재 융합 파이프라인 기준 SKU 이미지 색인 상태만 점검",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -273,6 +341,20 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     settings = storage.get_settings()
+    if args.check_image_index:
+        status_conn = db.connect(settings.database)
+        try:
+            status = db.fetch_image_embedding_index_status(
+                status_conn,
+                settings.embedding_pipeline_version,
+            )
+        finally:
+            status_conn.close()
+        print_image_index_status(status)
+        if status.pending:
+            raise SystemExit(1)
+        return
+
     skus = load_skus(args.limit)
 
     result = RunResult(total_skus=len(skus))
@@ -285,7 +367,14 @@ def main() -> None:
             embed_texts(conn, skus, settings, result, args.dry_run, args.force_text)
 
         if not args.skip_images:
-            embed_images(conn, settings, result, args.dry_run, args.force_images)
+            embed_images(
+                conn,
+                settings,
+                skus,
+                result,
+                args.dry_run,
+                args.force_images,
+            )
     finally:
         if conn is not None:
             conn.close()

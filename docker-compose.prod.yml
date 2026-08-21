@@ -39,6 +39,9 @@ services:
     profiles: ["migration"]
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_HOST: cloud-sql-proxy
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
     volumes:
       - ./docker/db/migrations:/migrations:ro
     depends_on:
@@ -46,13 +49,7 @@ services:
         condition: service_healthy
     networks:
       - app_network
-    command:
-      - psql
-      - --set=ON_ERROR_STOP=1
-      - --host=cloud-sql-proxy
-      - --username=${POSTGRES_USER:?POSTGRES_USER must be set}
-      - --dbname=${POSTGRES_DB:?POSTGRES_DB must be set}
-      - --file=/migrations/create_ai_job.sql
+    entrypoint: ["/bin/sh", "/migrations/run_migrations.sh"]
 
   api:
     image: ${API_IMAGE:-centagging-api:prod}

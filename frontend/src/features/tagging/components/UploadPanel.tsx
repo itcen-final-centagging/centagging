@@ -81,7 +81,7 @@ export const UploadPanel = () => {
             연출 이미지 업로드
           </h2>
           <p className="mt-1.5 text-sm text-neutral-500">
-            JPG 또는 PNG 형식, 최대 10MB, 최소 512 × 512px
+            JPG 또는 PNG 형식, 최대 10MB
           </p>
         </div>
         <div

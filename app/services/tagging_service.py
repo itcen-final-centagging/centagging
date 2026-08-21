@@ -3,6 +3,7 @@
 import asyncio
 import pathlib
 
+from PIL import Image
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core.config import Settings
@@ -20,7 +21,12 @@ from app.services.image_processing_service import (
     CroppedObject,
     crop_scene_objects,
 )
-from app.services.similar_sku_service import SimilarSkuService
+from app.services.image_preprocessing_service import preprocess_for_embedding
+from app.services.fused_metadata import build_metadata_text
+from app.services.similar_sku_service import (
+    FusedEmbeddingInput,
+    SimilarSkuService,
+)
 from app.services.xai_scoring_service import XaiObjectResult, XaiScoringService
 
 DETECTED_STATUS = "DETECTED"
@@ -111,14 +117,23 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 crop for crop in crops if crop.crop_index in requested_idxs
             ]
 
+        preprocessed_images = await self._preprocess_crops(crops)
         attributes_by_idx = await self._extract_attributes(
             crops,
             category_by_idx,
+            preprocessed_images,
+        )
+        fused_inputs = self._build_fused_embedding_inputs(
+            crops,
+            category_by_idx,
+            attributes_by_idx,
+            preprocessed_images,
         )
 
         # 2) 임베딩 및 유사 SKU 탐색
         result.objects = await self.similar_sku_service.build_detected_objects(
-            crops
+            crops,
+            fused_inputs,
         )
 
         # 3) XAI 근거 산출
@@ -151,8 +166,9 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         self,
         crops: list[CroppedObject],
         category_by_idx: dict[int, str],
+        preprocessed_images: dict[int, Image.Image],
     ) -> dict[int, FurnitureAttributeResult | None]:
-        """크롭별 카테고리 규격에 맞춰 속성을 추출합니다."""
+        """보정 크롭별 카테고리 규격에 맞춰 속성을 추출합니다."""
         extraction_targets = []
         attributes_by_idx: dict[int, FurnitureAttributeResult | None] = {}
         for crop in crops:
@@ -160,17 +176,21 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             if not category:
                 attributes_by_idx[crop.crop_index] = None
                 continue
-            extraction_targets.append((crop, category))
+            preprocessed_image = preprocessed_images.get(crop.crop_index)
+            if preprocessed_image is None:
+                attributes_by_idx[crop.crop_index] = None
+                continue
+            extraction_targets.append((crop, category, preprocessed_image))
 
         extraction_results = await asyncio.gather(
             *(
-                self._extract_attributes_for_crop(crop, category)
-                for crop, category in extraction_targets
+                self._extract_attributes_for_crop(crop, category, image)
+                for crop, category, image in extraction_targets
             )
         )
         attributes_by_idx.update(
             (crop.crop_index, result)
-            for (crop, _), result in zip(
+            for (crop, _, _), result in zip(
                 extraction_targets, extraction_results
             )
         )
@@ -180,14 +200,67 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         self,
         crop: CroppedObject,
         category: str,
+        image: Image.Image,
     ) -> FurnitureAttributeResult:
-        """속성 추출 Vertex AI 요청 수를 제한합니다."""
+        """보정 크롭의 속성 추출 Vertex AI 요청 수를 제한합니다."""
         async with self._attribute_semaphore:
             return await asyncio.to_thread(
                 self.gemini_service.extract_furniture_attributes,
-                crop.image,
+                image,
                 category,
             )
+
+    async def _preprocess_crops(
+        self,
+        crops: list[CroppedObject],
+    ) -> dict[int, Image.Image]:
+        """속성 추출과 융합 임베딩에서 공유할 크롭 보정 결과를 만듭니다."""
+        processed = await asyncio.gather(
+            *(
+                asyncio.to_thread(
+                    preprocess_for_embedding,
+                    crop.image,
+                    self.settings,
+                )
+                for crop in crops
+            )
+        )
+        return {
+            crop.crop_index: result.image
+            for crop, result in zip(crops, processed)
+        }
+
+    @staticmethod
+    def _build_fused_embedding_inputs(
+        crops: list[CroppedObject],
+        category_by_idx: dict[int, str],
+        attributes_by_idx: dict[int, FurnitureAttributeResult | None],
+        preprocessed_images: dict[int, Image.Image],
+    ) -> dict[int, FusedEmbeddingInput]:
+        """보정 크롭과 추출 속성을 SKU와 동일한 입력 규칙으로 조립합니다."""
+        fused_inputs = {}
+        for crop in crops:
+            image = preprocessed_images.get(crop.crop_index)
+            if image is None:
+                continue
+            attributes = attributes_by_idx.get(crop.crop_index)
+            fused_inputs[crop.crop_index] = FusedEmbeddingInput(
+                image=image,
+                metadata_text=build_metadata_text(
+                    category=category_by_idx.get(crop.crop_index),
+                    sub_category=(
+                        attributes.sub_category
+                        if attributes is not None
+                        else None
+                    ),
+                    attributes=(
+                        attributes.attributes
+                        if attributes is not None
+                        else None
+                    ),
+                ),
+            )
+        return fused_inputs
 
     @staticmethod
     def _apply_xai_results(

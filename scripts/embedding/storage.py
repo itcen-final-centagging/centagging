@@ -20,7 +20,13 @@ SKU_JSON_PATH = PROJECT_ROOT / "data" / "catalog" / "answer" / "sku.json"
 IMAGES_DIR = PROJECT_ROOT / "data" / "images"
 INCOMING_IMAGES_DIR = IMAGES_DIR
 
-load_dotenv(PROJECT_ROOT / ".env", override=True)
+
+def load_environment() -> None:
+    """.env 기본값을 읽되, 호출 셸의 명시적 설정은 유지합니다."""
+    load_dotenv(PROJECT_ROOT / ".env", override=False)
+
+
+load_environment()
 
 
 def get_settings() -> config.Settings:
