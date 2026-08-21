@@ -177,9 +177,11 @@ def get_product_image_submission_service(
     session: sqlalchemy_async.AsyncSession = Depends(
         database.get_database_session
     ),
+    gemini_service: GeminiService = Depends(get_gemini_service),
 ) -> ProductImageSubmissionService:
     """요청 범위 세션으로 제품 이미지 등록 승인 서비스를 조립합니다."""
     return ProductImageSubmissionService(
         session=session,
         settings=config.get_settings(),
+        gemini_service=gemini_service,
     )
