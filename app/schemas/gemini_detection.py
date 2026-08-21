@@ -34,7 +34,7 @@ class GeminiRawDetection(BaseModel):
     category: str = Field(min_length=1)
     bbox_coord: GeminiBoundingBox
     evidence: str = Field(min_length=1)
-    confidence: float | None = Field(default=None, ge=0, le=1)
+    confidence: float = Field(ge=0, le=1)
 
 
 # Gemini 탐지 결과 리스트

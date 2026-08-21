@@ -4,6 +4,16 @@ import dataclasses
 import os
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """환경 변수의 불리언 값을 읽습니다."""
+    return os.getenv(name, str(default)).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 @dataclasses.dataclass(frozen=True)
 class DatabaseSettings:
     """PostgreSQL connection settings."""
@@ -32,6 +42,22 @@ class Settings:  # pylint: disable=too-many-instance-attributes
     gcp_project_id: str = ""
     vertex_ai_location: str = "global"
     gemini_rerank_model: str = "gemini-2.5-flash-lite"
+    image_preprocess_enabled: bool = True
+    embedding_pipeline_version: str = "2026-08-21.1"
+    image_max_side: int = 1024
+    quality_blur_laplacian_threshold: float = 180.0
+    quality_denoise_h: int = 3
+    quality_unsharp_amount: float = 0.30
+    quality_unsharp_sigma: float = 1.0
+    lighting_dark_pixel_value: int = 32
+    lighting_moderate_median: float = 60.0
+    lighting_severe_median: float = 30.0
+    lighting_moderate_dark_fraction: float = 0.35
+    lighting_severe_dark_fraction: float = 0.60
+    lighting_moderate_gamma: float = 0.80
+    lighting_severe_gamma: float = 0.60
+    lighting_clahe_clip_limit: float = 1.8
+    lighting_clahe_grid_size: int = 8
 
 
 def get_settings() -> Settings:
@@ -51,6 +77,42 @@ def get_settings() -> Settings:
         ),
         gemini_rerank_model=os.getenv(
             "GEMINI_RERANK_MODEL", "gemini-2.5-flash-lite"
+        ),
+        image_preprocess_enabled=_env_bool("IMAGE_PREPROCESS_ENABLED", True),
+        embedding_pipeline_version=os.getenv(
+            "EMBEDDING_PIPELINE_VERSION", "2026-08-21.1"
+        ),
+        image_max_side=int(os.getenv("IMAGE_MAX_SIDE", "1024")),
+        quality_blur_laplacian_threshold=float(
+            os.getenv("QUALITY_BLUR_LAPLACIAN_THRESHOLD", "180")
+        ),
+        quality_denoise_h=int(os.getenv("QUALITY_DENOISE_H", "3")),
+        quality_unsharp_amount=float(
+            os.getenv("QUALITY_UNSHARP_AMOUNT", "0.30")
+        ),
+        quality_unsharp_sigma=float(os.getenv("QUALITY_UNSHARP_SIGMA", "1.0")),
+        lighting_dark_pixel_value=int(
+            os.getenv("LIGHTING_DARK_PIXEL_VALUE", "32")
+        ),
+        lighting_moderate_median=float(
+            os.getenv("LIGHTING_MODERATE_MEDIAN", "60")
+        ),
+        lighting_severe_median=float(os.getenv("LIGHTING_SEVERE_MEDIAN", "30")),
+        lighting_moderate_dark_fraction=float(
+            os.getenv("LIGHTING_MODERATE_DARK_FRACTION", "0.35")
+        ),
+        lighting_severe_dark_fraction=float(
+            os.getenv("LIGHTING_SEVERE_DARK_FRACTION", "0.60")
+        ),
+        lighting_moderate_gamma=float(
+            os.getenv("LIGHTING_MODERATE_GAMMA", "0.80")
+        ),
+        lighting_severe_gamma=float(os.getenv("LIGHTING_SEVERE_GAMMA", "0.60")),
+        lighting_clahe_clip_limit=float(
+            os.getenv("LIGHTING_CLAHE_CLIP_LIMIT", "1.8")
+        ),
+        lighting_clahe_grid_size=int(
+            os.getenv("LIGHTING_CLAHE_GRID_SIZE", "8")
         ),
         mvp_login_id=os.getenv("MVP_LOGIN_ID", ""),
         mvp_login_password=os.getenv("MVP_LOGIN_PASSWORD", ""),
