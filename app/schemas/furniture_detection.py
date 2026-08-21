@@ -35,7 +35,7 @@ class DetectedObjectResponse(BaseModel):
     category: str = Field(min_length=1)
     sub_category: str | None = None
     bbox_coord: BoundingBoxResponse
-    confidence: float | None = Field(default=None, ge=0, le=1)
+    confidence: float = Field(ge=0, le=1)
     evidence: str = Field(min_length=1)
 
 

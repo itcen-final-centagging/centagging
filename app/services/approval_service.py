@@ -261,10 +261,23 @@ class ApprovalService:
     ) -> approval_schema.ConfirmResponse:
         """승인 대상 객체를 크롭해 SKU 스타일링 이미지로 등록합니다."""
         row = await self._get_pending_for_update(request_id)
-        image_url = self._save_crop(row)
+        crop = await asyncio.to_thread(self._crop_object, row)
+        image_url = sku_service.save_uploaded_image(
+            self.settings,
+            str(row["sku_code"]),
+            f"approved-{row['request_id']}.jpg",
+            crop.image_bytes,
+        )
+        embedding = await asyncio.to_thread(
+            self.gemini_service.embed_image, crop.image_bytes
+        )
         image_result = await self.session.execute(
             _INSERT_SKU_IMAGE,
-            {"image_url": image_url, "sku_id": row["sku_id"]},
+            {
+                "sku_id": row["sku_id"],
+                "image_url": image_url,
+                "embedding": embedding,
+            },
         )
         sku_image_id = image_result.scalar_one_or_none()
         await self._review(
@@ -414,24 +427,26 @@ class ApprovalService:
             raise AlreadyReviewedError(request_id)
         await self.session.commit()
 
-    def _save_crop(self, row: sqlalchemy.RowMapping) -> str:
+    def _crop_object(
+        self, row: sqlalchemy.RowMapping
+    ) -> image_processing_service.CroppedObject:
+        """승인 대상 객체를 연출 이미지 태깅 파이프라인과 동일하게 크롭합니다.
+
+        ``tagging_service``가 추천 단계에서 쓰는
+        ``image_processing_service.crop_scene_objects``를 그대로
+        재사용합니다. 승인 시 저장하는 임베딩이 연출 이미지 크롭
+        임베딩과 같은 좌표계·인코딩으로 만들어져야 유사도 비교가
+        유효하기 때문입니다.
+        """
         object_metadata = _as_object_metadata(row["object_metadata"])
-        bbox = object_metadata.get("bbox_coord")
-        if not isinstance(bbox, dict):
+        if not isinstance(object_metadata.get("bbox_coord"), dict):
             raise ValueError("승인 대상 객체의 바운딩 박스가 없습니다.")
         source_path = pathlib.Path(self.settings.image_storage_root) / str(
             row["scene_image_url"]
         ).removeprefix("/uploads/")
-        scene_image = image_processing_service.decode_image(
-            source_path.read_bytes()
-        )
-        crop = image_processing_service.get_crop_image(scene_image, bbox)
-        return sku_service.save_uploaded_image(
-            self.settings,
-            str(row["sku_code"]),
-            f"approved-{row['request_id']}.jpg",
-            image_processing_service.parse_image_to_bytes(crop),
-        )
+        return image_processing_service.crop_scene_objects(
+            source_path, [object_metadata]
+        )[0]
 
 
 def _as_object_metadata(value: object) -> dict[str, typing.Any]:

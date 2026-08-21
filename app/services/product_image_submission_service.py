@@ -18,6 +18,7 @@ from app.services import image_processing_service, sku_service
 from app.services.fused_metadata import build_metadata_text
 from app.services.gemini_service import GeminiService
 from app.services.image_preprocessing_service import preprocess_for_embedding
+from app.services.sku_image_storage import SkuImageStorage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,11 +73,24 @@ _SELECT_DETAIL = sqlalchemy.text("""
            p.final_sku_image_id,
            target.sku_code AS target_sku_code,
            target.product_name AS target_product_name,
+           target.brand AS target_brand,
+           target.price AS target_price,
+           target.category AS target_category,
+           target.sub_category AS target_sub_category,
+           target_image.image_url AS target_main_image_url,
            requester.user_name AS requested_by_name,
            reviewer.user_name AS reviewed_by_name
       FROM product_image_submission p
       JOIN app_user requester ON requester.user_id = p.requested_by
       LEFT JOIN sku_catalog target ON target.sku_id = p.target_sku_id
+      LEFT JOIN LATERAL (
+          SELECT si.image_url
+            FROM sku_image si
+           WHERE si.sku_id = target.sku_id
+             AND si.image_type = 'MAIN'
+           ORDER BY si.sku_image_id
+           LIMIT 1
+      ) target_image ON TRUE
       LEFT JOIN app_user reviewer ON reviewer.user_id = p.reviewed_by
      WHERE p.submission_id = :submission_id
     """)
@@ -103,11 +117,20 @@ _SELECT_LIST = sqlalchemy.text("""
            p.final_sku_image_id,
            target.sku_code AS target_sku_code,
            target.product_name AS target_product_name,
+           target_image.image_url AS target_main_image_url,
            requester.user_name AS requested_by_name,
            reviewer.user_name AS reviewed_by_name
       FROM product_image_submission p
       JOIN app_user requester ON requester.user_id = p.requested_by
       LEFT JOIN sku_catalog target ON target.sku_id = p.target_sku_id
+      LEFT JOIN LATERAL (
+          SELECT si.image_url
+            FROM sku_image si
+           WHERE si.sku_id = target.sku_id
+             AND si.image_type = 'MAIN'
+           ORDER BY si.sku_image_id
+           LIMIT 1
+      ) target_image ON TRUE
       LEFT JOIN app_user reviewer ON reviewer.user_id = p.reviewed_by
      WHERE (:is_super_admin OR p.requested_by = :requester_id)
        AND (:status = 'ALL' OR p.status = :status)
@@ -193,6 +216,7 @@ class ProductImageSubmissionService:
         self.session = session
         self.settings = settings
         self.gemini_service = gemini_service
+        self.sku_image_storage = SkuImageStorage(settings.sku_image_root)
 
     async def create_drafts(
         self,
@@ -340,6 +364,13 @@ class ProductImageSubmissionService:
         if row["status"] != "PENDING":
             raise SubmissionStateError(submission_id)
 
+        text_embedding: list[float] | None = None
+        if row["target_type"] != "EXISTING":
+            text_embedding = await asyncio.to_thread(
+                self.gemini_service.embed_text,
+                _build_registration_text(row),
+            )
+
         try:
             if row["target_type"] == "EXISTING":
                 final_sku_id = int(row["target_sku_id"])
@@ -352,6 +383,7 @@ class ProductImageSubmissionService:
                     category=row["proposed_category"],
                     sub_category=row["proposed_sub_category"],
                     attributes=_as_attributes(row["proposed_attributes"]),
+                    text_embedding=text_embedding,
                 )
                 self.session.add(sku)
                 await self.session.flush()
@@ -514,10 +546,11 @@ class ProductImageSubmissionService:
             "기존 SKU 또는 신규 SKU 필수 정보를 입력해야 합니다."
         )
 
-    @staticmethod
     def _to_item(
+        self,
         row: sqlalchemy.RowMapping,
     ) -> submission_schema.ProductImageSubmissionItem:
+        target_main_image_url = row["target_main_image_url"]
         return submission_schema.ProductImageSubmissionItem(
             final_sku_id=row["final_sku_id"],
             final_sku_image_id=row["final_sku_image_id"],
@@ -537,6 +570,11 @@ class ProductImageSubmissionService:
             ),
             submission_id=int(row["submission_id"]),
             submitted_at=row["submitted_at"],
+            target_main_image_url=(
+                self.sku_image_storage.public_url(target_main_image_url)
+                if target_main_image_url
+                else None
+            ),
             target_product_name=row["target_product_name"],
             target_sku_code=row["target_sku_code"],
             target_type=typing.cast(
@@ -545,18 +583,21 @@ class ProductImageSubmissionService:
             ),
         )
 
-    @classmethod
     def _to_detail(
-        cls,
+        self,
         row: sqlalchemy.RowMapping,
     ) -> submission_schema.ProductImageSubmissionDetail:
         return submission_schema.ProductImageSubmissionDetail(
-            **cls._to_item(row).model_dump(),
+            **self._to_item(row).model_dump(),
             proposed_attributes=_as_attributes(row["proposed_attributes"]),
             proposed_brand=row["proposed_brand"],
             proposed_category=row["proposed_category"],
             proposed_price=row["proposed_price"],
             proposed_sub_category=row["proposed_sub_category"],
+            target_brand=row["target_brand"],
+            target_category=row["target_category"],
+            target_price=row["target_price"],
+            target_sub_category=row["target_sub_category"],
         )
 
 
@@ -570,3 +611,27 @@ def _image_sha256(image: Image.Image) -> str:
     buffer = io.BytesIO()
     image.convert("RGB").save(buffer, format="PNG", optimize=False)
     return hashlib.sha256(buffer.getvalue()).hexdigest()
+
+
+def _build_registration_text(row: sqlalchemy.RowMapping) -> str:
+    """신규 SKU의 text_embedding에 넣을 텍스트를 만듭니다.
+
+    scripts/embedding/text_builder.py::build_embedding_text와 같은 순서
+    (상품명 -> 카테고리 -> 속성)를 써서, 초기 카탈로그 시드로 만들어진
+    sku_catalog.text_embedding과 같은 텍스트 관례를 따르게 합니다.
+    """
+    lines = [str(row["proposed_product_name"])]
+
+    category_line = f"카테고리: {row['proposed_category']}"
+    if row["proposed_sub_category"]:
+        category_line += f" > {row['proposed_sub_category']}"
+    lines.append(category_line)
+
+    attributes = _as_attributes(row["proposed_attributes"])
+    if attributes:
+        attr_text = ", ".join(
+            f"{key}: {value}" for key, value in attributes.items()
+        )
+        lines.append(f"속성: {attr_text}")
+
+    return "\n".join(lines)

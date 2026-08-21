@@ -167,6 +167,7 @@ def get_approval_service(
 
     Args:
         session: 요청 범위의 비동기 SQLAlchemy 세션입니다.
+        gemini_service: 승인 확정 시 스타일링 크롭을 임베딩하는 서비스입니다.
 
     Returns:
         설정이 주입된 ApprovalService입니다.
