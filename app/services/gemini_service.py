@@ -8,7 +8,6 @@ import json
 import logging
 import time
 import typing
-from collections.abc import Mapping
 
 from google.genai import errors, types
 from PIL import Image
@@ -574,15 +573,62 @@ class GeminiService:
                 f"Gemini 텍스트 임베딩에 실패했습니다: {error}"
             ) from error
 
-    def embed_with_attrs(
+    def embed_fused(
         self,
         image: Image.Image,
-        *,
-        category: str | None = None,
-        sub_category: str | None = None,
-        attrs: Mapping[str, str] | None = None,
+        metadata_text: str,
     ) -> list[float]:
-        """이미지와 추출 속성을 함께 임베딩합니다."""
-        raise NotImplementedError(
-            "하이브리드 임베딩 구현이 아직 연결되지 않았습니다."
-        )
+        """메타 텍스트·전처리 RGB·그레이스케일을 한 번에 임베딩합니다.
+
+        Args:
+            image: 전처리가 완료된 RGB 이미지입니다.
+            metadata_text: 카탈로그 스펙 순서로 정규화한 메타데이터입니다.
+
+        Returns:
+            세 입력을 융합한 임베딩 벡터입니다.
+
+        Raises:
+            GeminiConfigurationError: Gemini 인증이 설정되지 않은 경우입니다.
+            GeminiEmbeddingError: Gemini 융합 임베딩 호출이 실패한 경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "Google Gen AI 인증 설정이 누락되었습니다."
+            )
+
+        try:
+            rgb = image.convert("RGB")
+            gray = rgb.convert("L").convert("RGB")
+            contents = [
+                "상품 메타데이터:\n" + (metadata_text or "(없음)"),
+                _image_part_as_png(rgb),
+                _image_part_as_png(gray),
+            ]
+            client = genai_client.create_client(self._settings)
+            response = client.models.embed_content(
+                model=self._settings.gemini_embedding_model,
+                contents=contents,  # type: ignore[arg-type]
+            )
+            embeddings = response.embeddings
+            if not embeddings or not embeddings[0].values:
+                raise GeminiEmbeddingError(
+                    "Gemini 융합 임베딩 응답이 비어 있습니다."
+                )
+            return embeddings[0].values
+        except GeminiEmbeddingError:
+            raise
+        except Exception as error:
+            logging.getLogger(__name__).exception("Gemini 융합 임베딩 실패")
+            raise GeminiEmbeddingError(
+                f"Gemini 융합 임베딩에 실패했습니다: {error}"
+            ) from error
+
+
+def _image_part_as_png(image: Image.Image) -> types.Part:
+    """Gemini interleaved 입력에 쓸 PNG Part를 생성합니다."""
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=False)
+    return types.Part.from_bytes(
+        data=buffer.getvalue(),
+        mime_type="image/png",
+    )
