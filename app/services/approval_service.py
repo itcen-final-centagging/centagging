@@ -1,16 +1,24 @@
 """현재 태깅 결과 모델을 위한 승인 요청 서비스입니다."""
 
+import asyncio
 import dataclasses
 import datetime
+import hashlib
+import io
 import pathlib
 import typing
 
+from PIL import Image
 import sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core import config
+from app.models import sku as sku_models
 from app.schemas import approval as approval_schema
 from app.services import image_processing_service, sku_service
+from app.services.fused_metadata import build_metadata_text
+from app.services.gemini_service import GeminiService
+from app.services.image_preprocessing_service import preprocess_for_embedding
 from app.services.sku_image_storage import SkuImageStorage
 
 
@@ -135,6 +143,7 @@ _UPDATE_APPROVAL = sqlalchemy.text("""
     RETURNING request_id
     """)
 
+
 class ApprovalService:
     """태깅 확정 결과를 SKU 스타일링 이미지로 승인·반려합니다."""
 
@@ -142,10 +151,12 @@ class ApprovalService:
         self,
         session: sqlalchemy_async.AsyncSession,
         settings: config.Settings,
+        gemini_service: GeminiService,
     ) -> None:
         """Initialize the approval service."""
         self.session = session
         self.settings = settings
+        self.gemini_service = gemini_service
         self.sku_image_storage = SkuImageStorage(settings.sku_image_root)
 
     async def list_approvals(
@@ -264,6 +275,8 @@ class ApprovalService:
                 reject_reason=None,
             ),
         )
+        if sku_image_id is not None:
+            await self._index_styling_sku_image(int(sku_image_id))
         return approval_schema.ConfirmResponse(
             request_id=request_id,
             reviewed_by_name=reviewer_name,
@@ -278,6 +291,65 @@ class ApprovalService:
                 else None
             ),
         )
+
+    async def _index_styling_sku_image(self, sku_image_id: int) -> None:
+        """승인된 스타일링 이미지를 융합 임베딩으로 즉시 색인합니다."""
+        try:
+            sku_image = await self.session.get(
+                sku_models.SkuImage,
+                sku_image_id,
+            )
+            if sku_image is None:
+                raise RuntimeError(
+                    "승인된 스타일링 SKU 이미지를 찾을 수 없습니다."
+                )
+            sku = await self.session.get(
+                sku_models.SkuCatalog, sku_image.sku_id
+            )
+            if sku is None:
+                raise RuntimeError("스타일링 이미지의 SKU를 찾을 수 없습니다.")
+            image_bytes = image_processing_service.read_sku_image_bytes(
+                sku_image.image_url,
+                self.settings.sku_image_root,
+                self.settings.image_storage_root,
+            )
+            if image_bytes is None:
+                raise RuntimeError("스타일링 SKU 이미지를 읽을 수 없습니다.")
+            image = await asyncio.to_thread(
+                image_processing_service.decode_image,
+                image_bytes,
+            )
+            processed = (
+                await asyncio.to_thread(
+                    preprocess_for_embedding,
+                    image,
+                    self.settings,
+                )
+            ).image
+            metadata_text = build_metadata_text(
+                category=sku.category,
+                sub_category=sku.sub_category,
+                product_name=sku.product_name,
+                brand=sku.brand,
+                price=sku.price,
+                attributes=sku.attributes,
+            )
+            embedding = await asyncio.to_thread(
+                self.gemini_service.embed_fused,
+                processed,
+                metadata_text,
+            )
+            sku_image.embedding = embedding
+            sku_image.embedding_pipeline_version = (
+                self.settings.embedding_pipeline_version
+            )
+            sku_image.embedding_image_sha256 = _image_sha256(processed)
+            sku_image.indexed_at = sqlalchemy.func.now()
+            await self.session.commit()
+        except (
+            Exception
+        ):  # noqa: BLE001 - 승인 상태를 보존하고 배치 재색인을 허용한다
+            await self.session.rollback()
 
     async def reject(
         self,
@@ -365,3 +437,10 @@ class ApprovalService:
 def _as_object_metadata(value: object) -> dict[str, typing.Any]:
     """Psycopg JSONB 결과를 안전한 객체 메타데이터로 변환합니다."""
     return value if isinstance(value, dict) else {}
+
+
+def _image_sha256(image: Image.Image) -> str:
+    """전처리 이미지의 고정 PNG 표현을 재색인 식별자로 해시합니다."""
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=False)
+    return hashlib.sha256(buffer.getvalue()).hexdigest()

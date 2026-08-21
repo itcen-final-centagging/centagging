@@ -161,6 +161,7 @@ def get_approval_service(
     session: sqlalchemy_async.AsyncSession = Depends(
         database.get_database_session
     ),
+    gemini_service: GeminiService = Depends(get_gemini_service),
 ) -> ApprovalService:
     """요청 범위 세션으로 승인 요청 서비스를 조립합니다.
 
@@ -170,7 +171,11 @@ def get_approval_service(
     Returns:
         설정이 주입된 ApprovalService입니다.
     """
-    return ApprovalService(session=session, settings=config.get_settings())
+    return ApprovalService(
+        session=session,
+        settings=config.get_settings(),
+        gemini_service=gemini_service,
+    )
 
 
 def get_product_image_submission_service(
