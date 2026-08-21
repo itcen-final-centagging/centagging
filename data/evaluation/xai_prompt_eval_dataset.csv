@@ -1,0 +1,13 @@
+case_id,scene_image,object_idx,expected_label,bbox_xmin,bbox_ymin,bbox_xmax,bbox_ymax,sku_code,sku_image
+dining-room-table,../../uploads/scene-images/965605c6-2171-4f3d-b27a-ee6683a375d5.png,0,테이블·식탁·책상,47,521,990,887,TBL-B4540F5A,../images/1148571_TBL-B4540F5A_WHITE_m_001.png
+dining-room-chair-right,../../uploads/scene-images/965605c6-2171-4f3d-b27a-ee6683a375d5.png,1,의자,719,566,965,990,CHR-7DFE2E44,../images/1050728_CHR-7DFE2E44_BLACK_m_001.png
+dining-room-chair-left,../../uploads/scene-images/965605c6-2171-4f3d-b27a-ee6683a375d5.png,2,의자,207,446,393,806,CHR-7DFE2E44,../images/1050728_CHR-7DFE2E44_BLACK_m_001.png
+dining-room-chair-back,../../uploads/scene-images/965605c6-2171-4f3d-b27a-ee6683a375d5.png,3,의자,650,444,804,774,CHR-7DFE2E44,../images/1050728_CHR-7DFE2E44_BLACK_m_001.png
+storage-bed,../../uploads/scene-images/564d4461-2d2a-4a54-ae83-51241ff7c26b.png,0,침대,21,116,998,998,BED-666D5945,../images/1259188_BED-666D5945_WHITE_m_001.png
+office-desk,../../uploads/scene-images/ed31fc51-1a62-4880-ad74-7a498d3d7e21.jpg,0,테이블·식탁·책상,209,455,858,972,TBL-B4540F5A,../images/1148571_TBL-B4540F5A_WHITE_m_001.png
+office-chair,../../uploads/scene-images/ed31fc51-1a62-4880-ad74-7a498d3d7e21.jpg,1,의자,232,346,570,999,CHR-7DFE2E44,../images/1050728_CHR-7DFE2E44_BLACK_m_001.png
+office-shelf,../../uploads/scene-images/ed31fc51-1a62-4880-ad74-7a498d3d7e21.jpg,2,선반,363,171,676,195,SHLF-E3EE77F9,../images/1297048_SHLF-E3EE77F9_BLACK_m_001.png
+kitchen-storage,../../uploads/scene-images/10bee0cb-397d-4449-837d-742d9556077d.png,0,서랍·수납장,161,96,516,735,DRW-B3F498B6,../images/1000245_DRW-B3F498B6_WHITE_m_001.png
+kitchen-table,../../uploads/scene-images/10bee0cb-397d-4449-837d-742d9556077d.png,1,테이블·식탁·책상,101,552,564,999,TBL-B4540F5A,../images/1148571_TBL-B4540F5A_WHITE_m_001.png
+kitchen-chair-front,../../uploads/scene-images/10bee0cb-397d-4449-837d-742d9556077d.png,2,의자,344,550,626,997,CHR-7DFE2E44,../images/1050728_CHR-7DFE2E44_BLACK_m_001.png
+kitchen-chair-side,../../uploads/scene-images/10bee0cb-397d-4449-837d-742d9556077d.png,3,의자,363,600,514,872,CHR-7DFE2E44,../images/1050728_CHR-7DFE2E44_BLACK_m_001.png

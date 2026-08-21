@@ -1,84 +1,108 @@
-"""Crop 이미지의 가구 속성 추출 프롬프트를 정의합니다."""
+"""Crop 이미지의 가구 속성 추출 프롬프트 v1을 정의합니다."""
 
-FURNITURE_ATTRIBUTE_PROMPT = """
-You are a furniture attribute extraction model.
+import json
+from collections.abc import Mapping
 
-## Task
-Analyze the single furniture object visible in the cropped image.
+PROMPT_VERSION = "v1"
 
-Use the provided category and extract only visually identifiable attributes.
+FURNITURE_ATTRIBUTE_PROMPT_TEMPLATE = """
+당신은 가구 속성 추출 모델입니다.
 
-A category-specific input schema will be provided separately with this
-prompt. The input schema contains category, sub_category_options, and
-attributes.
+## 작업
 
-Return only valid JSON matching the specified output format.
+Crop 이미지에 보이는 단일 가구 객체를 분석하세요. 제공된 고정 대분류를
+사용하고 이미지에서 시각적으로 확인되는 속성만 추출하세요. 아래 입력 규격과
+응답 형식에 맞는 유효한 JSON만 반환하세요.
 
-## Input schema
-The provided input schema has the following structure:
+## 입력 규격
 
-- category:
-  The fixed parent category. Do not change this value.
+- 고정 대분류: {category}
+- 허용 소분류: {sub_category_options}
+- 공통 속성 규격: {common_attributes}
+- 카테고리별 속성 규격: {category_specific_attributes}
 
-- sub_category_options:
-  The allowed sub-category values for the provided category.
-  Select sub_category only from this list.
+고정 대분류는 변경하지 마세요. `sub_category`는 허용 소분류 중 하나만
+선택하세요. 공통 속성과 카테고리별 속성에 정의된 key와 허용값만 사용하세요.
 
-- attributes.common:
-  The allowed common attribute keys and values.
+## 분류 규칙
 
-- attributes.category_specific:
-  The allowed category-specific attribute keys and values.
+1. `category`는 제공된 고정 대분류와 정확히 일치해야 합니다.
+2. 제공된 대분류를 변경하거나 다른 카테고리로 재분류하지 않습니다.
+3. `sub_category`는 허용 소분류 목록의 값 중 하나만 선택합니다.
+4. 소분류를 신뢰할 수 있게 식별할 수 없으면 해당 필드를 생략합니다.
+5. 허용 목록에 없는 소분류를 새로 만들지 않습니다.
 
-The input attributes object defines allowed options.
-The output attributes object must contain only the selected key-value pairs.
-Do not include common or category_specific groups in the output.
+## 속성 규칙
 
-## Classification rules
-1. category must exactly match the provided category.
-2. Do not change or reclassify the provided category.
-3. sub_category must be selected only from sub_category_options.
-4. If no sub-category can be reliably identified, omit sub_category.
-5. Do not create a sub-category that is not included in sub_category_options.
+1. 공통 또는 카테고리별 속성에 정의된 영문 snake_case key만 사용합니다.
+2. 각 key에는 해당 규격에 나열된 허용값만 사용합니다.
+3. 공통 속성과 카테고리별 속성을 하나의 평면 `attributes` 객체로 반환합니다.
+4. 출력에 `common` 또는 `category_specific` 그룹을 만들지 않습니다.
+5. 이미지에서 실제로 확인되는 속성만 반환합니다.
+6. 숨은 제품 사양, 정확한 치수, 가격, 대상 고객과 비시각 정보를 추론하지
+   않습니다.
+7. 일반 속성을 확인할 수 없으면 null을 반환하지 말고 key를 생략합니다.
+8. `has_`로 시작하는 속성은 `있음`, `없음`, `모름` 중 하나만 사용합니다.
+9. 설명, confidence와 정의되지 않은 필드를 `attributes`에 추가하지 않습니다.
+10. 신뢰할 수 있는 속성이 없으면 빈 `attributes` 객체를 반환합니다.
 
-## Attribute rules
-1. Use only attribute keys defined in attributes.common or attributes.category_specific.
-2. Use only values listed for each attribute key.
-3. Return common and category-specific results together in one flat attributes object.
-4. Do not return common or category_specific as output keys.
-5. Attribute keys must use the provided English snake_case names.
-6. Return only attributes that can be visually confirmed from the image.
-7. Do not infer hidden product specifications, exact dimensions, price, target customer, or other non-visual information.
-8. Do not return null for an unknown general attribute. Omit the key instead.
-9. For attributes beginning with has_, use only:
-   - "있음"
-   - "없음"
-   - "모름"
-10. Do not add explanations, confidence values, or unsupported fields to attributes.
-11. An empty attributes object is allowed when no attribute can be determined reliably.
+## 응답 형식
 
-## Output format
-
-{
-  "category": "의자",
-  "sub_category": "학생·사무용의자",
-  "attributes": {
+{{
+  "category": {category_json},
+  "sub_category": "허용 소분류 중 하나",
+  "attributes": {{
     "color": "베이지",
     "style": "모던",
     "material": "패브릭",
     "has_armrest": "있음"
-  }
-}
+  }}
+}}
 
-
-Before returning the result, internally verify:
-- category exactly matches the provided category,
-- sub_category is included in sub_category_options,
-- every attribute key exists in attributes.common or attributes.category_specific
-- every attribute value is one of the provided allowed values,
-- output attributes is a flat object,
-- no unverified attribute was invented.
-
-Return JSON only.
-Do not return Markdown or explanations outside the JSON.
+반환 전에 category와 소분류, 모든 속성 key와 값, 평면 attributes 구조를
+내부적으로 검증하세요. 확인되지 않은 값을 만들지 말고 JSON 외의 설명,
+Markdown과 코드 블록은 반환하지 마세요.
 """.strip()
+
+
+def build_furniture_attribute_prompt(
+    *,
+    attribute_schema: Mapping[str, object],
+) -> str:
+    """카테고리별 허용 규격을 주입한 속성 추출 프롬프트 v1을 생성합니다."""
+    category = attribute_schema.get("category")
+    sub_categories = attribute_schema.get("sub_category_options")
+    attributes = attribute_schema.get("attributes")
+
+    if not isinstance(category, str) or not category:
+        raise ValueError("속성 추출 카테고리가 올바르지 않습니다.")
+    if not isinstance(sub_categories, list) or not all(
+        isinstance(value, str) for value in sub_categories
+    ):
+        raise ValueError("허용 소분류 규격이 올바르지 않습니다.")
+    if not isinstance(attributes, Mapping):
+        raise ValueError("허용 속성 규격이 올바르지 않습니다.")
+
+    common_attributes = attributes.get("common")
+    category_specific_attributes = attributes.get("category_specific")
+    if not isinstance(common_attributes, Mapping) or not isinstance(
+        category_specific_attributes, Mapping
+    ):
+        raise ValueError("공통 또는 카테고리별 속성 규격이 올바르지 않습니다.")
+
+    return FURNITURE_ATTRIBUTE_PROMPT_TEMPLATE.format(
+        category=category,
+        category_json=json.dumps(category, ensure_ascii=False),
+        sub_category_options=json.dumps(
+            sub_categories,
+            ensure_ascii=False,
+        ),
+        common_attributes=json.dumps(
+            dict(common_attributes),
+            ensure_ascii=False,
+        ),
+        category_specific_attributes=json.dumps(
+            dict(category_specific_attributes),
+            ensure_ascii=False,
+        ),
+    )

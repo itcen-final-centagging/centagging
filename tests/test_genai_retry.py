@@ -44,3 +44,52 @@ class GenAiRetryTest(unittest.TestCase):
             call_with_rate_limit_retry(operation, operation_name="test")
 
         self.assertEqual(operation.call_count, 1)
+
+    def test_accepts_evaluation_backoff_and_jitter(self) -> None:
+        """평가 전용 재시도 간격과 jitter를 실제 대기에 반영합니다."""
+        operation = mock.Mock(
+            side_effect=[
+                errors.ClientError(429, {"error": {"message": "busy"}}),
+                errors.ClientError(429, {"error": {"message": "busy"}}),
+                "success",
+            ]
+        )
+
+        with (
+            mock.patch(
+                "app.services.genai_retry.random.uniform",
+                side_effect=[0.5, 1.5],
+            ),
+            mock.patch("app.services.genai_retry.time.sleep") as sleep,
+        ):
+            result = call_with_rate_limit_retry(
+                operation,
+                operation_name="evaluation",
+                retry_delays_seconds=(5.0, 15.0, 30.0),
+                jitter_seconds=2.0,
+            )
+
+        self.assertEqual(result, "success")
+        sleep.assert_has_calls([mock.call(5.5), mock.call(16.5)])
+
+    def test_rate_limit_callback_can_extend_retry_delay(self) -> None:
+        """평가 전체 cooldown이 개별 재시도 대기에도 적용됩니다."""
+        operation = mock.Mock(
+            side_effect=[
+                errors.ClientError(429, {"error": {"message": "busy"}}),
+                "success",
+            ]
+        )
+        rate_limit_callback = mock.Mock(return_value=60.0)
+
+        with mock.patch("app.services.genai_retry.time.sleep") as sleep:
+            result = call_with_rate_limit_retry(
+                operation,
+                operation_name="evaluation",
+                retry_delays_seconds=(5.0,),
+                rate_limit_callback=rate_limit_callback,
+            )
+
+        self.assertEqual(result, "success")
+        rate_limit_callback.assert_called_once_with(5.0)
+        sleep.assert_called_once_with(60.0)

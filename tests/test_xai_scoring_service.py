@@ -15,6 +15,12 @@ from app.core import config
 from app.schemas import tagging
 from app.services import gemini_service, tagging_service, xai_scoring_service
 from app.services.image_processing_service import CroppedObject
+from app.services.prompt.xai_prompt.xai_prompt import (
+    build_xai_prompt as build_xai_prompt_v1,
+)
+from app.services.prompt.xai_prompt.xai_prompt_v2 import (
+    build_xai_prompt as build_xai_prompt_v2,
+)
 
 
 class _RateLimitedModels:
@@ -131,6 +137,70 @@ def _build_xai_request(
 
 class XaiScoringServiceTest(unittest.TestCase):
     """Gemini 오류를 XAI 도메인 오류로 변환하는지 검증합니다."""
+
+    def test_uses_v2_prompt_by_default(self) -> None:
+        """운영 XAI 채점기는 별도 지정이 없으면 v2를 사용합니다."""
+        settings = typing.cast(config.Settings, types.SimpleNamespace())
+
+        service = xai_scoring_service.XaiScoringService(settings)
+
+        self.assertEqual(service.prompt_version, "v2")
+
+    def test_xai_prompt_versions_inject_the_same_inputs(self) -> None:
+        """v1·v2가 같은 crop 구성값을 중괄호 템플릿으로 주입합니다."""
+        crop_summary = "- crop 7: SKU 후보 ['CHR-2041']"
+
+        v1_prompt = build_xai_prompt_v1(
+            crop_count=1,
+            crop_summary=crop_summary,
+        )
+        v2_prompt = build_xai_prompt_v2(
+            crop_count=1,
+            crop_summary=crop_summary,
+        )
+
+        for prompt in (v1_prompt, v2_prompt):
+            self.assertIn("1개의", prompt)
+            self.assertIn(crop_summary, prompt)
+            self.assertNotIn("{crop_count}", prompt)
+            self.assertNotIn("{crop_summary}", prompt)
+
+        self.assertNotEqual(v1_prompt, v2_prompt)
+
+    def test_selects_xai_prompt_version_without_changing_inputs(self) -> None:
+        """서비스가 동일한 대상 구성에서 요청한 XAI 버전을 선택합니다."""
+        settings = typing.cast(config.Settings, types.SimpleNamespace())
+        targets = [
+            xai_scoring_service.ScoringCrop(
+                crop_index=7,
+                crop_image_bytes=b"crop",
+                candidates=[
+                    xai_scoring_service.ScoringCandidate(
+                        sku_code="CHR-2041",
+                        image_bytes=b"sku",
+                    )
+                ],
+            )
+        ]
+
+        v1_service = xai_scoring_service.XaiScoringService(
+            settings,
+            prompt_version="v1",
+        )
+        v2_service = xai_scoring_service.XaiScoringService(
+            settings,
+            prompt_version="v2",
+        )
+
+        self.assertEqual(v1_service.prompt_version, "v1")
+        self.assertEqual(v2_service.prompt_version, "v2")
+        # pylint: disable-next=protected-access
+        v1_prompt = v1_service._build_prompt(targets)
+        # pylint: disable-next=protected-access
+        v2_prompt = v2_service._build_prompt(targets)
+        self.assertIn("crop 7", v1_prompt)
+        self.assertIn("crop 7", v2_prompt)
+        self.assertNotEqual(v1_prompt, v2_prompt)
 
     def test_builds_client_through_shared_genai_factory(self) -> None:
         """XAI 채점기도 공통 Gen AI 클라이언트 정책을 사용합니다."""

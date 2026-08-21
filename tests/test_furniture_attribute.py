@@ -10,6 +10,12 @@ import PIL.Image
 from app.core import config
 from app.schemas.furniture_attribute import FurnitureAttributeResult
 from app.services import furniture_attribute_rules, gemini_service
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v1,
+)
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt_v2 import (
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v2,
+)
 
 
 def _test_settings(api_key: str = "test-key") -> config.Settings:
@@ -21,6 +27,7 @@ def _test_settings(api_key: str = "test-key") -> config.Settings:
         mvp_login_id="",
         mvp_login_password="",
         image_storage_root="unused",
+        sku_image_root="unused",
         database=config.DatabaseSettings(
             name="",
             username="",
@@ -29,6 +36,44 @@ def _test_settings(api_key: str = "test-key") -> config.Settings:
             port=5432,
         ),
     )
+
+
+def test_build_v1_furniture_attribute_prompt_injects_allowed_schema() -> None:
+    """v1 한글 프롬프트에 카테고리별 허용 규격을 직접 주입합니다."""
+    attribute_schema = furniture_attribute_rules.build_allowed_attribute_schema(
+        "의자"
+    )
+
+    prompt = build_furniture_attribute_prompt_v1(
+        attribute_schema=attribute_schema,
+    )
+
+    assert "- 고정 대분류: 의자" in prompt
+    assert '"인테리어의자"' in prompt
+    assert '"color"' in prompt
+    assert '"material"' in prompt
+    assert '"has_armrest"' in prompt
+    assert '"category": "의자"' in prompt
+    assert "JSON 외의 설명" in prompt
+
+
+def test_build_v2_furniture_attribute_prompt_injects_allowed_schema() -> None:
+    """v2 프롬프트에 카테고리별 허용 규격을 직접 주입합니다."""
+    attribute_schema = furniture_attribute_rules.build_allowed_attribute_schema(
+        "의자"
+    )
+
+    prompt = build_furniture_attribute_prompt_v2(
+        attribute_schema=attribute_schema,
+    )
+
+    assert "- 고정 대분류: 의자" in prompt
+    assert '"인테리어의자"' in prompt
+    assert '"color"' in prompt
+    assert '"material"' in prompt
+    assert '"has_armrest"' in prompt
+    assert '"category": "의자"' in prompt
+    assert "JSON 외의 설명" in prompt
 
 
 def test_build_allowed_schema_contains_only_visual_common_attributes() -> None:
@@ -70,7 +115,7 @@ def test_build_allowed_schema_rejects_unknown_category() -> None:
 
 
 def test_build_response_schema_uses_explicit_attribute_properties() -> None:
-    schema = furniture_attribute_rules.build_attribute_response_schema("?섏옄")
+    schema = furniture_attribute_rules.build_attribute_response_schema("의자")
 
     assert schema["type"] == "OBJECT"
     assert set(schema["required"]) == {"category", "attributes"}
@@ -178,11 +223,12 @@ def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
         )
     )
     image = PIL.Image.new("RGB", (20, 20))
-    service = gemini_service.GeminiService(_test_settings())
+    settings = _test_settings()
+    service = gemini_service.GeminiService(settings)
 
     with unittest.mock.patch.object(
-        gemini_service.genai,
-        "Client",
+        gemini_service.genai_client,
+        "create_client",
         return_value=client,
     ) as client_factory:
         result = service.extract_furniture_attributes(image, "의자")
@@ -192,7 +238,7 @@ def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
         sub_category="인테리어의자",
         attributes={"color": "베이지", "material": "패브릭"},
     )
-    client_factory.assert_called_once_with(api_key="test-key")
+    client_factory.assert_called_once_with(settings)
     call = client.models.generate_content.call_args
     assert call.kwargs["model"] == "gemini-test"
     assert call.kwargs["contents"][0] is image
@@ -202,9 +248,11 @@ def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
         "additionalProperties"
         not in response_schema["properties"]["attributes"]
     )
-    context = json.loads(call.kwargs["contents"][2])
-    assert context["category"] == "의자"
-    assert context["attributes"]["category_specific"]["material"]
+    assert len(call.kwargs["contents"]) == 2
+    prompt = call.kwargs["contents"][1]
+    assert "- 고정 대분류: 의자" in prompt
+    assert '"material"' in prompt
+    assert '"has_armrest"' in prompt
 
 
 def test_extract_furniture_attributes_rejects_category_change() -> None:
@@ -219,8 +267,8 @@ def test_extract_furniture_attributes_rejects_category_change() -> None:
     service = gemini_service.GeminiService(_test_settings())
 
     with unittest.mock.patch.object(
-        gemini_service.genai,
-        "Client",
+        gemini_service.genai_client,
+        "create_client",
         return_value=client,
     ):
         try:

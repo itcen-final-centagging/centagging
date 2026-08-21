@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import string
 import typing
 
 from google import genai
@@ -27,13 +26,21 @@ from app.services.image_processing_service import (
     CroppedObject,
     read_sku_image_bytes,
 )
-from app.services.prompt.xai_prompt.xai_prompt import XAI_PROMPT
+from app.services.prompt.xai_prompt.xai_prompt import (
+    build_xai_prompt as build_xai_prompt_v1,
+)
+from app.services.prompt.xai_prompt.xai_prompt_v2 import (
+    build_xai_prompt as build_xai_prompt_v2,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 XAI_CONCURRENCY = 3
 
 THINKING_BUDGET = 0
+
+XaiPromptVersion = typing.Literal["v1", "v2"]
+
 
 class ScoringCandidate(BaseModel):
     """채점 대상 SKU 후보 1건입니다."""
@@ -112,15 +119,29 @@ class RubricScoreResult(BaseModel):
 class XaiScoringService:
     """크롭 단위 VLM 요청을 동시에 보내 루브릭으로 채점하는 서비스입니다."""
 
-    def __init__(self, settings: config.Settings) -> None:
+    def __init__(
+        self,
+        settings: config.Settings,
+        prompt_version: XaiPromptVersion = "v2",
+    ) -> None:
         """Gemini 설정으로 XAI 채점기를 초기화합니다.
 
         Args:
             settings: Gemini 모델과 이미지 저장소 설정입니다.
+            prompt_version: 사용할 XAI 프롬프트 버전입니다.
         """
+        if prompt_version not in ("v1", "v2"):
+            raise ValueError("지원하지 않는 XAI 프롬프트 버전입니다.")
+
         self.settings = settings
+        self._prompt_version = prompt_version
         self._client: genai.Client | None = None
         self._score_semaphore = asyncio.Semaphore(XAI_CONCURRENCY)
+
+    @property
+    def prompt_version(self) -> XaiPromptVersion:
+        """현재 XAI 채점에 사용하는 프롬프트 버전을 반환합니다."""
+        return self._prompt_version
 
     def _get_client(self) -> genai.Client:
         if not genai_client.is_configured(self.settings):
@@ -372,15 +393,7 @@ class XaiScoringService:
 
         client = self._get_client()
 
-        crop_summary = "\n".join(
-            f"    - crop {crop.crop_index}: "
-            f"SKU 후보 {[c.sku_code for c in crop.candidates]}"
-            for crop in targets
-        )
-        prompt = string.Template(XAI_PROMPT).substitute(
-            crop_count=len(targets),
-            crop_summary=crop_summary,
-        )
+        prompt = self._build_prompt(targets)
 
         contents: list[typing.Any] = [prompt]
         for crop in targets:
@@ -439,3 +452,20 @@ class XaiScoringService:
             raise GeminiApiError(
                 "Gemini 루브릭 채점 요청에 실패했습니다."
             ) from error
+
+    def _build_prompt(self, targets: list[ScoringCrop]) -> str:
+        """현재 버전에 맞춰 crop과 SKU 후보 구성을 프롬프트에 주입합니다."""
+        crop_summary = "\n".join(
+            f"    - crop {crop.crop_index}: "
+            f"SKU 후보 {[c.sku_code for c in crop.candidates]}"
+            for crop in targets
+        )
+        prompt_builder = (
+            build_xai_prompt_v1
+            if self._prompt_version == "v1"
+            else build_xai_prompt_v2
+        )
+        return prompt_builder(
+            crop_count=len(targets),
+            crop_summary=crop_summary,
+        )
