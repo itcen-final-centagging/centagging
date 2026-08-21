@@ -22,7 +22,11 @@ from app.services.image_processing_service import (
     crop_scene_objects,
 )
 from app.services.image_preprocessing_service import preprocess_for_embedding
-from app.services.similar_sku_service import SimilarSkuService
+from app.services.fused_metadata import build_metadata_text
+from app.services.similar_sku_service import (
+    FusedEmbeddingInput,
+    SimilarSkuService,
+)
 from app.services.xai_scoring_service import XaiObjectResult, XaiScoringService
 
 DETECTED_STATUS = "DETECTED"
@@ -119,10 +123,17 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             category_by_idx,
             preprocessed_images,
         )
+        fused_inputs = self._build_fused_embedding_inputs(
+            crops,
+            category_by_idx,
+            attributes_by_idx,
+            preprocessed_images,
+        )
 
         # 2) 임베딩 및 유사 SKU 탐색
         result.objects = await self.similar_sku_service.build_detected_objects(
-            crops
+            crops,
+            fused_inputs,
         )
 
         # 3) XAI 근거 산출
@@ -218,6 +229,38 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             crop.crop_index: result.image
             for crop, result in zip(crops, processed)
         }
+
+    @staticmethod
+    def _build_fused_embedding_inputs(
+        crops: list[CroppedObject],
+        category_by_idx: dict[int, str],
+        attributes_by_idx: dict[int, FurnitureAttributeResult | None],
+        preprocessed_images: dict[int, Image.Image],
+    ) -> dict[int, FusedEmbeddingInput]:
+        """보정 크롭과 추출 속성을 SKU와 동일한 입력 규칙으로 조립합니다."""
+        fused_inputs = {}
+        for crop in crops:
+            image = preprocessed_images.get(crop.crop_index)
+            if image is None:
+                continue
+            attributes = attributes_by_idx.get(crop.crop_index)
+            fused_inputs[crop.crop_index] = FusedEmbeddingInput(
+                image=image,
+                metadata_text=build_metadata_text(
+                    category=category_by_idx.get(crop.crop_index),
+                    sub_category=(
+                        attributes.sub_category
+                        if attributes is not None
+                        else None
+                    ),
+                    attributes=(
+                        attributes.attributes
+                        if attributes is not None
+                        else None
+                    ),
+                ),
+            )
+        return fused_inputs
 
     @staticmethod
     def _apply_xai_results(

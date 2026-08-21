@@ -2,9 +2,11 @@
 
 import asyncio
 import collections.abc
+import dataclasses
 import logging
 import typing
 
+from PIL import Image
 import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import pydantic
 import sqlalchemy
@@ -37,6 +39,14 @@ class SceneImageNotFoundError(RuntimeError):
 
 class SimilarSkuQueryError(RuntimeError):
     """유사 SKU 검색 중 발생한 오류입니다."""
+
+
+@dataclasses.dataclass(frozen=True)
+class FusedEmbeddingInput:
+    """연출 객체를 SKU 색인과 같은 규칙으로 벡터화할 입력입니다."""
+
+    image: Image.Image
+    metadata_text: str
 
 
 class SimilarSku(pydantic.BaseModel):
@@ -82,6 +92,7 @@ class SimilarSkuService:
     async def build_detected_objects(
         self,
         crops: list[CroppedObject],
+        fused_inputs: collections.abc.Mapping[int, FusedEmbeddingInput],
     ) -> list[DetectedObject]:
         """크롭 목록으로 SKU 후보까지 채운 탐지 객체를 만듭니다.
 
@@ -91,6 +102,7 @@ class SimilarSkuService:
 
         Args:
             crops: 장면 이미지에서 잘라낸 탐지 객체 목록입니다.
+            fused_inputs: 객체별 보정 이미지와 추출 속성 메타데이터입니다.
 
         Returns:
             sku_candidates까지 채워진 탐지 객체 목록입니다. label과
@@ -100,7 +112,10 @@ class SimilarSkuService:
             return []
 
         embeddings = await asyncio.gather(
-            *(self._embed_crop(crop) for crop in crops),
+            *(
+                self._embed_crop(crop, fused_inputs.get(crop.crop_index))
+                for crop in crops
+            ),
             return_exceptions=True,
         )
 
@@ -151,18 +166,29 @@ class SimilarSkuService:
             )
             return []
 
-    async def _embed_crop(self, crop: CroppedObject) -> list[float]:
+    async def _embed_crop(
+        self,
+        crop: CroppedObject,
+        fused_input: FusedEmbeddingInput | None,
+    ) -> list[float]:
         """크롭 1건을 임베딩합니다. 동시 호출 수를 세마포어로 제한합니다.
 
         Args:
             crop: 임베딩할 크롭입니다.
+            fused_input: 보정 이미지와 메타데이터 입력입니다.
 
         Returns:
             크롭 이미지의 임베딩 벡터입니다.
         """
+        if fused_input is None:
+            raise SimilarSkuQueryError(
+                f"융합 임베딩 입력이 없습니다: crop_index={crop.crop_index}"
+            )
         async with self._embed_semaphore:
             return await asyncio.to_thread(
-                self.gemini_service.embed_image, crop.image_bytes
+                self.gemini_service.embed_fused,
+                fused_input.image,
+                fused_input.metadata_text,
             )
 
     def _to_sku_candidate(self, sku: "SimilarSku") -> SkuCandidate:
