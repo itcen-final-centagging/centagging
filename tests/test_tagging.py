@@ -174,7 +174,11 @@ class _FakeSession:
 class _FakeGeminiService:
     """고정된 이미지 임베딩을 반환합니다."""
 
-    def embed_image(self, _image: PIL.Image.Image) -> list[float]:
+    def embed_fused(
+        self,
+        _image: PIL.Image.Image,
+        _metadata_text: str,
+    ) -> list[float]:
         """검색 차원에 맞는 임베딩을 반환합니다."""
         return [0.1] * similar_sku_service.EMBEDDING_DIMENSIONS
 
@@ -220,7 +224,15 @@ class SimilarSkuRecommendationTest(unittest.IsolatedAsyncioTestCase):
             image_bytes=b"image",
         )
 
-        objects = await service.build_detected_objects([crop])
+        objects = await service.build_detected_objects(
+            [crop],
+            {
+                0: similar_sku_service.FusedEmbeddingInput(
+                    image=crop.image,
+                    metadata_text="카테고리: 의자",
+                )
+            },
+        )
 
         self.assertEqual(
             objects[0].sku_candidates[0].matched_sku_image.image_url,

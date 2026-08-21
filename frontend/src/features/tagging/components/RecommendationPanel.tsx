@@ -170,19 +170,23 @@ export const RecommendationPanel = () => {
                       <span className="mt-1 block truncate text-xs font-extrabold text-text-primary">
                         {candidate.name}
                       </span>
-                      <span className="mt-2 flex items-center gap-2">
-                        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
-                          <span
-                            className="block h-full rounded-full bg-emerald-600"
-                            style={{ width: `${candidate.score ?? 0}%` }}
-                          />
+                      {candidate.score === null ? (
+                        <span className="mt-2 inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-500">
+                          검색으로 추가됨
                         </span>
-                        <span className="text-[11px] font-extrabold text-emerald-700">
-                          {candidate.score === null
-                            ? 'null'
-                            : `${candidate.score}점`}
+                      ) : (
+                        <span className="mt-2 flex items-center gap-2">
+                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100">
+                            <span
+                              className="block h-full rounded-full bg-emerald-600"
+                              style={{ width: `${candidate.score}%` }}
+                            />
+                          </span>
+                          <span className="text-[11px] font-extrabold text-emerald-700">
+                            {candidate.score}점
+                          </span>
                         </span>
-                      </span>
+                      )}
                     </span>
                   </div>
                 </button>
@@ -208,27 +212,44 @@ export const RecommendationPanel = () => {
                 <h2 className="text-lg font-extrabold text-text-primary">
                   {focusedCandidate.name}
                 </h2>
-                <span className="rounded-full bg-success-50 px-2 py-0.5 text-[11px] font-bold text-success-600">
-                  추천
-                </span>
+                {focusedCandidate.score !== null && (
+                  <span className="rounded-full bg-success-50 px-2 py-0.5 text-[11px] font-bold text-success-600">
+                    추천
+                  </span>
+                )}
               </div>
+              {/* 사이즈(attrs.size)는 카테고리에 따라 없을 수 있어, 값이 있을 때만 잇습니다. */}
               <p className="mt-1 font-mono text-xs text-text-tertiary">
-                {focusedCandidate.sku} · {focusedCandidate.size ?? 'null'}
+                {focusedCandidate.size
+                  ? `${focusedCandidate.sku} · ${focusedCandidate.size}`
+                  : focusedCandidate.sku}
               </p>
             </div>
             <div className="text-left sm:text-right">
-              <p className="text-2xl font-extrabold tracking-[-0.04em] text-emerald-700">
-                {focusedCandidate.score === null
-                  ? 'null'
-                  : `${focusedCandidate.score}점`}
-              </p>
-              <p className="text-[11px] font-semibold text-text-tertiary">
-                최종 매칭 점수
-              </p>
+              {focusedCandidate.score === null ? (
+                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-bold text-neutral-500">
+                  검색으로 추가된 SKU
+                </span>
+              ) : (
+                <>
+                  <p className="text-2xl font-extrabold tracking-[-0.04em] text-emerald-700">
+                    {focusedCandidate.score}점
+                  </p>
+                  <p className="text-[11px] font-semibold text-text-tertiary">
+                    최종 매칭 점수
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.92fr)]">
+          <div
+            className={cn(
+              'mt-5 grid gap-4',
+              focusedCandidate.score !== null &&
+                'lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.92fr)]',
+            )}
+          >
             <div className="rounded-xl bg-bg-tertiary/75 p-5">
               <div className="flex min-h-44 items-center justify-center gap-3 sm:gap-6">
                 <div className="w-28 text-center sm:w-36">
@@ -255,49 +276,51 @@ export const RecommendationPanel = () => {
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold text-text-secondary">
-                  VLM 루브릭 채점
+            {focusedCandidate.score !== null && (
+              <div className="rounded-xl border border-border p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-text-secondary">
+                    VLM 루브릭 채점
+                  </p>
+                  <span className="text-sm font-extrabold text-text-primary">
+                    {rubricTotal === null ? '—' : `${rubricTotal}점`}
+                  </span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {rubricScores.map(({ key, label, maximum, score }) => {
+                    const percentage =
+                      score === null ? 0 : (score / maximum) * 100;
+                    return (
+                      <div
+                        className="grid grid-cols-[42px_minmax(0,1fr)_44px] items-center gap-2"
+                        key={key}
+                      >
+                        <span className="text-xs font-semibold text-text-secondary">
+                          {label}
+                        </span>
+                        <span className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                          <span
+                            className="block h-full rounded-full bg-emerald-600"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </span>
+                        <span className="text-right text-xs font-bold text-emerald-700">
+                          {score === null
+                            ? '—'
+                            : `${score}점/${maximum}점`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mt-4 border-t border-neutral-100 pt-3 text-xs leading-5 text-text-secondary">
+                  {focusedCandidate.xaiResult?.summary ??
+                    focusedCandidate.rubric?.xaiReason ??
+                    focusedCandidate.xaiReason ??
+                    '—'}
                 </p>
-                <span className="text-sm font-extrabold text-text-primary">
-                  {rubricTotal === null ? 'null' : `${rubricTotal}점`}
-                </span>
               </div>
-              <div className="mt-4 space-y-3">
-                {rubricScores.map(({ key, label, maximum, score }) => {
-                  const percentage =
-                    score === null ? 0 : (score / maximum) * 100;
-                  return (
-                    <div
-                      className="grid grid-cols-[42px_minmax(0,1fr)_44px] items-center gap-2"
-                      key={key}
-                    >
-                      <span className="text-xs font-semibold text-text-secondary">
-                        {label}
-                      </span>
-                      <span className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
-                        <span
-                          className="block h-full rounded-full bg-emerald-600"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </span>
-                      <span className="text-right text-xs font-bold text-emerald-700">
-                        {score === null
-                          ? 'null'
-                          : `${score}점/${maximum}점`}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="mt-4 border-t border-neutral-100 pt-3 text-xs leading-5 text-text-secondary">
-                {focusedCandidate.xaiResult?.summary ??
-                  focusedCandidate.rubric?.xaiReason ??
-                  focusedCandidate.xaiReason ??
-                  'null'}
-              </p>
-            </div>
+            )}
           </div>
 
           <div className="mt-5">

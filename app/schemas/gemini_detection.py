@@ -40,7 +40,6 @@ class GeminiRawDetection(BaseModel):
         description="객체와 카테고리 판정에 대한 0~1 범위의 확신도",
     )
 
-
 # Gemini 탐지 결과 리스트
 class GeminiModelDetectionResult(BaseModel):
     """Gemini 구조화 응답의 탐지 객체 목록입니다."""

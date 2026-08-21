@@ -28,23 +28,23 @@ __all__ = [
 
 def embed_text(settings: config.Settings, text: str) -> list[float]:
     """텍스트 1건을 임베딩하여 벡터 값을 반환한다.
-
-    Args:
-        settings: GEMINI_API_KEY·임베딩 모델이 담긴 애플리케이션 설정입니다.
-        text: 임베딩할 텍스트입니다.
-
-    Returns:
-        임베딩 벡터(float 리스트)입니다.
-
-    Raises:
-        GeminiConfigurationError: GEMINI_API_KEY가 설정되지 않은 경우입니다.
-        GeminiEmbeddingError: 텍스트 임베딩 호출에 실패한 경우입니다.
+    ...
     """
-    if not settings.gemini_api_key:
-        raise GeminiConfigurationError("GEMINI_API_KEY가 설정되지 않았습니다.")
+    if not settings.gcp_project_id and not settings.gemini_api_key:
+        raise GeminiConfigurationError(
+            "GEMINI_API_KEY 또는 GCP_PROJECT_ID(Vertex) 중 하나는 설정되어야 합니다."
+        )
 
     try:
-        client = genai.Client(api_key=settings.gemini_api_key)
+        if settings.gcp_project_id:
+            client = genai.Client(
+                vertexai=True,
+                project=settings.gcp_project_id,
+                location=settings.vertex_ai_location,
+            )
+        else:
+            client = genai.Client(api_key=settings.gemini_api_key)
+
         response = client.models.embed_content(
             model=settings.gemini_embedding_model,
             contents=text,

@@ -1,6 +1,18 @@
 import { createAuthorizationHeaders } from '@/features/auth/api/auth';
 import { requestJson, type ApiSuccessResponse } from '@/lib/api-request';
 
+export type ExtractedSkuMetadata = {
+  attributes: Record<string, string>;
+  category: string | null;
+  subCategory: string | null;
+};
+
+type ApiExtractedSkuMetadata = {
+  attributes: Record<string, string>;
+  category: string | null;
+  sub_category: string | null;
+};
+
 export type CatalogSku = {
   attributes: Record<string, unknown>;
   brand: string | null;
@@ -29,6 +41,15 @@ type ApiCatalogSku = {
 
 type CatalogResponse = { items: ApiCatalogSku[] };
 
+export type CatalogFilters = {
+  category?: string | null;
+  color?: string | null;
+  pattern?: string | null;
+  q?: string | null;
+  style?: string | null;
+  subCategory?: string | null;
+};
+
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(
     /\/$/,
@@ -56,10 +77,40 @@ const toCatalogSku = (item: ApiCatalogSku): CatalogSku => ({
 /** 시스템에 등록된 SKU의 대표 이미지와 메타데이터를 조회합니다. */
 export const fetchCatalogSkus = async (
   session: string,
+  filters?: CatalogFilters,
 ): Promise<CatalogSku[]> => {
+  const params = new URLSearchParams();
+  if (filters?.category) params.set('category', filters.category);
+  if (filters?.subCategory) params.set('sub_category', filters.subCategory);
+  if (filters?.color) params.set('color', filters.color);
+  if (filters?.style) params.set('style', filters.style);
+  if (filters?.pattern) params.set('pattern', filters.pattern);
+  if (filters?.q) params.set('q', filters.q);
+  const query = params.toString();
   const response = await requestJson<ApiSuccessResponse<CatalogResponse>>(
-    `${API_BASE_URL}/sku/catalog`,
+    `${API_BASE_URL}/sku/catalog${query ? `?${query}` : ''}`,
     { headers: createAuthorizationHeaders(session) },
   );
   return response.data.items.map(toCatalogSku);
+};
+
+export const extractSkuMetadata = async (
+  session: string,
+  image: Blob,
+): Promise<ExtractedSkuMetadata> => {
+  const body = new FormData();
+  body.append('image', image, 'image.jpg');
+  const result = await requestJson<ApiExtractedSkuMetadata>(
+    `${API_BASE_URL}/sku/extract`,
+    {
+      body,
+      headers: createAuthorizationHeaders(session),
+      method: 'POST',
+    },
+  );
+  return {
+    attributes: result.attributes,
+    category: result.category,
+    subCategory: result.sub_category,
+  };
 };

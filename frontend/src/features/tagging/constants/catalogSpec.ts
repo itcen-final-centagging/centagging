@@ -321,6 +321,36 @@ export const getMaterialValues = (category: string | null): string[] => {
   return values.length > 0 ? values : MATERIAL_FULL;
 };
 
+/** 검수 화면에서 소재 계열로 묶어 노출할 속성 키와 표기 순서입니다. */
+export const MATERIAL_ATTRIBUTE_KEYS = [
+  'material',
+  'top_material',
+  'frame_material',
+] as const;
+
+export interface MaterialAttribute {
+  key: string;
+  values: string[];
+}
+
+/**
+ * 대분류에서 쓰는 소재 계열 속성과 허용값을 모두 반환합니다.
+ * 예) 테이블·식탁·책상 -> 상판 소재 + 프레임 소재, 거울 -> 프레임 소재.
+ * 소재 계열 정의가 하나도 없으면(예: 매트리스) 전체 소재 목록을 가진
+ * material 한 건으로 대신합니다.
+ */
+export const getMaterialAttributes = (
+  category: string | null,
+): MaterialAttribute[] => {
+  const attributes = category ? (PRODUCT_ATTRIBUTE[category] ?? {}) : {};
+  const defined = MATERIAL_ATTRIBUTE_KEYS.filter(
+    (key) => (attributes[key] ?? []).length > 0,
+  ).map((key) => ({ key, values: attributes[key] }));
+  return defined.length > 0
+    ? defined
+    : [{ key: 'material', values: MATERIAL_FULL }];
+};
+
 /**
  * 현재 값이 허용값 목록에 없으면 맨 앞에 끼워 넣습니다.
  * 이미 저장된 값이 드롭다운에서 사라지지 않도록 하기 위한 보정입니다.

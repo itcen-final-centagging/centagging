@@ -27,7 +27,14 @@ const getActiveStep = (stage: WorkflowStage): number => {
   if (stage === 'detect' || stage === 'not-found' || stage === 'redetecting') {
     return 1;
   }
-  if (stage === 'recommend' || stage === 'catalog') return 2;
+  // 유사 SKU 추천 로딩(recommending)도 SKU 선택 단계로 표시합니다.
+  if (
+    stage === 'recommending' ||
+    stage === 'recommend' ||
+    stage === 'catalog'
+  ) {
+    return 2;
+  }
   if (stage === 'review' || stage === 'saving') return 3;
   return 4;
 };

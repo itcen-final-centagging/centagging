@@ -1,16 +1,24 @@
 """현재 태깅 결과 모델을 위한 승인 요청 서비스입니다."""
 
+import asyncio
 import dataclasses
 import datetime
+import hashlib
+import io
 import pathlib
 import typing
 
+from PIL import Image
 import sqlalchemy
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core import config
+from app.models import sku as sku_models
 from app.schemas import approval as approval_schema
 from app.services import image_processing_service, sku_service
+from app.services.fused_metadata import build_metadata_text
+from app.services.gemini_service import GeminiService
+from app.services.image_preprocessing_service import preprocess_for_embedding
 from app.services.sku_image_storage import SkuImageStorage
 
 
@@ -135,6 +143,7 @@ _UPDATE_APPROVAL = sqlalchemy.text("""
     RETURNING request_id
     """)
 
+
 class ApprovalService:
     """태깅 확정 결과를 SKU 스타일링 이미지로 승인·반려합니다."""
 
@@ -142,10 +151,12 @@ class ApprovalService:
         self,
         session: sqlalchemy_async.AsyncSession,
         settings: config.Settings,
+        gemini_service: GeminiService,
     ) -> None:
         """Initialize the approval service."""
         self.session = session
         self.settings = settings
+        self.gemini_service = gemini_service
         self.sku_image_storage = SkuImageStorage(settings.sku_image_root)
 
     async def list_approvals(
@@ -250,10 +261,23 @@ class ApprovalService:
     ) -> approval_schema.ConfirmResponse:
         """승인 대상 객체를 크롭해 SKU 스타일링 이미지로 등록합니다."""
         row = await self._get_pending_for_update(request_id)
-        image_url = self._save_crop(row)
+        crop = await asyncio.to_thread(self._crop_object, row)
+        image_url = sku_service.save_uploaded_image(
+            self.settings,
+            str(row["sku_code"]),
+            f"approved-{row['request_id']}.jpg",
+            crop.image_bytes,
+        )
+        embedding = await asyncio.to_thread(
+            self.gemini_service.embed_image, crop.image_bytes
+        )
         image_result = await self.session.execute(
             _INSERT_SKU_IMAGE,
-            {"image_url": image_url, "sku_id": row["sku_id"]},
+            {
+                "sku_id": row["sku_id"],
+                "image_url": image_url,
+                "embedding": embedding,
+            },
         )
         sku_image_id = image_result.scalar_one_or_none()
         await self._review(
@@ -264,6 +288,8 @@ class ApprovalService:
                 reject_reason=None,
             ),
         )
+        if sku_image_id is not None:
+            await self._index_styling_sku_image(int(sku_image_id))
         return approval_schema.ConfirmResponse(
             request_id=request_id,
             reviewed_by_name=reviewer_name,
@@ -278,6 +304,65 @@ class ApprovalService:
                 else None
             ),
         )
+
+    async def _index_styling_sku_image(self, sku_image_id: int) -> None:
+        """승인된 스타일링 이미지를 융합 임베딩으로 즉시 색인합니다."""
+        try:
+            sku_image = await self.session.get(
+                sku_models.SkuImage,
+                sku_image_id,
+            )
+            if sku_image is None:
+                raise RuntimeError(
+                    "승인된 스타일링 SKU 이미지를 찾을 수 없습니다."
+                )
+            sku = await self.session.get(
+                sku_models.SkuCatalog, sku_image.sku_id
+            )
+            if sku is None:
+                raise RuntimeError("스타일링 이미지의 SKU를 찾을 수 없습니다.")
+            image_bytes = image_processing_service.read_sku_image_bytes(
+                sku_image.image_url,
+                self.settings.sku_image_root,
+                self.settings.image_storage_root,
+            )
+            if image_bytes is None:
+                raise RuntimeError("스타일링 SKU 이미지를 읽을 수 없습니다.")
+            image = await asyncio.to_thread(
+                image_processing_service.decode_image,
+                image_bytes,
+            )
+            processed = (
+                await asyncio.to_thread(
+                    preprocess_for_embedding,
+                    image,
+                    self.settings,
+                )
+            ).image
+            metadata_text = build_metadata_text(
+                category=sku.category,
+                sub_category=sku.sub_category,
+                product_name=sku.product_name,
+                brand=sku.brand,
+                price=sku.price,
+                attributes=sku.attributes,
+            )
+            embedding = await asyncio.to_thread(
+                self.gemini_service.embed_fused,
+                processed,
+                metadata_text,
+            )
+            sku_image.embedding = embedding
+            sku_image.embedding_pipeline_version = (
+                self.settings.embedding_pipeline_version
+            )
+            sku_image.embedding_image_sha256 = _image_sha256(processed)
+            sku_image.indexed_at = sqlalchemy.func.now()
+            await self.session.commit()
+        except (
+            Exception
+        ):  # noqa: BLE001 - 승인 상태를 보존하고 배치 재색인을 허용한다
+            await self.session.rollback()
 
     async def reject(
         self,
@@ -342,26 +427,35 @@ class ApprovalService:
             raise AlreadyReviewedError(request_id)
         await self.session.commit()
 
-    def _save_crop(self, row: sqlalchemy.RowMapping) -> str:
+    def _crop_object(
+        self, row: sqlalchemy.RowMapping
+    ) -> image_processing_service.CroppedObject:
+        """승인 대상 객체를 연출 이미지 태깅 파이프라인과 동일하게 크롭합니다.
+
+        ``tagging_service``가 추천 단계에서 쓰는
+        ``image_processing_service.crop_scene_objects``를 그대로
+        재사용합니다. 승인 시 저장하는 임베딩이 연출 이미지 크롭
+        임베딩과 같은 좌표계·인코딩으로 만들어져야 유사도 비교가
+        유효하기 때문입니다.
+        """
         object_metadata = _as_object_metadata(row["object_metadata"])
-        bbox = object_metadata.get("bbox_coord")
-        if not isinstance(bbox, dict):
+        if not isinstance(object_metadata.get("bbox_coord"), dict):
             raise ValueError("승인 대상 객체의 바운딩 박스가 없습니다.")
         source_path = pathlib.Path(self.settings.image_storage_root) / str(
             row["scene_image_url"]
         ).removeprefix("/uploads/")
-        scene_image = image_processing_service.decode_image(
-            source_path.read_bytes()
-        )
-        crop = image_processing_service.get_crop_image(scene_image, bbox)
-        return sku_service.save_uploaded_image(
-            self.settings,
-            str(row["sku_code"]),
-            f"approved-{row['request_id']}.jpg",
-            image_processing_service.parse_image_to_bytes(crop),
-        )
+        return image_processing_service.crop_scene_objects(
+            source_path, [object_metadata]
+        )[0]
 
 
 def _as_object_metadata(value: object) -> dict[str, typing.Any]:
     """Psycopg JSONB 결과를 안전한 객체 메타데이터로 변환합니다."""
     return value if isinstance(value, dict) else {}
+
+
+def _image_sha256(image: Image.Image) -> str:
+    """전처리 이미지의 고정 PNG 표현을 재색인 식별자로 해시합니다."""
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=False)
+    return hashlib.sha256(buffer.getvalue()).hexdigest()

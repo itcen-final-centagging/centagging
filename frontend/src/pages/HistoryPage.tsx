@@ -3,9 +3,14 @@ import { Clock3, Plus, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button } from '@/commons/components/Button';
+import {
+  APPROVAL_STATUS_LABELS,
+  APPROVAL_STATUS_STYLES,
+} from '@/features/approvals/constants/approvalStatus';
 import { fetchTaggingHistory } from '@/features/tagging/api/tagging';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import type { TaggingHistory } from '@/features/tagging/types';
+import { cn } from '@/lib/utils';
 
 export const HistoryPage = () => {
   const { resetWorkflow } = useTaggingWorkflow();
@@ -96,8 +101,21 @@ export const HistoryPage = () => {
                 key={record.id}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-mono text-xs font-bold text-primary">
-                    {record.sku}
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-primary">
+                      {record.sku}
+                    </span>
+                    {/* 승인 요청이 없는 예전 결과는 상태 배지를 숨깁니다. */}
+                    {record.approvalStatus ? (
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-bold',
+                          APPROVAL_STATUS_STYLES[record.approvalStatus],
+                        )}
+                      >
+                        {APPROVAL_STATUS_LABELS[record.approvalStatus]}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="text-xs text-neutral-400">
                     {record.savedAt}
