@@ -30,13 +30,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command:
-      - psql
-      - --set=ON_ERROR_STOP=1
-      - --host=db
-      - --username=${POSTGRES_USER:-centagging}
-      - --dbname=${POSTGRES_DB:-centagging}
-      - --file=/migrations/create_ai_job.sql
+    entrypoint: ["/bin/sh", "-ec"]
+    command: |
+      for migration in /migrations/*.sql; do
+        psql --set=ON_ERROR_STOP=1 --host=db \
+          --username=${POSTGRES_USER:-centagging} \
+          --dbname=${POSTGRES_DB:-centagging} --file="$$migration"
+      done
 
   # FastAPI 백엔드 / FastAPI backend
   api:

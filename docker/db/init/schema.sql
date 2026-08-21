@@ -185,6 +185,8 @@ CREATE TABLE sku_image (
                  CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
     embedding    VECTOR(3072),
     indexed_at   TIMESTAMPTZ,
+    embedding_pipeline_version VARCHAR(50),
+    embedding_image_sha256     TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -199,8 +201,10 @@ CREATE INDEX idx_skuimg_pending ON sku_image(sku_image_id) WHERE embedding IS NU
 
 COMMENT ON TABLE  sku_image            IS 'SKU 이미지 + 벡터 (색인 단위)';
 COMMENT ON COLUMN sku_image.image_type IS 'MAIN | ANGLE | DETAIL | STYLING — 색인 대상 선별에 사용';
-COMMENT ON COLUMN sku_image.embedding  IS '이미지 벡터 - 검색 대상. NULL 이면 미색인';
+COMMENT ON COLUMN sku_image.embedding  IS '보정 RGB·그레이·메타데이터 융합 벡터 - 검색 대상. NULL 이면 미색인';
 COMMENT ON COLUMN sku_image.indexed_at IS '임베딩 생성 완료 일시';
+COMMENT ON COLUMN sku_image.embedding_pipeline_version IS 'embedding 생성 파이프라인 버전';
+COMMENT ON COLUMN sku_image.embedding_image_sha256 IS 'embedding 생성에 사용한 보정 이미지 SHA-256';
 
 -- ------------------------------------------------------------
 -- 6. tagging_result : 최종 객체-SKU 매핑 + 검수 이력

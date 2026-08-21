@@ -46,13 +46,13 @@ services:
         condition: service_healthy
     networks:
       - app_network
-    command:
-      - psql
-      - --set=ON_ERROR_STOP=1
-      - --host=cloud-sql-proxy
-      - --username=${POSTGRES_USER:?POSTGRES_USER must be set}
-      - --dbname=${POSTGRES_DB:?POSTGRES_DB must be set}
-      - --file=/migrations/create_ai_job.sql
+    entrypoint: ["/bin/sh", "-ec"]
+    command: |
+      for migration in /migrations/*.sql; do
+        psql --set=ON_ERROR_STOP=1 --host=cloud-sql-proxy \
+          --username=${POSTGRES_USER:?POSTGRES_USER must be set} \
+          --dbname=${POSTGRES_DB:?POSTGRES_DB must be set} --file="$$migration"
+      done
 
   api:
     image: ${API_IMAGE:-centagging-api:prod}
