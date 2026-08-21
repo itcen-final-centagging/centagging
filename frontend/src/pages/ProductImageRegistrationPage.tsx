@@ -10,11 +10,13 @@ import {
   LoaderCircle,
   PackagePlus,
   Send,
+  Sparkles,
 } from 'lucide-react';
 
 import { Button } from '@/commons/components/Button';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
+  extractSkuMetadata,
   fetchCatalogSkus,
   type CatalogSku,
 } from '@/features/catalog/api/catalog';
@@ -32,6 +34,18 @@ import {
   type ProductImageTargetType,
   type ProductImageType,
 } from '@/features/productImageSubmissions/api/productImageSubmissions';
+import { SkuCatalogSearchDialog } from '@/features/productImageSubmissions/components/SkuCatalogSearchDialog';
+import {
+  CATEGORIES,
+  getAllowedValues,
+  getCategoryAttributeKeys,
+  getSubCategories,
+  withCurrentValue,
+} from '@/features/tagging/constants/catalogSpec';
+import {
+  ATTRIBUTE_LABELS,
+  COMMON_ATTRIBUTE_KEYS,
+} from '@/features/tagging/constants/skuAttributes';
 import { cn } from '@/lib/utils';
 
 const statuses: Array<{
@@ -64,7 +78,7 @@ const fieldClassName =
 const fieldLabelClassName = 'text-xs font-bold text-text-secondary';
 
 const emptyDraft = (): ProductImageSubmissionDraft => ({
-  imageType: 'MAIN',
+  imageType: 'ANGLE',
   proposedAttributes: {},
   proposedBrand: null,
   proposedCategory: null,
@@ -78,18 +92,24 @@ const emptyDraft = (): ProductImageSubmissionDraft => ({
 
 const draftFromSubmission = (
   submission: ProductImageSubmission,
-): ProductImageSubmissionDraft => ({
-  imageType: submission.imageType,
-  proposedAttributes: submission.proposedAttributes,
-  proposedBrand: submission.proposedBrand,
-  proposedCategory: submission.proposedCategory,
-  proposedPrice: submission.proposedPrice,
-  proposedProductName: submission.proposedProductName,
-  proposedSkuCode: submission.proposedSkuCode,
-  proposedSubCategory: submission.proposedSubCategory,
-  targetSkuCode: submission.targetSkuCode,
-  targetType: submission.targetType ?? 'EXISTING',
-});
+): ProductImageSubmissionDraft => {
+  const targetType = submission.targetType ?? 'EXISTING';
+  return {
+    imageType:
+      targetType === 'EXISTING' && submission.imageType === 'MAIN'
+        ? 'ANGLE'
+        : submission.imageType,
+    proposedAttributes: submission.proposedAttributes,
+    proposedBrand: submission.proposedBrand,
+    proposedCategory: submission.proposedCategory,
+    proposedPrice: submission.proposedPrice,
+    proposedProductName: submission.proposedProductName,
+    proposedSkuCode: submission.proposedSkuCode,
+    proposedSubCategory: submission.proposedSubCategory,
+    targetSkuCode: submission.targetSkuCode,
+    targetType,
+  };
+};
 
 const formatDate = (value: string | null): string => {
   if (!value) return '-';
@@ -150,6 +170,7 @@ export const ProductImageRegistrationPage = () => {
   const [draft, setDraft] = useState<ProductImageSubmissionDraft>(emptyDraft);
   const [error, setError] = useState<string>();
   const [isBusy, setIsBusy] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -308,6 +329,33 @@ export const ProductImageRegistrationPage = () => {
       );
     } finally {
       setIsBusy(false);
+    }
+  };
+
+  const handleExtractAttributes = async () => {
+    if (!session || !detail) return;
+    setIsExtracting(true);
+    setError(undefined);
+    try {
+      const imageBlob = await fetch(detail.imageUrl).then((response) =>
+        response.blob(),
+      );
+      const extracted = await extractSkuMetadata(session, imageBlob);
+      setDraft((current) => ({
+        ...current,
+        proposedAttributes: extracted.attributes,
+        proposedCategory: extracted.category ?? current.proposedCategory,
+        proposedSubCategory:
+          extracted.subCategory ?? current.proposedSubCategory,
+      }));
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'AI 속성 추출에 실패했습니다.',
+      );
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -562,7 +610,11 @@ export const ProductImageRegistrationPage = () => {
                     catalog={catalog}
                     draft={draft}
                     isBusy={isBusy}
+                    isExtracting={isExtracting}
                     onChange={setDraft}
+                    onExtractAttributes={() => {
+                      void handleExtractAttributes();
+                    }}
                     onSave={() => {
                       void saveDraft();
                     }}
@@ -600,7 +652,9 @@ type DraftEditorProps = {
   catalog: CatalogSku[];
   draft: ProductImageSubmissionDraft;
   isBusy: boolean;
+  isExtracting: boolean;
   onChange: (draft: ProductImageSubmissionDraft) => void;
+  onExtractAttributes: () => void;
   onSave: () => void;
   onSubmit: () => void;
 };
@@ -609,14 +663,59 @@ const DraftEditor = ({
   catalog,
   draft,
   isBusy,
+  isExtracting,
   onChange,
+  onExtractAttributes,
   onSave,
   onSubmit,
 }: DraftEditorProps) => {
+  const [isCatalogSearchOpen, setIsCatalogSearchOpen] = useState(false);
+
   const setField = <Key extends keyof ProductImageSubmissionDraft>(
     field: Key,
     value: ProductImageSubmissionDraft[Key],
   ) => onChange({ ...draft, [field]: value });
+
+  const selectedTarget = catalog.find(
+    (sku) => sku.skuCode === draft.targetSkuCode,
+  );
+
+  const handleTargetTypeChange = (nextTargetType: ProductImageTargetType) => {
+    onChange({
+      ...draft,
+      imageType:
+        nextTargetType === 'NEW'
+          ? 'MAIN'
+          : draft.imageType === 'MAIN'
+            ? 'ANGLE'
+            : draft.imageType,
+      targetType: nextTargetType,
+    });
+  };
+
+  const handleCategoryChange = (nextCategory: string) => {
+    onChange({
+      ...draft,
+      proposedAttributes: {},
+      proposedCategory: nextCategory || null,
+      proposedSubCategory: null,
+    });
+  };
+
+  const handleAttributeChange = (key: string, value: string) => {
+    const nextAttributes = { ...draft.proposedAttributes };
+    if (value) {
+      nextAttributes[key] = value;
+    } else {
+      delete nextAttributes[key];
+    }
+    onChange({ ...draft, proposedAttributes: nextAttributes });
+  };
+
+  const attributeKeys = [
+    ...COMMON_ATTRIBUTE_KEYS,
+    ...getCategoryAttributeKeys(draft.proposedCategory),
+  ];
 
   return (
     <div>
@@ -629,19 +728,24 @@ const DraftEditor = ({
             이미지 한 장씩 등록 방식을 정한 뒤 승인 요청을 보냅니다.
           </p>
         </div>
-        <select
-          aria-label="이미지 유형"
-          className="min-h-9 rounded-lg border border-border bg-bg-primary px-2 text-xs font-semibold text-text-secondary"
-          onChange={(event) =>
-            setField('imageType', event.target.value as ProductImageType)
-          }
-          value={draft.imageType}
-        >
-          <option value="MAIN">대표 이미지</option>
-          <option value="ANGLE">각도 이미지</option>
-          <option value="DETAIL">상세 이미지</option>
-          <option value="STYLING">연출 이미지</option>
-        </select>
+        {draft.targetType === 'NEW' ? (
+          <span className="inline-flex min-h-9 items-center rounded-lg border border-border bg-bg-muted px-3 text-xs font-semibold text-text-secondary">
+            대표 이미지
+          </span>
+        ) : (
+          <select
+            aria-label="이미지 유형"
+            className="min-h-9 rounded-lg border border-border bg-bg-primary px-2 text-xs font-semibold text-text-secondary"
+            onChange={(event) =>
+              setField('imageType', event.target.value as ProductImageType)
+            }
+            value={draft.imageType}
+          >
+            <option value="ANGLE">각도 이미지</option>
+            <option value="DETAIL">상세 이미지</option>
+            <option value="STYLING">연출 이미지</option>
+          </select>
+        )}
       </div>
 
       <fieldset className="mt-6">
@@ -666,7 +770,7 @@ const DraftEditor = ({
                 checked={draft.targetType === value}
                 className="accent-blue-700"
                 name="target-type"
-                onChange={() => setField('targetType', value)}
+                onChange={() => handleTargetTypeChange(value)}
                 type="radio"
               />
               {label}
@@ -677,9 +781,18 @@ const DraftEditor = ({
 
       {draft.targetType === 'EXISTING' ? (
         <div className="mt-5">
-          <label className={fieldLabelClassName} htmlFor="target-sku">
-            연결할 SKU
-          </label>
+          <div className="flex items-end justify-between gap-3">
+            <label className={fieldLabelClassName} htmlFor="target-sku">
+              연결할 SKU
+            </label>
+            <button
+              className="text-xs font-bold text-blue-700 hover:underline"
+              onClick={() => setIsCatalogSearchOpen(true)}
+              type="button"
+            >
+              전체 카탈로그 검색
+            </button>
+          </div>
           <select
             className={fieldClassName}
             id="target-sku"
@@ -698,59 +811,201 @@ const DraftEditor = ({
           <p className="mt-2 text-xs text-text-tertiary">
             시스템에 이미 등록된 SKU에 새 제품 이미지를 연결합니다.
           </p>
+
+          {selectedTarget ? (
+            <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-bg-secondary p-3">
+              <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-tertiary">
+                {selectedTarget.mainImageUrl ? (
+                  <img
+                    alt="선택한 SKU 대표 이미지"
+                    className="h-full w-full object-cover"
+                    src={selectedTarget.mainImageUrl}
+                  />
+                ) : (
+                  <FileImage className="size-5 text-text-quaternary" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-text-primary">
+                  {selectedTarget.productName}
+                </p>
+                <p className="mt-0.5 font-mono text-[11px] text-text-tertiary">
+                  {selectedTarget.skuCode}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {isCatalogSearchOpen ? (
+            <SkuCatalogSearchDialog
+              onClose={() => setIsCatalogSearchOpen(false)}
+              onSelect={(detail) => {
+                setField('targetSkuCode', detail.skuCode);
+                setIsCatalogSearchOpen(false);
+              }}
+            />
+          ) : null}
         </div>
       ) : (
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Field
-            label="신규 SKU 코드"
-            onChange={(value) => setField('proposedSkuCode', value || null)}
-            placeholder="예: CHR-2042"
-            value={draft.proposedSkuCode ?? ''}
-          />
-          <Field
-            label="상품명"
-            onChange={(value) => setField('proposedProductName', value || null)}
-            placeholder="예: 우드 다이닝 체어"
-            value={draft.proposedProductName ?? ''}
-          />
-          <Field
-            label="브랜드"
-            onChange={(value) => setField('proposedBrand', value || null)}
-            placeholder="브랜드명"
-            value={draft.proposedBrand ?? ''}
-          />
-          <div>
-            <label className={fieldLabelClassName} htmlFor="product-price">
-              가격
-            </label>
-            <input
-              className={fieldClassName}
-              id="product-price"
-              min="0"
-              onChange={(event) =>
-                setField(
-                  'proposedPrice',
-                  event.target.value ? Number(event.target.value) : null,
+        <>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Field
+              label="신규 SKU 코드"
+              onChange={(value) => setField('proposedSkuCode', value || null)}
+              placeholder="예: CHR-2042"
+              value={draft.proposedSkuCode ?? ''}
+            />
+            <Field
+              label="상품명"
+              onChange={(value) =>
+                setField('proposedProductName', value || null)
+              }
+              placeholder="예: 우드 다이닝 체어"
+              value={draft.proposedProductName ?? ''}
+            />
+            <Field
+              label="브랜드"
+              onChange={(value) => setField('proposedBrand', value || null)}
+              placeholder="브랜드명"
+              value={draft.proposedBrand ?? ''}
+            />
+            <div>
+              <label className={fieldLabelClassName} htmlFor="product-price">
+                가격
+              </label>
+              <input
+                className={fieldClassName}
+                id="product-price"
+                min="0"
+                onChange={(event) =>
+                  setField(
+                    'proposedPrice',
+                    event.target.value ? Number(event.target.value) : null,
+                  )
+                }
+                placeholder="원 단위"
+                type="number"
+                value={draft.proposedPrice ?? ''}
+              />
+            </div>
+            <div>
+              <label className={fieldLabelClassName} htmlFor="product-category">
+                대분류
+              </label>
+              <select
+                className={fieldClassName}
+                id="product-category"
+                onChange={(event) => handleCategoryChange(event.target.value)}
+                value={draft.proposedCategory ?? ''}
+              >
+                <option value="">대분류를 선택하세요</option>
+                {withCurrentValue(CATEGORIES, draft.proposedCategory).map(
+                  (category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+            <div>
+              <label
+                className={fieldLabelClassName}
+                htmlFor="product-sub-category"
+              >
+                소분류
+              </label>
+              <select
+                className={cn(
+                  fieldClassName,
+                  'disabled:bg-bg-muted disabled:text-text-quaternary',
+                )}
+                disabled={!draft.proposedCategory}
+                id="product-sub-category"
+                onChange={(event) =>
+                  setField('proposedSubCategory', event.target.value || null)
+                }
+                value={draft.proposedSubCategory ?? ''}
+              >
+                <option value="">소분류를 선택하세요</option>
+                {withCurrentValue(
+                  getSubCategories(draft.proposedCategory),
+                  draft.proposedSubCategory,
+                ).map((subCategory) => (
+                  <option key={subCategory} value={subCategory}>
+                    {subCategory}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-bold text-blue-900">AI 속성 추출</p>
+              <p className="mt-0.5 text-xs text-blue-800/80">
+                등록 이미지에서 대분류·소분류·속성을 한 번에 추출합니다. 추출
+                결과는 아래에서 직접 수정할 수 있습니다.
+              </p>
+            </div>
+            <Button
+              disabled={isExtracting}
+              onClick={onExtractAttributes}
+              size="sm"
+              startDecorator={
+                isExtracting ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
                 )
               }
-              placeholder="원 단위"
-              type="number"
-              value={draft.proposedPrice ?? ''}
-            />
+              variant="neutral-outlined"
+            >
+              {isExtracting ? '추출 중' : 'AI로 속성 추출하기'}
+            </Button>
           </div>
-          <Field
-            label="대분류"
-            onChange={(value) => setField('proposedCategory', value || null)}
-            placeholder="예: 의자"
-            value={draft.proposedCategory ?? ''}
-          />
-          <Field
-            label="소분류"
-            onChange={(value) => setField('proposedSubCategory', value || null)}
-            placeholder="예: 다이닝 체어"
-            value={draft.proposedSubCategory ?? ''}
-          />
-        </div>
+
+          {draft.proposedCategory ? (
+            <fieldset className="mt-5">
+              <legend className={fieldLabelClassName}>상세 속성</legend>
+              <p className="mt-1 text-xs text-text-tertiary">
+                대분류를 바꾸면 아래 속성은 초기화됩니다. 카테고리에 맞게 다시
+                선택해 주세요.
+              </p>
+              <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                {attributeKeys.map((key) => {
+                  const currentValue = draft.proposedAttributes[key];
+                  return (
+                    <label className={fieldLabelClassName} key={key}>
+                      {ATTRIBUTE_LABELS[key] ?? key}
+                      <select
+                        className={fieldClassName}
+                        onChange={(event) =>
+                          handleAttributeChange(key, event.target.value)
+                        }
+                        value={
+                          typeof currentValue === 'string' ? currentValue : ''
+                        }
+                      >
+                        <option value="">선택 안 함</option>
+                        {withCurrentValue(
+                          getAllowedValues(draft.proposedCategory, key),
+                          typeof currentValue === 'string'
+                            ? currentValue
+                            : undefined,
+                        ).map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+        </>
       )}
 
       <div className="mt-8 flex flex-wrap justify-end gap-2 border-t border-border pt-5">
@@ -832,6 +1087,25 @@ const SubmissionReview = ({
         <SubmissionBadge status={detail.status} />
       </div>
 
+      {detail.targetType === 'EXISTING' ? (
+        <div className="mt-5">
+          <p className="text-[11px] font-bold text-text-tertiary">
+            연결 대상 대표 이미지
+          </p>
+          <div className="mt-2 flex size-24 items-center justify-center overflow-hidden rounded-xl border border-border bg-bg-tertiary">
+            {detail.targetMainImageUrl ? (
+              <img
+                alt="연결 대상 SKU 대표 이미지"
+                className="h-full w-full object-cover"
+                src={detail.targetMainImageUrl}
+              />
+            ) : (
+              <FileImage className="size-6 text-text-quaternary" />
+            )}
+          </div>
+        </div>
+      ) : null}
+
       <dl className="mt-6 grid gap-3 sm:grid-cols-2">
         <ReviewValue label="등록 방식">
           {detail.targetType === 'EXISTING'
@@ -839,16 +1113,50 @@ const SubmissionReview = ({
             : '신규 SKU 생성'}
         </ReviewValue>
         <ReviewValue label="이미지 유형">{detail.imageType}</ReviewValue>
-        <ReviewValue label="브랜드">{detail.proposedBrand ?? '-'}</ReviewValue>
+        <ReviewValue label="브랜드">
+          {(detail.targetType === 'EXISTING'
+            ? detail.targetBrand
+            : detail.proposedBrand) ?? '-'}
+        </ReviewValue>
         <ReviewValue label="가격">
-          {formatPrice(detail.proposedPrice)}
+          {formatPrice(
+            detail.targetType === 'EXISTING'
+              ? detail.targetPrice
+              : detail.proposedPrice,
+          )}
         </ReviewValue>
         <ReviewValue label="카테고리">
-          {[detail.proposedCategory, detail.proposedSubCategory]
+          {[
+            detail.targetType === 'EXISTING'
+              ? detail.targetCategory
+              : detail.proposedCategory,
+            detail.targetType === 'EXISTING'
+              ? detail.targetSubCategory
+              : detail.proposedSubCategory,
+          ]
             .filter(Boolean)
             .join(' · ') || '-'}
         </ReviewValue>
       </dl>
+
+      {detail.targetType === 'NEW' ? (
+        <div className="mt-4">
+          <p className="text-[11px] font-bold text-text-tertiary">세부 속성</p>
+          {Object.keys(detail.proposedAttributes).length > 0 ? (
+            <dl className="mt-2 grid gap-3 sm:grid-cols-2">
+              {Object.entries(detail.proposedAttributes).map(([key, value]) => (
+                <ReviewValue key={key} label={ATTRIBUTE_LABELS[key] ?? key}>
+                  {typeof value === 'string' ? value : String(value)}
+                </ReviewValue>
+              ))}
+            </dl>
+          ) : (
+            <p className="mt-2 text-sm text-text-tertiary">
+              등록된 세부 속성이 없습니다.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {detail.status === 'REJECTED' ? (
         <div className="mt-6 rounded-xl border border-danger-200 bg-danger-20 p-4">
