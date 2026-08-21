@@ -226,7 +226,7 @@ class SimilarSkuService:
         embedding: collections.abc.Sequence[float],
         limit: int = DEFAULT_RESULT_LIMIT,
     ) -> list[SimilarSku]:
-        """임베딩 벡터와 코사인 거리가 가까운 SKU를 조회합니다.
+        """호환되는 파이프라인 벡터 중 코사인 거리가 가까운 SKU를 조회합니다.
 
         Args:
             embedding: 크롭 이미지의 임베딩 벡터입니다.
@@ -253,7 +253,11 @@ class SimilarSkuService:
 
         candidate = (
             sqlalchemy.select(SkuImage.sku_id, distance)
-            .where(SkuImage.embedding.is_not(None))
+            .where(
+                SkuImage.embedding.is_not(None),
+                SkuImage.embedding_pipeline_version
+                == self.settings.embedding_pipeline_version,
+            )
             .order_by(distance)
             .limit(CANDIDATE_LIMIT)
             .cte("candidate")
