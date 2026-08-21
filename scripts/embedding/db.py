@@ -143,18 +143,23 @@ def fetch_sku_ids_by_code(conn: psycopg.Connection) -> dict[str, int]:
         return {row[0]: row[1] for row in cur.fetchall()}
 
 
-def fetch_embedded_image_urls(conn: psycopg.Connection) -> set[str]:
-    """임베딩이 이미 채워진 image_url 집합을 돌려준다.
+def fetch_image_embedding_states(
+    conn: psycopg.Connection,
+) -> dict[str, tuple[str | None, str | None]]:
+    """이미지별 융합 임베딩 파이프라인·입력 해시 상태를 돌려준다.
 
-    이미지 1건 = image_url 1개 기준으로 완료 여부를 추적한다. SKU당
-    이미지가 여러 장(MAIN + ANGLE 등)일 수 있어 sku_id 단위로는 더 이상
-    완료 여부를 판단할 수 없다.
+    이미지 파일이나 전처리 결과가 바뀌면 SHA-256이 달라지므로, 같은
+    파이프라인 버전의 기존 벡터라도 재색인할 수 있다.
     """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT image_url FROM sku_image WHERE embedding IS NOT NULL"
+            """
+            SELECT image_url, embedding_pipeline_version, embedding_image_sha256
+            FROM sku_image
+            WHERE embedding IS NOT NULL
+            """
         )
-        return {row[0] for row in cur.fetchall()}
+        return {row[0]: (row[1], row[2]) for row in cur.fetchall()}
 
 
 def upsert_sku_image(
@@ -163,26 +168,25 @@ def upsert_sku_image(
     image_url: str,
     image_type: str,
     embedding: list[float],
-    overwrite: bool = False,
+    pipeline_version: str,
+    image_sha256: str,
 ) -> bool:
-    """SKU 이미지 1건을 적재하되, 이미 임베딩이 있으면 건드리지 않는다.
+    """SKU 이미지 1건의 현재 융합 임베딩을 저장한다.
 
-    같은 image_url의 행이 없으면 새로 만든다. 있는데 embedding이 아직
-    비어 있으면 채워 넣는다. 이미 embedding이 있으면 overwrite=True가
-    아닌 한 그대로 두고 건너뛴다. image_url을 키로 써서 SKU당 이미지가
-    여러 장이어도(MAIN + ANGLE, sequence 여러 장) 안전하게 재실행할 수
-    있다.
+    같은 image_url의 행이 없으면 새로 만들고, 있으면 현재 파이프라인의
+    벡터·추적 정보를 갱신한다. 호출 전 단계에서 버전과 해시가 모두 같은
+    이미지는 건너뛰므로, 여기서는 저장이 필요한 경우만 다룬다.
 
     Args:
         conn: DB 연결입니다.
         sku_id: sku_catalog.sku_id입니다.
         image_url: 이미지 경로(프로젝트 루트 기준 상대 경로)입니다.
         image_type: 'MAIN' 또는 'ANGLE'입니다.
-        embedding: Gemini 이미지 임베딩 벡터입니다.
-        overwrite: True면 이미 임베딩이 있어도 덮어씁니다(--force-images용).
-
+        embedding: Gemini 융합 임베딩 벡터입니다.
+        pipeline_version: 전처리·입력 조립 규칙을 포함한 파이프라인 버전입니다.
+        image_sha256: 전처리 후 PNG 입력의 SHA-256입니다.
     Returns:
-        실제로 삽입·갱신했으면 True, 이미 임베딩이 있어서 건너뛰었으면 False.
+        삽입 또는 갱신이 완료되면 True입니다.
     """
     now = datetime.datetime.now(datetime.timezone.utc)
     with conn.cursor() as cur:
@@ -193,21 +197,35 @@ def upsert_sku_image(
         )
         existing = cur.fetchone()
 
-        if existing and existing[1] is not None and not overwrite:
-            return False
-
         if existing:
             cur.execute(
                 "UPDATE sku_image "
-                "SET image_type = %s, embedding = %s, indexed_at = %s "
+                "SET image_type = %s, embedding = %s, indexed_at = %s, "
+                "embedding_pipeline_version = %s, embedding_image_sha256 = %s "
                 "WHERE sku_image_id = %s",
-                (image_type, embedding, now, existing[0]),
+                (
+                    image_type,
+                    embedding,
+                    now,
+                    pipeline_version,
+                    image_sha256,
+                    existing[0],
+                ),
             )
         else:
             cur.execute(
                 "INSERT INTO sku_image "
-                "(sku_id, image_url, image_type, embedding, indexed_at) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (sku_id, image_url, image_type, embedding, now),
+                "(sku_id, image_url, image_type, embedding, indexed_at, "
+                "embedding_pipeline_version, embedding_image_sha256) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (
+                    sku_id,
+                    image_url,
+                    image_type,
+                    embedding,
+                    now,
+                    pipeline_version,
+                    image_sha256,
+                ),
             )
         return True
