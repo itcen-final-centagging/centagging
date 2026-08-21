@@ -182,7 +182,7 @@ CREATE TABLE sku_image (
     sku_id       BIGINT      NOT NULL REFERENCES sku_catalog(sku_id) ON DELETE CASCADE,
     image_url    TEXT        NOT NULL,
     image_type   VARCHAR(20) NOT NULL DEFAULT 'MAIN'
-                 CHECK (image_type IN ('MAIN','ANGLE')),
+                 CHECK (image_type IN ('MAIN','ANGLE','DETAIL','STYLING')),
     embedding    VECTOR(3072),
     indexed_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -225,8 +225,6 @@ CREATE TABLE tagging_result (
     similarity_score NUMERIC(6,4),
     similarity_grade CHAR(1)     CHECK (similarity_grade IN ('상','중','하')),
     xai_result       JSONB,
-    status           VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-                     CHECK (status IN ('PENDING', 'ACTIVE', 'DEACTIVE')),
     vlm_mood         JSONB,
     created_by       BIGINT      NOT NULL REFERENCES app_user(user_id),
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -264,7 +262,6 @@ COMMENT ON COLUMN tagging_result.match_rank       IS '선택 시점의 추천 �
 COMMENT ON COLUMN tagging_result.similarity_score IS '선택 시점의 임베딩 유사도 (0~1)';
 COMMENT ON COLUMN tagging_result.similarity_grade IS '화면 표시용 등급 상/중/하';
 COMMENT ON COLUMN tagging_result.xai_result       IS '루브릭 채점 결과 - 위 주석의 JSON 구조 참고';
-COMMENT ON COLUMN tagging_result.status           IS '최종 관리자 검수 상태: PENDING | ACTIVE | DEACTIVE';
 COMMENT ON COLUMN tagging_result.vlm_mood         IS '연출 이미지 분위기 요약과 태그';
 
 -- ------------------------------------------------------------
@@ -319,7 +316,6 @@ CREATE TABLE product_image_submission (
     proposed_product_name VARCHAR(200),
     proposed_brand      VARCHAR(100),
     proposed_price      INT          CHECK (proposed_price IS NULL OR proposed_price >= 0),
-    proposed_space      VARCHAR(50),
     proposed_category   VARCHAR(50),
     proposed_sub_category VARCHAR(50),
     proposed_attributes JSONB        NOT NULL DEFAULT '{}'::jsonb,

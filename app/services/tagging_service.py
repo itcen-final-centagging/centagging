@@ -24,6 +24,7 @@ from app.services.similar_sku_service import SimilarSkuService
 from app.services.xai_scoring_service import XaiObjectResult, XaiScoringService
 
 DETECTED_STATUS = "DETECTED"
+ATTRIBUTE_EXTRACTION_CONCURRENCY = 3
 
 
 # 단일 태깅 유스케이스를 제공하는 오케스트레이터입니다.
@@ -52,6 +53,9 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         self.gemini_service = gemini_service
         self.similar_sku_service = similar_sku_service
         self.xai_scoring_service = xai_scoring_service
+        self._attribute_semaphore = asyncio.Semaphore(
+            ATTRIBUTE_EXTRACTION_CONCURRENCY
+        )
 
     async def get_sku_candidates(
         self,
@@ -160,11 +164,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
 
         extraction_results = await asyncio.gather(
             *(
-                asyncio.to_thread(
-                    self.gemini_service.extract_furniture_attributes,
-                    crop.image,
-                    category,
-                )
+                self._extract_attributes_for_crop(crop, category)
                 for crop, category in extraction_targets
             )
         )
@@ -175,6 +175,19 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             )
         )
         return attributes_by_idx
+
+    async def _extract_attributes_for_crop(
+        self,
+        crop: CroppedObject,
+        category: str,
+    ) -> FurnitureAttributeResult:
+        """속성 추출 Vertex AI 요청 수를 제한합니다."""
+        async with self._attribute_semaphore:
+            return await asyncio.to_thread(
+                self.gemini_service.extract_furniture_attributes,
+                crop.image,
+                category,
+            )
 
     @staticmethod
     def _apply_xai_results(

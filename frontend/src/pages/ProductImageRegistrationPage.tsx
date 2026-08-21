@@ -71,7 +71,6 @@ const emptyDraft = (): ProductImageSubmissionDraft => ({
   proposedPrice: null,
   proposedProductName: null,
   proposedSkuCode: null,
-  proposedSpace: null,
   proposedSubCategory: null,
   targetSkuCode: null,
   targetType: 'EXISTING',
@@ -87,7 +86,6 @@ const draftFromSubmission = (
   proposedPrice: submission.proposedPrice,
   proposedProductName: submission.proposedProductName,
   proposedSkuCode: submission.proposedSkuCode,
-  proposedSpace: submission.proposedSpace,
   proposedSubCategory: submission.proposedSubCategory,
   targetSkuCode: submission.targetSkuCode,
   targetType: submission.targetType ?? 'EXISTING',
@@ -752,12 +750,6 @@ const DraftEditor = ({
             placeholder="예: 다이닝 체어"
             value={draft.proposedSubCategory ?? ''}
           />
-          <Field
-            label="사용 공간"
-            onChange={(value) => setField('proposedSpace', value || null)}
-            placeholder="예: 다이닝룸"
-            value={draft.proposedSpace ?? ''}
-          />
         </div>
       )}
 
@@ -855,9 +847,6 @@ const SubmissionReview = ({
           {[detail.proposedCategory, detail.proposedSubCategory]
             .filter(Boolean)
             .join(' · ') || '-'}
-        </ReviewValue>
-        <ReviewValue label="사용 공간">
-          {detail.proposedSpace ?? '-'}
         </ReviewValue>
       </dl>
 

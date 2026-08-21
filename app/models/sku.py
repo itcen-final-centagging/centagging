@@ -33,9 +33,6 @@ class SkuCatalog(Base):  # pylint: disable=too-few-public-methods
     price: orm.Mapped[typing.Optional[int]] = orm.mapped_column(
         sqlalchemy.Integer
     )
-    space: orm.Mapped[typing.Optional[str]] = orm.mapped_column(
-        sqlalchemy.String(50)
-    )
     category: orm.Mapped[typing.Optional[str]] = orm.mapped_column(
         sqlalchemy.String(50)
     )

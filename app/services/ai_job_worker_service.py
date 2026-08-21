@@ -183,10 +183,11 @@ async def _record_job_failure(
     error_message: str,
 ) -> AiJob:
     """장면 상태를 바꾸지 않고 추천 작업의 실패 상태만 기록합니다."""
+    job_id = job.job_id
     await session.rollback()
     return await ai_job_repository.mark_job_failed(
         session,
-        job.job_id,
+        job_id,
         error_code,
         error_message,
     )

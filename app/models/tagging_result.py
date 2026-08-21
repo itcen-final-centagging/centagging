@@ -48,13 +48,6 @@ class TaggingResult(Base):  # pylint: disable=too-few-public-methods
     match_rank: orm.Mapped[typing.Optional[int]] = orm.mapped_column(
         sqlalchemy.SmallInteger
     )
-    status: orm.Mapped[typing.Literal["PENDING", "ACTIVE", "DEACTIVE"]] = (
-        orm.mapped_column(
-            sqlalchemy.String(20),
-            nullable=False,
-            server_default=sqlalchemy.text("'PENDING'"),
-        )
-    )
     similarity_score: orm.Mapped[typing.Optional[decimal.Decimal]] = (
         orm.mapped_column(sqlalchemy.Numeric(6, 4))
     )

@@ -3,8 +3,8 @@
 Service for live Gemini model calls through Vertex AI or Developer API.
 """
 
+import dataclasses
 import io
-import json
 import logging
 import time
 import typing
@@ -25,11 +25,21 @@ from app.services.furniture_attribute_rules import (
     build_attribute_response_schema,
     validate_attribute_result,
 )
+from app.services.genai_retry import (
+    RateLimitCallback,
+    call_with_rate_limit_retry,
+)
 from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
-    FURNITURE_ATTRIBUTE_PROMPT,
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v1,
+)
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt_v2 import (
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v2,
 )
 from app.services.prompt.detect_prompt.furniture_detect_prompt import (
-    FURNITURE_DETECTION_PROMPT,
+    build_furniture_detection_prompt as build_furniture_detection_prompt_v1,
+)
+from app.services.prompt.detect_prompt.furniture_detect_prompt_v2 import (
+    build_furniture_detection_prompt as build_furniture_detection_prompt_v2,
 )
 
 
@@ -82,16 +92,191 @@ class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
 
 
+PromptVersion = typing.Literal["v1", "v2"]
+
+
+@dataclasses.dataclass(frozen=True)
+class GeminiCallTelemetry:
+    """프롬프트 평가에 전달할 단일 Gemini 호출 계측값입니다."""
+
+    operation_name: str
+    prompt_version: PromptVersion
+    attempt_count: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    generation_succeeded: bool
+
+
+GeminiTelemetryCallback = typing.Callable[[GeminiCallTelemetry], None]
+
+
+def _contains_hangul(text: str) -> bool:
+    """문자열에 한글 음절이 포함되어 있는지 반환합니다."""
+    return any("\uac00" <= char <= "\ud7a3" for char in text)
+
+
+def _fallback_evidence(category: str) -> str:
+    """탐지 근거가 한글이 아닐 때 사용할 기본 문장을 반환합니다."""
+    return f"이미지에서 {category} 형태가 확인됩니다."
+
+
 class GeminiService:
     """VLM 및 임베딩 모델을 실제 Gemini API로 호출합니다."""
 
-    def __init__(self, settings: config.Settings) -> None:
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        settings: config.Settings,
+        *,
+        prompt_version: PromptVersion = "v2",
+        telemetry_callback: GeminiTelemetryCallback | None = None,
+        rate_limit_retry_delays_seconds: tuple[float, ...] | None = None,
+        rate_limit_retry_jitter_seconds: float = 0.0,
+        rate_limit_callback: RateLimitCallback | None = None,
+    ) -> None:
         """Gemini 서비스에 필요한 설정을 초기화합니다.
 
         Args:
             settings: API 키와 모델명이 담긴 애플리케이션 설정입니다.
+            prompt_version: 탐지·속성 추출에 적용할 프롬프트 버전입니다.
+            telemetry_callback: 생성 호출의 토큰·재시도 정보를 받을 함수입니다.
+            rate_limit_retry_delays_seconds: 429 응답의 재시도 간격입니다.
+            rate_limit_retry_jitter_seconds: 재시도 간격에 추가할 최대 난수입니다.
+            rate_limit_callback: 429 발생과 재시도 지연을 전달받을 함수입니다.
+
+        Raises:
+            ValueError: 프롬프트 버전 또는 재시도 설정이 유효하지 않은
+                경우입니다.
         """
+        if prompt_version not in ("v1", "v2"):
+            raise ValueError(
+                f"지원하지 않는 프롬프트 버전입니다: {prompt_version}"
+            )
+        if (
+            rate_limit_retry_jitter_seconds < 0
+            or rate_limit_retry_delays_seconds is not None
+            and any(delay < 0 for delay in rate_limit_retry_delays_seconds)
+        ):
+            raise ValueError("재시도 지연 시간은 0 이상이어야 합니다.")
         self._settings = settings
+        self._prompt_version = prompt_version
+        self._telemetry_callback = telemetry_callback
+        self._rate_limit_retry_delays_seconds = rate_limit_retry_delays_seconds
+        self._rate_limit_retry_jitter_seconds = rate_limit_retry_jitter_seconds
+        self._rate_limit_callback = rate_limit_callback
+
+    @property
+    def prompt_version(self) -> PromptVersion:
+        """현재 탐지·속성 추출 프롬프트 버전을 반환합니다."""
+        return self._prompt_version
+
+    def _build_detection_contents(
+        self,
+        image: Image.Image,
+    ) -> list[types.ContentUnionDict]:
+        """프롬프트 버전에 맞는 객체 탐지 입력을 생성합니다."""
+        if self._prompt_version == "v1":
+            return [
+                image,
+                build_furniture_detection_prompt_v1(
+                    allowed_categories=catalog_spec.CATEGORIES,
+                ),
+            ]
+
+        return [
+            image,
+            build_furniture_detection_prompt_v2(
+                allowed_categories=catalog_spec.CATEGORIES,
+            ),
+        ]
+
+    def _build_attribute_contents(
+        self,
+        image: Image.Image,
+        attribute_schema: Mapping[str, object],
+    ) -> list[types.ContentUnionDict]:
+        """프롬프트 버전에 맞는 속성 추출 입력을 생성합니다."""
+        if self._prompt_version == "v1":
+            return [
+                image,
+                build_furniture_attribute_prompt_v1(
+                    attribute_schema=attribute_schema,
+                ),
+            ]
+
+        return [
+            image,
+            build_furniture_attribute_prompt_v2(
+                attribute_schema=attribute_schema,
+            ),
+        ]
+
+    def _record_telemetry(
+        self,
+        *,
+        operation_name: str,
+        response: types.GenerateContentResponse | None,
+        attempt_count: int,
+        generation_succeeded: bool,
+    ) -> None:
+        """생성 응답의 토큰 사용량과 시도 횟수를 선택적으로 기록합니다."""
+        if self._telemetry_callback is None:
+            return
+
+        usage_metadata = getattr(response, "usage_metadata", None)
+
+        def _token_count(field_name: str) -> int:
+            value = getattr(usage_metadata, field_name, 0)
+            return value if isinstance(value, int) and value >= 0 else 0
+
+        self._telemetry_callback(
+            GeminiCallTelemetry(
+                operation_name=operation_name,
+                prompt_version=self._prompt_version,
+                attempt_count=attempt_count,
+                input_tokens=_token_count("prompt_token_count"),
+                output_tokens=_token_count("candidates_token_count"),
+                total_tokens=_token_count("total_token_count"),
+                generation_succeeded=generation_succeeded,
+            )
+        )
+
+    def _call_generation(
+        self,
+        operation: typing.Callable[[], types.GenerateContentResponse],
+        operation_name: str,
+    ) -> types.GenerateContentResponse:
+        """재시도 시도 횟수와 토큰을 기록하며 생성 호출을 실행합니다."""
+        attempt_count = 0
+
+        def _tracked_operation() -> types.GenerateContentResponse:
+            nonlocal attempt_count
+            attempt_count += 1
+            return operation()
+
+        try:
+            response = call_with_rate_limit_retry(
+                _tracked_operation,
+                operation_name=operation_name,
+                retry_delays_seconds=self._rate_limit_retry_delays_seconds,
+                jitter_seconds=self._rate_limit_retry_jitter_seconds,
+                rate_limit_callback=self._rate_limit_callback,
+            )
+        except Exception:
+            self._record_telemetry(
+                operation_name=operation_name,
+                response=None,
+                attempt_count=attempt_count,
+                generation_succeeded=False,
+            )
+            raise
+        self._record_telemetry(
+            operation_name=operation_name,
+            response=response,
+            attempt_count=attempt_count,
+            generation_succeeded=True,
+        )
+        return response
 
     @property
     def is_configured(self) -> bool:
@@ -164,25 +349,17 @@ class GeminiService:
 
         try:
             client = genai_client.create_client(self._settings)
-
-            category_context = json.dumps(
-                {"allowed_categories": catalog_spec.CATEGORIES},
-                ensure_ascii=False,
-            )
-
-            contents: list[types.ContentUnionDict] = [
-                image,
-                FURNITURE_DETECTION_PROMPT,
-                category_context,
-            ]
-
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=GeminiModelDetectionResult,
+            contents = self._build_detection_contents(image)
+            response = self._call_generation(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=GeminiModelDetectionResult,
+                    ),
                 ),
+                "detect_furniture",
             )
             if not response.text:
                 raise GeminiResponseInvalidError(
@@ -192,12 +369,6 @@ class GeminiService:
             result = GeminiModelDetectionResult.model_validate_json(
                 response.text
             )
-
-            def _contains_hangul(text: str) -> bool:
-                return any("\uac00" <= char <= "\ud7a3" for char in text)
-
-            def _fallback_evidence(category: str) -> str:
-                return f"이미지에서 {category} 형태가 확인됩니다."
 
             normalized_detections = []
 
@@ -243,6 +414,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 탐지 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini authentication failed."
@@ -278,23 +453,20 @@ class GeminiService:
 
         try:
             attribute_schema = build_allowed_attribute_schema(category)
-            attribute_context = json.dumps(attribute_schema, ensure_ascii=False)
-
             client = genai_client.create_client(self._settings)
-            contents: list[types.ContentUnionDict] = [
-                image,
-                FURNITURE_ATTRIBUTE_PROMPT,
-                attribute_context,
-            ]
-
-            # FurnitureAttributeResult를 Gemini SDK에 직접 전달 X
-            response = client.models.generate_content(
-                model=self._settings.gemini_vlm_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=build_attribute_response_schema(category),
+            contents = self._build_attribute_contents(image, attribute_schema)
+            response = self._call_generation(
+                lambda: client.models.generate_content(
+                    model=self._settings.gemini_vlm_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=(
+                            build_attribute_response_schema(category)
+                        ),
+                    ),
                 ),
+                "extract_furniture_attributes",
             )
 
             if not response.text:
@@ -315,6 +487,10 @@ class GeminiService:
             ) from error
 
         except errors.ClientError as error:
+            if getattr(error, "code", None) == 429:
+                raise GeminiRateLimitError(
+                    "Gemini 가구 속성 추출 요청 한도를 초과했습니다."
+                ) from error
             if getattr(error, "code", None) in (401, 403):
                 raise GeminiAuthenticationError(
                     "Gemini 인증이 실패했습니다."
