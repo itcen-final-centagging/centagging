@@ -25,18 +25,15 @@ services:
     profiles: ["migration"]
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-centagging}
+      POSTGRES_DB: ${POSTGRES_DB:-centagging}
     volumes:
       - ./docker/db/migrations:/migrations:ro
     depends_on:
       db:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "-ec"]
-    command: |
-      for migration in /migrations/*.sql; do
-        psql --set=ON_ERROR_STOP=1 --host=db \
-          --username=${POSTGRES_USER:-centagging} \
-          --dbname=${POSTGRES_DB:-centagging} --file="$$migration"
-      done
+    entrypoint: ["/bin/sh", "/migrations/run_migrations.sh"]
 
   # FastAPI 백엔드 / FastAPI backend
   api:

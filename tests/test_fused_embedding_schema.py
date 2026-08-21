@@ -47,5 +47,14 @@ def test_migration_service_runs_all_versioned_migrations() -> None:
         PROJECT_ROOT / "docker-compose.prod.yml"
     ).read_text(encoding="utf-8")
 
-    assert "for migration in /migrations/*.sql" in compose_file
-    assert "for migration in /migrations/*.sql" in production_compose_file
+    assert 'entrypoint: ["/bin/sh", "/migrations/run_migrations.sh"]' in (
+        compose_file
+    )
+    assert 'entrypoint: ["/bin/sh", "/migrations/run_migrations.sh"]' in (
+        production_compose_file
+    )
+
+    runner = (
+        PROJECT_ROOT / "docker" / "db" / "migrations" / "run_migrations.sh"
+    ).read_text(encoding="utf-8")
+    assert "for migration_path in /migrations/*.sql" in runner
