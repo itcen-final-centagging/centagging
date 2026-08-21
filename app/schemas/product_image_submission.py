@@ -25,6 +25,7 @@ class ProductImageSubmissionItem(pydantic.BaseModel):
     image_type: SkuImageType
     target_sku_code: str | None = None
     target_product_name: str | None = None
+    target_main_image_url: str | None = None
     proposed_sku_code: str | None = None
     proposed_product_name: str | None = None
     requested_by_name: str
@@ -44,6 +45,10 @@ class ProductImageSubmissionDetail(ProductImageSubmissionItem):
     proposed_price: int | None = None
     proposed_category: str | None = None
     proposed_sub_category: str | None = None
+    target_brand: str | None = None
+    target_price: int | None = None
+    target_category: str | None = None
+    target_sub_category: str | None = None
     proposed_attributes: dict[str, typing.Any] = pydantic.Field(
         default_factory=dict
     )
