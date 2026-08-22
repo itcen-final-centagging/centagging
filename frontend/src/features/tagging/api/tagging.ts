@@ -105,6 +105,8 @@ type SkuSearchResponseData = { skus: ApiSkuSearchItem[] };
 
 type ApiHistoryListItem = {
   result_id: number;
+  scene_image_id: number;
+  object_idx: number;
   sku_code: string;
   product_name: string;
   object_name: string | null;
@@ -402,9 +404,15 @@ const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
   approvalStatus: item.approval_status ?? null,
   id: String(item.result_id),
   imageName: item.scene_image.origin_name,
+  objectIdx: item.object_idx,
   objectName: item.object_name ?? '',
   productName: item.product_name,
   savedAt: item.created_at,
+  sceneImage: {
+    bbox: item.scene_image.bbox,
+    id: String(item.scene_image_id),
+    imageUrl: resolveAssetUrl(item.scene_image.image_url),
+  },
   sku: item.sku_code,
   skuImageUrl: resolveAssetUrl(item.sku_image_url),
   tags: {

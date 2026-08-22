@@ -9,6 +9,8 @@ from app.services import sku_image_storage
 
 _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
     SELECT tr.result_id,
+           tr.scene_image_id,
+           tr.object_idx,
            sc.sku_code,
            sc.product_name,
            COALESCE(object_data.metadata,
@@ -128,6 +130,8 @@ async def list_tagging_history(
             history_schema.TaggingHistoryListItem.model_validate(
                 {
                     "result_id": row["result_id"],
+                    "scene_image_id": row["scene_image_id"],
+                    "object_idx": row["object_idx"],
                     "sku_code": row["sku_code"],
                     "product_name": row["product_name"],
                     "object_name": row["object_name"],
