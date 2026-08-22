@@ -21,11 +21,12 @@ type ApiBoundingBox = {
 type DevDetection = {
   object_idx: number;
   category: string;
-  sub_category: string;
+  sub_category: string | null;
   bbox_coord: ApiBoundingBox;
-  confidence: number | null;
+  confidence: number;
+  attrs: Record<string, string>;
   evidence: string;
-  label: string;
+  vlm_mood: VlmMood;
 };
 
 type AiJobAcceptedData = {
@@ -75,6 +76,7 @@ type DevRecommendationObject = {
   confidence: number;
   attrs: Record<string, string>;
   xai_attrs?: Record<string, string>;
+  vlm_mood: VlmMood;
   sku_candidates: DevCandidate[];
 };
 
@@ -86,9 +88,15 @@ type DevRecommendationData = {
   objects: DevRecommendationObject[];
 };
 
-type EditedSceneObject = Pick<FurnitureObject, 'bbox' | 'category' | 'name'> & {
-  objectIdx: number;
-};
+type EditedSceneObject = Pick<
+  FurnitureObject,
+  'attrsDirty' | 'bbox' | 'category' | 'metadata' | 'name'
+> & { objectIdx: number };
+
+type SearchMoodObject = Pick<
+  FurnitureObject,
+  'bbox' | 'category' | 'name' | 'objectIdx'
+>;
 
 type ApiSkuSearchItem = {
   brand: string | null;
@@ -222,6 +230,17 @@ const toBbox = (bbox: ApiBoundingBox): [number, number, number, number] => [
 
 const nullableText = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
+
+const toStringAttributes = (
+  attributes: Record<string, unknown>,
+): Record<string, string> =>
+  Object.entries(attributes).reduce<Record<string, string>>(
+    (result, [key, value]) => {
+      if (typeof value === 'string') result[key] = value;
+      return result;
+    },
+    {},
+  );
 
 const NULL_TAG_VALUE = 'null';
 
@@ -506,11 +525,12 @@ export const analyzeImage = async (
       description: detection.evidence,
       id: `${accepted.data.scene_image_id}-${detection.object_idx}`,
       metadata: {
-        attributes: {},
+        attributes: detection.attrs,
         category: nullableText(detection.category),
         description: detection.evidence,
         keyFeatures: [],
         subCategory: detection.sub_category,
+        vlmMood: detection.vlm_mood,
       },
       name: detection.category,
       objectIdx: detection.object_idx,
@@ -560,9 +580,13 @@ export const updateSceneObjects = async (
         objects: objects.map((object) => {
           const [ymin, xmin, ymax, xmax] = object.bbox;
           return {
+            attrs: toStringAttributes(object.metadata.attributes),
             bbox_coord: { xmax, xmin, ymax, ymin },
             category: object.category ?? object.name,
+            needs_attribute_extraction: object.attrsDirty ?? false,
             object_idx: object.objectIdx,
+            sub_category: object.metadata.subCategory,
+            vlm_mood: object.metadata.vlmMood ?? { summary: '', tags: [] },
           };
         }),
       }),
@@ -597,7 +621,7 @@ type ApiSearchCandidateMoodData = {
  */
 export const fetchSearchCandidateMood = async (
   sceneImageId: string,
-  object: EditedSceneObject,
+  object: SearchMoodObject,
   skuCode: string,
 ): Promise<VlmMood> => {
   const [ymin, xmin, ymax, xmax] = object.bbox;
@@ -711,6 +735,10 @@ export const saveTaggingReview = async (
                   values?.subCategory,
                   object.metadata.subCategory,
                 ),
+                vlm_mood: object.metadata.vlmMood ?? {
+                  summary: '',
+                  tags: [],
+                },
               },
               similarity_score:
                 isRecommended && selectedSku.score !== null

@@ -37,6 +37,7 @@ export interface FurnitureObject {
    * 서버가 객체 목록을 다시 색인하므로, 이 값은 화면 상태에만 사용합니다.
    */
   isNew?: boolean;
+  attrsDirty?: boolean;
   metadata: ExtractedMetadata;
   name: string;
   objectIdx: number;
@@ -49,6 +50,7 @@ export interface ExtractedMetadata {
   description: string | null;
   keyFeatures: string[];
   subCategory: string | null;
+  vlmMood?: VlmMood;
 }
 
 export interface RubricEvaluation {

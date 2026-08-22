@@ -45,6 +45,25 @@ class GenAiRetryTest(unittest.TestCase):
 
         self.assertEqual(operation.call_count, 1)
 
+    def test_retries_transient_server_error(self) -> None:
+        """500 응답은 일시 오류로 보고 지정된 간격 후 재시도합니다."""
+        operation = mock.Mock(
+            side_effect=[
+                errors.ServerError(500, {"error": {"message": "internal"}}),
+                "success",
+            ]
+        )
+
+        with mock.patch("app.services.genai_retry.time.sleep") as sleep:
+            result = call_with_rate_limit_retry(
+                operation,
+                operation_name="test",
+            )
+
+        self.assertEqual(result, "success")
+        self.assertEqual(operation.call_count, 2)
+        sleep.assert_called_once_with(1.0)
+
     def test_accepts_evaluation_backoff_and_jitter(self) -> None:
         """평가 전용 재시도 간격과 jitter를 실제 대기에 반영합니다."""
         operation = mock.Mock(

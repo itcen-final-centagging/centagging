@@ -17,6 +17,9 @@ from app.schemas.furniture_detection import (
 from app.schemas.gemini_detection import GeminiDetectionResult
 from app.schemas.tagging import EditedSceneObject
 from app.services import furniture_detection_service
+from app.services.image_processing_service import crop_scene_objects
+from app.services.object_attribute_extraction_service import ObjectAttributeExtractionService
+
 from app.services.gemini_service import GeminiService
 from app.services.similar_sku_service import SimilarSkuService
 from app.services.tagging_service import TaggingService
@@ -63,12 +66,35 @@ def _build_detected_objects(
                 xmax=round(detection.bbox_coord.xmax),
                 ymax=round(detection.bbox_coord.ymax),
             ),
-            evidence=detection.evidence,
             confidence=detection.confidence,
+            evidence=detection.evidence,
         )
         for object_index, detection in enumerate(detection_result.detections)
     ]
 
+
+def _build_enriched_evidence(
+    category: str,
+    attrs: dict[str, str],
+) -> str:
+    """추출된 객체 속성을 기반으로 화면용 탐지 근거를 생성합니다."""
+    labels = {
+        "color": "색상",
+        "material": "소재",
+        "style": "스타일",
+        "pattern": "패턴",
+        "shape": "형태",
+    }
+    descriptors = [
+        f"{attrs[key]} {label}"
+        for key, label in labels.items()
+        if attrs.get(key)
+    ]
+
+    if not descriptors:
+        return f"시각적으로 확인되는 형태와 구조를 바탕으로 {category} 객체로 판단했습니다."
+
+    return f"{', '.join(descriptors[:3])} 특성이 보여 {category} 객체로 판단했습니다."
 
 def _mark_detection_succeeded(scene: SceneImage) -> None:
     """장면 이미지의 탐지 완료 상태만 기록합니다."""
@@ -93,6 +119,43 @@ async def _detect_scene(
         settings,
     )
     detections = _build_detected_objects(detection_result)
+
+    object_metadata = [
+        detection.model_dump(mode="json")
+        for detection in detections
+    ]
+    crops = await run_in_threadpool(
+        crop_scene_objects,
+        image_path,
+        object_metadata,
+    )
+    category_by_idx = {
+        detection.object_idx: detection.category
+        for detection in detections
+    }
+    attribute_extraction_service = ObjectAttributeExtractionService(
+        settings=settings,
+        gemini_service=GeminiService(settings=settings),
+    )
+    attributes_by_idx = await attribute_extraction_service.extract_for_crops(
+        crops,
+        category_by_idx,
+    )
+
+    for detection in detections:
+        attribute_result = attributes_by_idx.get(detection.object_idx)
+
+        if attribute_result is None:
+            continue
+
+        detection.sub_category = attribute_result.sub_category
+        detection.attrs = attribute_result.attributes
+        detection.vlm_mood = attribute_result.vlm_mood
+        detection.evidence = _build_enriched_evidence(
+            category=detection.category,
+            attrs=detection.attrs,
+        )
+
     _mark_detection_succeeded(scene)
     await session.flush()
 

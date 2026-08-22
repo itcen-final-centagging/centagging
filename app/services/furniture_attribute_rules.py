@@ -85,8 +85,19 @@ def build_attribute_response_schema(
                 "type": "OBJECT",
                 "properties": attribute_properties,
             },
+            "vlm_mood": {
+                "type": "OBJECT",
+                "properties": {
+                    "summary": {"type": "STRING"},
+                    "tags": {
+                        "type": "ARRAY",
+                        "items": {"type": "STRING"},
+                    },
+                },
+                "required": ["summary", "tags"],
+            },
         },
-        "required": ["category", "attributes"],
+        "required": ["category", "attributes", "vlm_mood"],
     }
 
 
