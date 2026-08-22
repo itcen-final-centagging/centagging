@@ -98,6 +98,8 @@ type ApiSkuSearchItem = {
   product_name: string;
   similarity_score: number;
   sku_code: string;
+  space_moods: string[];
+  style_tags: string[];
   sub_category: string | null;
 };
 
@@ -315,6 +317,8 @@ const toSearchCandidate = (item: ApiSkuSearchItem): SkuCandidate => ({
   score: null,
   size: null,
   sku: item.sku_code,
+  spaceMoods: item.space_moods,
+  styleTags: item.style_tags,
   subCategory: item.sub_category,
   vectorScore: null,
   vlmMood: null,
@@ -332,6 +336,8 @@ type ApiSkuDetail = {
   sku_code: string;
   sku_id: number;
   sku_image_id: number | null;
+  space_moods: string[];
+  style_tags: string[];
   sub_category: string | null;
 };
 
@@ -345,6 +351,8 @@ export type SkuDetail = {
   skuCode: string;
   skuId: number;
   skuImageId: number | null;
+  spaceMoods: string[];
+  styleTags: string[];
   subCategory: string | null;
 };
 
@@ -358,6 +366,8 @@ const toSkuDetail = (detail: ApiSkuDetail): SkuDetail => ({
   skuCode: detail.sku_code,
   skuId: detail.sku_id,
   skuImageId: detail.sku_image_id,
+  spaceMoods: detail.space_moods,
+  styleTags: detail.style_tags,
   subCategory: detail.sub_category,
 });
 
@@ -392,7 +402,9 @@ export const toCandidateFromDetail = (detail: SkuDetail): SkuCandidate => ({
   sku: detail.skuCode,
   skuId: detail.skuId,
   skuImageId: detail.skuImageId,
+  spaceMoods: detail.spaceMoods,
   style: nullableText(detail.attrs.style),
+  styleTags: detail.styleTags,
   subCategory: detail.subCategory,
   vectorScore: null,
   vlmMood: null,

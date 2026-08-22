@@ -77,6 +77,24 @@ python -m scripts.embedding.build_embeddings --check-image-index
 자동 색인 실패는 승인 자체를 취소하지 않는다. 해당 이미지는 미색인 상태로
 남으며 3단계의 배치 재색인이 복구 경로다.
 
+## 5-1. 승인 시 SKU 텍스트 임베딩 자동 재생성
+
+최종 관리자가 태깅 결과를 승인(`POST /approvals/{request_id}/confirm`)하면,
+이미지 색인과 별도로 해당 SKU 1건의 `sku_catalog.text_embedding`도 자동으로
+다시 만든다(`app.services.approval_service._reindex_sku_text_embedding`).
+
+- 상품명·카테고리·속성·특징에, 그 SKU에 대해 지금까지 ACTIVE로 승인된 모든
+  `tagging_res연출 이미지에서 반복 승인되면 공간 분위기·스타일 태그가
+  누적되며, 중복은ult.vlm_mood`(공간 분위기 `summary`, 스타일 태그 `tags`)를
+  더해 텍스트를 다시 조립하고 임베딩한다.
+- 같은 SKU가 다른  제거한다(`app.services.sku_text_embedding`).
+- 별도 DB 컬럼에 누적 결과를 저장하지 않고, 승인마다 `tagging_result`를 다시
+  모아 계산한다.
+- 재생성 실패는 승인 자체를 취소하지 않는다. 해당 SKU는 이전
+  `text_embedding` 상태로 남으며, 아래 3단계의 `--force-text` 배치가 복구
+  경로다. 이 배치도 같은 방식으로 승인된 `vlm_mood`를 반영하므로 온라인
+  트리거와 같은 결과를 재현한다.
+
 ## 6. 정확도 확인
 
 추천 결과 JSON을 준비한 뒤 지표를 계산한다.
