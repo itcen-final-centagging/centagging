@@ -316,7 +316,7 @@ export const CatalogPanel = () => {
                 className="h-11 w-full rounded-md border border-neutral-200 bg-white pl-10 pr-3 text-sm text-neutral-800 outline-none transition-shadow placeholder:text-neutral-400 focus:border-primary focus:ring-3 focus:ring-primary-50"
                 id="catalog-search"
                 onChange={(event) => handleQueryChange(event.target.value)}
-                placeholder="예: 엠버, SOF-EMB-350-GR"
+                placeholder="1인용 브라운 가죽 빈백 의자"
                 value={query}
               />
             </div>
