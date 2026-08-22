@@ -22,8 +22,6 @@ export const HistoryObjectThumbnail = ({
 
   useEffect(() => {
     if (!imageUrl || !bbox) {
-      setThumbnailUrl(undefined);
-      setHasFailed(true);
       return;
     }
 
@@ -86,7 +84,7 @@ export const HistoryObjectThumbnail = ({
     };
   }, [bbox, imageUrl]);
 
-  if (hasFailed || !thumbnailUrl) {
+  if (!imageUrl || !bbox || hasFailed || !thumbnailUrl) {
     return (
       <div
         aria-label="가구 썸네일을 불러올 수 없습니다"
