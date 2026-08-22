@@ -42,6 +42,7 @@ class TaggingHistoryListItem(pydantic.BaseModel):
     # 생기면 가장 최근 요청의 상태를 쓰고, 요청이 없으면 None입니다.
     approval_status: ApprovalStatus | None = None
     style_tags: list[str] = pydantic.Field(default_factory=list)
+    sku_image_url: str | None = None
     scene_image: HistorySceneImage
 
 

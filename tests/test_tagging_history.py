@@ -78,6 +78,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                     tzinfo=datetime.timezone(datetime.timedelta(hours=9)),
                 ),
                 "image_url": "/uploads/scene-images/9f2c.jpg",
+                "sku_image_url": r"data\images\2041\main.jpg",
                 "origin_name": "scene_office_01.jpg",
                 "bbox": {
                     "xmin": 262,
@@ -169,6 +170,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                         "created_at": "2026-08-10T17:56:00+09:00",
                         "approval_status": "REJECTED",
                         "style_tags": ["미니멀", "홈오피스"],
+                        "sku_image_url": "/sku-images/2041/main.jpg",
                         "scene_image": {
                             "image_url": ("/uploads/scene-images/9f2c.jpg"),
                             "origin_name": "scene_office_01.jpg",

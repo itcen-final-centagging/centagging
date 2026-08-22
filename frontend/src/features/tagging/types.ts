@@ -133,6 +133,7 @@ export interface TaggingHistory {
   productName: string;
   savedAt: string;
   sku: string;
+  skuImageUrl: string | null;
   tags: TaggingValues;
 }
 

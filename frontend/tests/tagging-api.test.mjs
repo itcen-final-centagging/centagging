@@ -180,6 +180,7 @@ test('history results are mapped from the backend response', async (t) => {
               created_at: '2026-08-11T00:00:00Z',
               approval_status: 'REJECTED',
               style_tags: ['minimal'],
+              sku_image_url: '/sku-images/chair.png',
               scene_image: {
                 image_url: '/uploads/scene.png',
                 origin_name: 'scene.png',
@@ -209,6 +210,7 @@ test('history results are mapped from the backend response', async (t) => {
       productName: 'work chair',
       savedAt: '2026-08-11T00:00:00Z',
       sku: 'CHR-2041',
+      skuImageUrl: '/sku-images/chair.png',
       tags: {
         category: '',
         color: '',

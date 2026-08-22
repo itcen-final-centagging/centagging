@@ -20,6 +20,7 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
            tr.created_at,
            si.image_url,
            si.origin_name,
+           sku_img.image_url AS sku_image_url,
            COALESCE(object_data.metadata,
                     si.object_metadata -> tr.object_idx)
                -> 'bbox_coord' AS bbox,
@@ -37,6 +38,8 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
             WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
             LIMIT 1
        ) object_data ON TRUE
+ LEFT JOIN sku_image sku_img
+        ON sku_img.sku_image_id = tr.sku_image_id
  LEFT JOIN LATERAL (
            SELECT a.status
              FROM approval a
@@ -105,6 +108,7 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
 
 async def list_tagging_history(
     session: sqlalchemy_async.AsyncSession,
+    image_storage: sku_image_storage.SkuImageStorage,
 ) -> list[history_schema.TaggingHistoryListItem]:
     """저장된 태깅 결과를 최신순으로 조회합니다.
 
@@ -134,6 +138,11 @@ async def list_tagging_history(
                     "created_at": row["created_at"],
                     "approval_status": row["approval_status"],
                     "style_tags": vlm_mood.get("tags", []),
+                    "sku_image_url": (
+                        image_storage.public_url(row["sku_image_url"])
+                        if row["sku_image_url"] is not None
+                        else None
+                    ),
                     "scene_image": {
                         "image_url": row["image_url"],
                         "origin_name": row["origin_name"],

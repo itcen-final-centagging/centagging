@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Clock3, Plus, Tag } from 'lucide-react';
+import { ChevronRight, Clock3, ImageOff, Plus, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button } from '@/commons/components/Button';
@@ -96,49 +96,65 @@ export const HistoryPage = () => {
           </p>
           <div className="space-y-3">
             {history.map((record) => (
-              <article
-                className="studio-surface studio-panel-hover p-5"
+              <Link
+                className="studio-surface studio-panel-hover block p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 key={record.id}
+                to={`/history/results/${record.id}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-primary">
-                      {record.sku}
-                    </span>
-                    {/* 승인 요청이 없는 예전 결과는 상태 배지를 숨깁니다. */}
-                    {record.approvalStatus ? (
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-xs font-bold',
-                          APPROVAL_STATUS_STYLES[record.approvalStatus],
-                        )}
-                      >
-                        {APPROVAL_STATUS_LABELS[record.approvalStatus]}
+                <div className="flex gap-4">
+                  {record.skuImageUrl ? (
+                    <img
+                      alt={`${record.productName} 상품 이미지`}
+                      className="size-20 shrink-0 rounded-lg border border-neutral-200 object-cover"
+                      src={record.skuImageUrl}
+                    />
+                  ) : (
+                    <div className="flex size-20 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary">
+                      <ImageOff size={20} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-primary">
+                          {record.sku}
+                        </span>
+                        {/* 승인 요청이 없는 예전 결과는 상태 배지를 숨깁니다. */}
+                        {record.approvalStatus ? (
+                          <span
+                            className={cn(
+                              'rounded-full px-2 py-0.5 text-xs font-bold',
+                              APPROVAL_STATUS_STYLES[record.approvalStatus],
+                            )}
+                          >
+                            {APPROVAL_STATUS_LABELS[record.approvalStatus]}
+                          </span>
+                        ) : null}
                       </span>
-                    ) : null}
-                  </span>
-                  <span className="text-xs text-neutral-400">
-                    {record.savedAt}
-                  </span>
+                      <span className="flex items-center gap-1 text-xs text-neutral-400">
+                        {record.savedAt} <ChevronRight size={15} />
+                      </span>
+                    </div>
+                    <h2 className="mt-2 text-base font-extrabold text-neutral-800">
+                      {record.productName}
+                    </h2>
+                    <p className="mt-1.5 text-sm text-neutral-500">
+                      {record.objectName} · {record.imageName}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {record.tags.styleTags.map((tag) => (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-primary-20 px-2.5 py-1.5 text-xs font-bold text-primary-700"
+                          key={tag}
+                        >
+                          <Tag size={12} />
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <h2 className="mt-2 text-base font-extrabold text-neutral-800">
-                  {record.productName}
-                </h2>
-                <p className="mt-1.5 text-sm text-neutral-500">
-                  {record.objectName} · {record.imageName}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {record.tags.styleTags.map((tag) => (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full bg-primary-20 px-2.5 py-1.5 text-xs font-bold text-primary-700"
-                      key={tag}
-                    >
-                      <Tag size={12} />
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </article>
+              </Link>
             ))}
           </div>
         </section>

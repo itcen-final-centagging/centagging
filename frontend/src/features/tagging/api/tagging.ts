@@ -112,6 +112,7 @@ type ApiHistoryListItem = {
   created_by: string;
   created_at: string;
   approval_status: ApprovalStatus | null;
+  sku_image_url: string | null;
   style_tags: string[];
   scene_image: {
     image_url: string;
@@ -405,6 +406,7 @@ const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
   productName: item.product_name,
   savedAt: item.created_at,
   sku: item.sku_code,
+  skuImageUrl: resolveAssetUrl(item.sku_image_url),
   tags: {
     category: '',
     color: '',
