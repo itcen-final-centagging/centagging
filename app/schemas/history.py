@@ -32,6 +32,8 @@ class TaggingHistoryListItem(pydantic.BaseModel):
     """태깅 이력 목록의 결과 한 건입니다."""
 
     result_id: int
+    scene_image_id: int
+    object_idx: int
     sku_code: str
     product_name: str
     object_name: str | None
