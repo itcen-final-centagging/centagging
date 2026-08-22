@@ -405,6 +405,10 @@ const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
   objectName: item.object_name ?? '',
   productName: item.product_name,
   savedAt: item.created_at,
+  sceneImage: {
+    bbox: item.scene_image.bbox,
+    imageUrl: resolveAssetUrl(item.scene_image.image_url),
+  },
   sku: item.sku_code,
   skuImageUrl: resolveAssetUrl(item.sku_image_url),
   tags: {

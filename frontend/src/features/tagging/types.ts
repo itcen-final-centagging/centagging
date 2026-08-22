@@ -132,6 +132,10 @@ export interface TaggingHistory {
   objectName: string;
   productName: string;
   savedAt: string;
+  sceneImage: {
+    bbox: HistoryBoundingBox | null;
+    imageUrl: string | null;
+  };
   sku: string;
   skuImageUrl: string | null;
   tags: TaggingValues;
