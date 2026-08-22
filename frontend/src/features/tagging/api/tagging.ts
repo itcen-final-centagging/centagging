@@ -499,6 +499,42 @@ export const updateSceneObjects = async (
   );
 };
 
+type ApiSearchCandidateMoodData = {
+  vlm_mood: VlmMood;
+};
+
+/**
+ * 전체 카탈로그 검색으로 선택한 SKU에 대해, VLM이 크롭 이미지에서 읽어낸
+ * 공간 분위기·스타일 태그를 계산합니다. AI 추천 후보와 달리 순위 근거는
+ * 만들지 않으므로(match_source가 SEARCH인 결과는 xai_result를 가질 수
+ * 없음), vlm_mood 하나만 돌려받습니다.
+ */
+export const fetchSearchCandidateMood = async (
+  sceneImageId: string,
+  object: EditedSceneObject,
+  skuCode: string,
+): Promise<VlmMood> => {
+  const [ymin, xmin, ymax, xmax] = object.bbox;
+  const response = await requestJson<ApiSuccessResponse<ApiSearchCandidateMoodData>>(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(
+      sceneImageId,
+    )}/search-candidates/mood`,
+    {
+      body: JSON.stringify({
+        object: {
+          bbox_coord: { xmax, xmin, ymax, ymin },
+          category: object.category ?? object.name,
+          object_idx: object.objectIdx,
+        },
+        sku_code: skuCode,
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+  return response.data.vlm_mood;
+};
+
 /** 검색어와 의미적으로 유사한 SKU를 전체 카탈로그에서 조회합니다. */
 export const searchCatalogItems = async (
   query: string,

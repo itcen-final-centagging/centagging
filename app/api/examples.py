@@ -536,6 +536,36 @@ TAGGING_RESULT_SAVE_SUCCESS_RESPONSE = {
     },
 }
 
+SEARCH_CANDIDATE_MOOD_REQUEST_EXAMPLE = {
+    "object": {
+        "object_idx": 0,
+        "category": "소파",
+        "bbox_coord": {
+            "xmin": 120.0,
+            "ymin": 430.0,
+            "xmax": 640.0,
+            "ymax": 780.0,
+        },
+    },
+    "sku_code": "SKU-1001",
+}
+
+SEARCH_CANDIDATE_MOOD_SUCCESS_RESPONSE = {
+    "description": "VLM이 크롭에서 읽어낸 공간 분위기 요약과 스타일 태그를 반환합니다.",
+    "content": {
+        "application/json": {
+            "example": _success_example(
+                {
+                    "vlm_mood": {
+                        "summary": "따뜻하고 내추럴한 거실 분위기입니다.",
+                        "tags": ["내추럴", "우드톤", "아늑함"],
+                    }
+                }
+            )
+        }
+    },
+}
+
 # NOTE: 태깅 라우터는 서비스 예외를 `detail=str(error)`로 그대로 전달하므로
 #       message에 안내 문구가 아닌 원본 값(scene_image_id 등)이 담깁니다.
 SCENE_IMAGE_NOT_FOUND_RESPONSE = _error_response(

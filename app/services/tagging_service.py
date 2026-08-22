@@ -2,6 +2,7 @@
 
 import asyncio
 import dataclasses
+import logging
 import pathlib
 
 from PIL import Image
@@ -16,12 +17,15 @@ from app.schemas.tagging import (
     DetectionResult,
     EditedSceneObject,
     SceneImageInfo,
+    VlmMood,
 )
+from app.services import sku_search_service
 from app.services.gemini_service import GeminiService
 from app.services.image_processing_service import (
     CroppedObject,
     crop_scene_objects,
     parse_image_to_bytes,
+    read_sku_image_bytes,
 )
 from app.services.image_preprocessing_service import preprocess_for_embedding
 from app.services.fused_metadata import build_metadata_text
@@ -29,10 +33,21 @@ from app.services.similar_sku_service import (
     FusedEmbeddingInput,
     SimilarSkuService,
 )
-from app.services.xai_scoring_service import XaiObjectResult, XaiScoringService
+from app.services.xai_scoring_service import (
+    ScoringCandidate,
+    ScoringCrop,
+    XaiObjectResult,
+    XaiScoringService,
+)
 
 DETECTED_STATUS = "DETECTED"
 ATTRIBUTE_EXTRACTION_CONCURRENCY = 3
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class SkuNotFoundError(RuntimeError):
+    """검색으로 선택한 SKU 코드가 카탈로그에 없는 경우입니다."""
 
 
 # 단일 태깅 유스케이스를 제공하는 오케스트레이터입니다.
@@ -164,6 +179,103 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 detected.attrs = attribute_result.attributes
 
         return result
+
+    async def score_search_selected_sku(
+        self,
+        scene_image_id: int,
+        object_edit: EditedSceneObject,
+        sku_code: str,
+    ) -> VlmMood:
+        """전체 카탈로그 검색으로 선택한 SKU의 공간 분위기·스타일 태그를 계산합니다.
+
+        AI 추천 흐름과 같은 XAI 채점(``XaiScoringService``)을 크롭 1건 ×
+        후보 1건으로 좁혀 실행하고, 거기서 얻은 ``vlm_mood``만 돌려줍니다.
+        검색으로 확정한 결과는 순위 근거(xai_result)를 저장할 수 없으므로
+        (``SkuMatching.validate_source_consistency``) 점수·criteria는
+        쓰지 않고 버립니다.
+
+        VLM 채점 자체가 실패해도 SKU 선택 흐름을 막지 않도록, 크롭·SKU
+        이미지를 읽지 못했거나 채점이 실패하면 빈 VlmMood를 반환합니다.
+
+        Args:
+            scene_image_id: 크롭을 잘라낼 연출 이미지 ID입니다.
+            object_edit: 크롭 대상 객체의 바운딩 박스·카테고리입니다.
+            sku_code: 검색으로 선택한 SKU 코드입니다.
+
+        Returns:
+            VLM이 크롭에서 읽어낸 공간 분위기 요약과 스타일 태그입니다.
+            채점에 실패하면 빈 VlmMood입니다.
+
+        Raises:
+            SceneImageNotFoundError: 장면 이미지가 없는 경우입니다.
+            InvalidImageError: 장면 원본 이미지를 열 수 없는 경우입니다.
+            SkuNotFoundError: sku_code가 카탈로그에 없는 경우입니다.
+        """
+        scene = await get_scene_image(self.session, scene_image_id)
+
+        sku_image = await sku_search_service.get_sku_image_for_scoring(
+            self.session, sku_code
+        )
+        if sku_image is None:
+            raise SkuNotFoundError(sku_code)
+
+        crops = await asyncio.to_thread(
+            crop_scene_objects,
+            self._resolve_image_path(scene),
+            [object_edit.model_dump()],
+        )
+        crop = next(
+            (
+                item
+                for item in crops
+                if item.crop_index == object_edit.object_idx
+            ),
+            None,
+        )
+        if crop is None:
+            return VlmMood()
+
+        candidate_image_bytes = await asyncio.to_thread(
+            read_sku_image_bytes,
+            sku_image.image_url,
+            self.settings.sku_image_root,
+            self.settings.image_storage_root,
+        )
+        if candidate_image_bytes is None:
+            _LOGGER.warning(
+                "검색 SKU 이미지를 읽지 못해 VLM 분위기 계산을 건너뜁니다: "
+                "sku_code=%s",
+                sku_code,
+            )
+            return VlmMood()
+
+        scoring_crop = ScoringCrop(
+            crop_index=crop.crop_index,
+            crop_image_bytes=crop.image_bytes,
+            candidates=[
+                ScoringCandidate(
+                    sku_code=sku_code, image_bytes=candidate_image_bytes
+                )
+            ],
+        )
+
+        try:
+            score_result = await asyncio.to_thread(
+                self.xai_scoring_service.score_all, [scoring_crop]
+            )
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception(
+                "검색 SKU VLM 분위기 채점 실패, 빈 값으로 대체합니다: "
+                "sku_code=%s",
+                sku_code,
+            )
+            return VlmMood()
+
+        for crop_score in score_result.crops:
+            for evaluation in crop_score.evaluations:
+                if evaluation.sku_id == sku_code:
+                    return evaluation.xai_result.vlm_mood
+        return VlmMood()
 
     async def _extract_attributes(
         self,
