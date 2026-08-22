@@ -5,6 +5,7 @@ import dataclasses
 import datetime
 import hashlib
 import io
+import logging
 import pathlib
 import typing
 
@@ -15,11 +16,17 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 from app.core import config
 from app.models import sku as sku_models
 from app.schemas import approval as approval_schema
-from app.services import image_processing_service, sku_service
+from app.services import (
+    image_processing_service,
+    sku_service,
+    sku_text_embedding,
+)
 from app.services.fused_metadata import build_metadata_text
 from app.services.gemini_service import GeminiService
 from app.services.image_preprocessing_service import preprocess_for_embedding
 from app.services.sku_image_storage import SkuImageStorage
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ApprovalNotFoundError(RuntimeError):
@@ -141,6 +148,15 @@ _UPDATE_APPROVAL = sqlalchemy.text("""
      WHERE request_id = :request_id
        AND status = 'PENDING'
     RETURNING request_id
+    """)
+
+_SELECT_ACTIVE_VLM_MOODS = sqlalchemy.text("""
+    SELECT tr.vlm_mood
+      FROM tagging_result tr
+      JOIN approval a ON a.tagging_result_id = tr.result_id
+     WHERE tr.sku_id = :sku_id
+       AND a.status = 'ACTIVE'
+       AND tr.vlm_mood IS NOT NULL
     """)
 
 
@@ -290,6 +306,7 @@ class ApprovalService:
         )
         if sku_image_id is not None:
             await self._index_styling_sku_image(int(sku_image_id))
+        await self._reindex_sku_text_embedding(int(row["sku_id"]))
         return approval_schema.ConfirmResponse(
             request_id=request_id,
             reviewed_by_name=reviewer_name,
@@ -363,6 +380,71 @@ class ApprovalService:
             Exception
         ):  # noqa: BLE001 - 승인 상태를 보존하고 배치 재색인을 허용한다
             await self.session.rollback()
+
+    async def _reindex_sku_text_embedding(self, sku_id: int) -> None:
+        """승인 누적 공간 분위기·스타일 태그를 반영해 텍스트 임베딩을 다시 만듭니다.
+
+        이번 승인 건 하나만이 아니라, 같은 SKU에 대해 지금까지 ACTIVE로
+        승인된 모든 tagging_result.vlm_mood를 다시 모아 텍스트를
+        조립한다. 같은 SKU가 여러 연출 이미지에서 반복 승인되어도 값이
+        누적되고 중복 태그는 제거된다(sku_text_embedding.append_mood_lines).
+        별도 컬럼에 결과를 저장하지 않고 매번 다시 계산하므로, 이 SKU의
+        text_embedding만 갱신되고 다른 SKU는 영향을 받지 않는다.
+
+        Gemini 호출 실패 등으로 재생성이 실패해도 이미 커밋된 승인
+        처리는 되돌리지 않는다. 실패한 SKU는 text_embedding이 이전
+        상태로 남으며, scripts/embedding/build_embeddings.py
+        --force-text로 다시 색인할 수 있다.
+
+        Args:
+            sku_id: 텍스트 임베딩을 재생성할 SKU입니다.
+        """
+        try:
+            sku = await self.session.get(sku_models.SkuCatalog, sku_id)
+            if sku is None:
+                raise RuntimeError(
+                    f"승인된 SKU를 찾을 수 없습니다: sku_id={sku_id}"
+                )
+            moods_result = await self.session.execute(
+                _SELECT_ACTIVE_VLM_MOODS, {"sku_id": sku_id}
+            )
+            vlm_moods = [row[0] for row in moods_result.all()]
+            summaries, tags = sku_text_embedding.collect_active_moods(vlm_moods)
+            deduped_summaries = sku_text_embedding.dedupe_preserve_order(
+                summaries
+            )
+            deduped_tags = sku_text_embedding.dedupe_preserve_order(tags)
+            base_text = sku_text_embedding.build_sku_base_text(
+                product_name=sku.product_name,
+                category=sku.category,
+                sub_category=sku.sub_category,
+                attributes=sku.attributes,
+                key_features=sku.key_features,
+            )
+            text = sku_text_embedding.append_mood_lines(
+                base_text,
+                mood_summaries=deduped_summaries,
+                style_tags=deduped_tags,
+            )
+            embedding = await asyncio.to_thread(
+                self.gemini_service.embed_text, text
+            )
+            sku.text_embedding = embedding
+            await self.session.commit()
+            _LOGGER.info(
+                "승인 SKU 텍스트 임베딩 재생성 완료: sku_id=%s, "
+                "space_moods=%s, style_tags=%s",
+                sku_id,
+                deduped_summaries,
+                deduped_tags,
+            )
+        except (
+            Exception
+        ):  # noqa: BLE001 - 승인 상태를 보존하고 배치 재색인을 허용한다
+            await self.session.rollback()
+            _LOGGER.exception(
+                "승인 SKU 텍스트 임베딩 재생성 실패: sku_id=%s", sku_id
+            )
 
     async def reject(
         self,
