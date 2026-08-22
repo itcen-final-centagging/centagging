@@ -161,7 +161,7 @@ export const DEMO_OBJECTS: FurnitureObject[] = [
     bbox: [250, 45, 850, 950],
     candidates: DEMO_SKUS,
     category: '소파',
-    confidence: 97,
+    confidence: 0.97,
     description: '이미지 중앙의 브라운 패브릭 2인 소파베드',
     id: 'demo-sofa-bed',
     metadata: {

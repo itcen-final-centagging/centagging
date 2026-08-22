@@ -5,6 +5,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.tagging import VlmMood
+
 NormalizedCoordinate = Annotated[int, Field(ge=0, le=1000)]
 
 
@@ -35,6 +37,8 @@ class DetectedObjectResponse(BaseModel):
     category: str = Field(min_length=1)
     sub_category: str | None = None
     bbox_coord: BoundingBoxResponse
+    attrs: dict[str, str] = Field(default_factory=dict)
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
     confidence: float = Field(ge=0, le=1)
     evidence: str = Field(min_length=1)
 
