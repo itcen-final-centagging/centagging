@@ -172,6 +172,8 @@ test('history results are mapped from the backend response', async (t) => {
           items: [
             {
               result_id: 91,
+              scene_image_id: 71,
+              object_idx: 2,
               sku_code: 'CHR-2041',
               product_name: 'work chair',
               object_name: 'chair',
@@ -205,11 +207,13 @@ test('history results are mapped from the backend response', async (t) => {
     {
       approvalStatus: 'REJECTED',
       id: '91',
+      objectIdx: 2,
       imageName: 'scene.png',
       objectName: 'chair',
       productName: 'work chair',
       savedAt: '2026-08-11T00:00:00Z',
       sceneImage: {
+        id: '71',
         bbox: { xmin: 10, ymin: 20, xmax: 30, ymax: 40 },
         imageUrl: '/uploads/scene.png',
       },

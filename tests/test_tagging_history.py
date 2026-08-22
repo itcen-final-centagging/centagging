@@ -64,6 +64,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
         rows = [
             {
                 "result_id": 8801,
+                "scene_image_id": 71,
+                "object_idx": 2,
                 "sku_code": "CHR-2041",
                 "product_name": "에르고 메쉬 오피스체어 화이트",
                 "object_name": "의자",
@@ -162,6 +164,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "items": [
                     {
                         "result_id": 8801,
+                        "scene_image_id": 71,
+                        "object_idx": 2,
                         "sku_code": "CHR-2041",
                         "product_name": ("에르고 메쉬 오피스체어 화이트"),
                         "object_name": "의자",

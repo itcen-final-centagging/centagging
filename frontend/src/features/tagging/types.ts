@@ -129,11 +129,13 @@ export interface TaggingHistory {
   approvalStatus: ApprovalStatus | null;
   id: string;
   imageName: string;
+  objectIdx: number;
   objectName: string;
   productName: string;
   savedAt: string;
   sceneImage: {
     bbox: HistoryBoundingBox | null;
+    id: string;
     imageUrl: string | null;
   };
   sku: string;
