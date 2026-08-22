@@ -209,6 +209,10 @@ test('history results are mapped from the backend response', async (t) => {
       objectName: 'chair',
       productName: 'work chair',
       savedAt: '2026-08-11T00:00:00Z',
+      sceneImage: {
+        bbox: { xmin: 10, ymin: 20, xmax: 30, ymax: 40 },
+        imageUrl: '/uploads/scene.png',
+      },
       sku: 'CHR-2041',
       skuImageUrl: '/sku-images/chair.png',
       tags: {
