@@ -135,3 +135,41 @@ export interface TaggingHistory {
   sku: string;
   tags: TaggingValues;
 }
+
+export interface HistoryBoundingBox {
+  xmax: number;
+  xmin: number;
+  ymax: number;
+  ymin: number;
+}
+
+/** 태깅 이력 한 건의 검수 상세 화면 데이터입니다. */
+export interface TaggingHistoryDetail {
+  approvalStatus: ApprovalStatus | null;
+  createdAt: string;
+  createdBy: string;
+  detectedObject: {
+    attrs: Record<string, unknown>;
+    bbox: HistoryBoundingBox | null;
+    category: string | null;
+    subCategory: string | null;
+    vlmMood: VlmMood | null;
+  };
+  id: string;
+  matchedSku: {
+    attrs: Record<string, unknown>;
+    brand: string | null;
+    category: string | null;
+    imageUrl: string | null;
+    price: number | null;
+    productName: string;
+    sku: string;
+    subCategory: string | null;
+  };
+  sceneImage: {
+    imageName: string;
+    imageUrl: string | null;
+  };
+  similarityScore: number | null;
+  xaiResult: XaiResult | null;
+}

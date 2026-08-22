@@ -5,6 +5,7 @@ import type {
   FurnitureObject,
   SkuCandidate,
   TaggingHistory,
+  TaggingHistoryDetail,
   TaggingValues,
   VlmMood,
   XaiCriterion,
@@ -126,6 +127,39 @@ type ApiHistoryListItem = {
 
 type ApiHistoryListData = {
   items: ApiHistoryListItem[];
+};
+
+type ApiHistoryDetail = {
+  approval_status: ApprovalStatus | null;
+  created_at: string;
+  created_by: string;
+  detected_object: {
+    attrs: Record<string, unknown>;
+    bbox: ApiBoundingBox | null;
+    category: string | null;
+    sub_category: string | null;
+    vlm_mood: VlmMood | null;
+  };
+  matched_sku: {
+    attrs: Record<string, unknown>;
+    brand: string | null;
+    category: string | null;
+    image_url: string | null;
+    price: number | null;
+    product_name: string;
+    sku_code: string;
+    sub_category: string | null;
+  };
+  result_id: number;
+  scene_image: {
+    image_url: string | null;
+    origin_name: string;
+  };
+  similarity_score: number | null;
+  xai_result: {
+    criteria: XaiCriterion[];
+    summary: string;
+  } | null;
 };
 
 export type TaggingAnalysis = {
@@ -381,6 +415,36 @@ const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
   },
 });
 
+const toHistoryDetail = (detail: ApiHistoryDetail): TaggingHistoryDetail => ({
+  approvalStatus: detail.approval_status ?? null,
+  createdAt: detail.created_at,
+  createdBy: detail.created_by,
+  detectedObject: {
+    attrs: detail.detected_object.attrs ?? {},
+    bbox: detail.detected_object.bbox,
+    category: detail.detected_object.category,
+    subCategory: detail.detected_object.sub_category,
+    vlmMood: detail.detected_object.vlm_mood,
+  },
+  id: String(detail.result_id),
+  matchedSku: {
+    attrs: detail.matched_sku.attrs ?? {},
+    brand: detail.matched_sku.brand,
+    category: detail.matched_sku.category,
+    imageUrl: resolveAssetUrl(detail.matched_sku.image_url),
+    price: detail.matched_sku.price,
+    productName: detail.matched_sku.product_name,
+    sku: detail.matched_sku.sku_code,
+    subCategory: detail.matched_sku.sub_category,
+  },
+  sceneImage: {
+    imageName: detail.scene_image.origin_name,
+    imageUrl: resolveAssetUrl(detail.scene_image.image_url),
+  },
+  similarityScore: detail.similarity_score,
+  xaiResult: detail.xai_result,
+});
+
 export const analyzeImage = async (
   file: File,
   targetDescription?: string,
@@ -515,7 +579,9 @@ export const fetchSearchCandidateMood = async (
   skuCode: string,
 ): Promise<VlmMood> => {
   const [ymin, xmin, ymax, xmax] = object.bbox;
-  const response = await requestJson<ApiSuccessResponse<ApiSearchCandidateMoodData>>(
+  const response = await requestJson<
+    ApiSuccessResponse<ApiSearchCandidateMoodData>
+  >(
     `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(
       sceneImageId,
     )}/search-candidates/mood`,
@@ -550,6 +616,16 @@ export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
     `${API_BASE_URL}/history/results`,
   );
   return response.data.items.map(toHistory);
+};
+
+/** 결과 ID로 연출 이미지·탐지 객체·SKU·XAI를 포함한 상세 이력을 조회합니다. */
+export const fetchTaggingHistoryDetail = async (
+  resultId: string,
+): Promise<TaggingHistoryDetail> => {
+  const response = await requestJson<ApiSuccessResponse<ApiHistoryDetail>>(
+    `${API_BASE_URL}/history/results/${encodeURIComponent(resultId)}`,
+  );
+  return toHistoryDetail(response.data);
 };
 
 type TaggingReviewMatch = {
