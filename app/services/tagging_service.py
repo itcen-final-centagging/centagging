@@ -1,6 +1,7 @@
 """장면 이미지 태깅 흐름을 단계별로 조립하는 오케스트레이션 서비스입니다."""
 
 import asyncio
+import dataclasses
 import pathlib
 
 from PIL import Image
@@ -20,6 +21,7 @@ from app.services.gemini_service import GeminiService
 from app.services.image_processing_service import (
     CroppedObject,
     crop_scene_objects,
+    parse_image_to_bytes,
 )
 from app.services.image_preprocessing_service import preprocess_for_embedding
 from app.services.fused_metadata import build_metadata_text
@@ -137,8 +139,9 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         )
 
         # 3) XAI 근거 산출
+        xai_crops = self._build_xai_crops(crops, preprocessed_images)
         xai_results = await self.xai_scoring_service.score_detected_objects(
-            crops, result.objects
+            xai_crops, result.objects
         )
         self._apply_xai_results(result.objects, xai_results)
 
@@ -261,6 +264,30 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 ),
             )
         return fused_inputs
+
+    @staticmethod
+    def _build_xai_crops(
+        crops: list[CroppedObject],
+        preprocessed_images: dict[int, Image.Image],
+    ) -> list[CroppedObject]:
+        """보정 Crop을 XAI 요청용 이미지·JPEG 바이트로 재구성합니다.
+
+        전처리 결과는 파일로 저장하지 않고, Gemini 요청 직전에만 JPEG 바이트로
+        직렬화합니다. 보정 결과가 없는 객체는 XAI 채점 대상에서 제외합니다.
+        """
+        xai_crops = []
+        for crop in crops:
+            image = preprocessed_images.get(crop.crop_index)
+            if image is None:
+                continue
+            xai_crops.append(
+                dataclasses.replace(
+                    crop,
+                    image=image,
+                    image_bytes=parse_image_to_bytes(image),
+                )
+            )
+        return xai_crops
 
     @staticmethod
     def _apply_xai_results(
