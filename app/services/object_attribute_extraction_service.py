@@ -11,7 +11,7 @@ from app.services.gemini_service import GeminiService
 from app.services.image_preprocessing_service import preprocess_for_embedding
 from app.services.image_processing_service import CroppedObject
 
-ATTRIBUTE_EXTRACTION_CONCURRENCY = 3
+ATTRIBUTE_EXTRACTION_CONCURRENCY = 2
 
 
 class ObjectAttributeExtractionService:
