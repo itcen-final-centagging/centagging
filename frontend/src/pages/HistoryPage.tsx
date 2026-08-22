@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, Clock3, ImageOff, Plus, Tag } from 'lucide-react';
+import { ChevronRight, Clock3, Plus, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button } from '@/commons/components/Button';
@@ -8,6 +8,7 @@ import {
   APPROVAL_STATUS_STYLES,
 } from '@/features/approvals/constants/approvalStatus';
 import { fetchTaggingHistory } from '@/features/tagging/api/tagging';
+import { HistoryObjectThumbnail } from '@/features/tagging/components/HistoryObjectThumbnail';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import type { TaggingHistory } from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
@@ -102,17 +103,11 @@ export const HistoryPage = () => {
                 to={`/history/results/${record.id}`}
               >
                 <div className="flex gap-4">
-                  {record.skuImageUrl ? (
-                    <img
-                      alt={`${record.productName} 상품 이미지`}
-                      className="size-20 shrink-0 rounded-lg border border-neutral-200 object-cover"
-                      src={record.skuImageUrl}
-                    />
-                  ) : (
-                    <div className="flex size-20 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary">
-                      <ImageOff size={20} />
-                    </div>
-                  )}
+                  <HistoryObjectThumbnail
+                    alt={`${record.objectName || record.productName} 객체 썸네일`}
+                    bbox={record.sceneImage.bbox}
+                    imageUrl={record.sceneImage.imageUrl}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="flex items-center gap-2">
