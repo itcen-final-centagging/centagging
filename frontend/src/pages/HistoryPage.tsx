@@ -16,7 +16,7 @@ import {
   APPROVAL_STATUS_STYLES,
 } from '@/features/approvals/constants/approvalStatus';
 import { fetchTaggingHistory } from '@/features/tagging/api/tagging';
-import { HistoryObjectThumbnail } from '@/features/tagging/components/HistoryObjectThumbnail';
+import { HistorySkuThumbnail } from '@/features/tagging/components/HistorySkuThumbnail';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import type { TaggingHistory } from '@/features/tagging/types';
 import { groupTaggingHistoryByScene } from '@/features/tagging/utils/history';
@@ -190,10 +190,9 @@ export const HistoryPage = () => {
                             to={`/history/results/${record.id}`}
                           >
                             <div className="flex gap-4">
-                              <HistoryObjectThumbnail
-                                alt={`${record.objectName || record.productName} 객체 썸네일`}
-                                bbox={record.sceneImage.bbox}
-                                imageUrl={record.sceneImage.imageUrl}
+                              <HistorySkuThumbnail
+                                alt={`${record.productName} SKU 썸네일`}
+                                imageUrl={record.skuImageUrl}
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
