@@ -5,8 +5,10 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Home,
   Search,
   SearchX,
+  Tag,
 } from 'lucide-react';
 
 import { Button } from '@/commons/components/Button';
@@ -43,6 +45,16 @@ const formatAttributeValue = (value: unknown): string => {
   if (typeof value === 'boolean') return value ? '있음' : '없음';
   return String(value);
 };
+
+/**
+ * 검색 결과 행 하나에 한 번에 노출할 스타일 태그·공간 분위기 개수입니다.
+ * 스타일 태그 줄과 공간 분위기 줄을 따로 표시하며(태그가 위, 분위기가
+ * 아래), 승인 이력이 많은 SKU는 각 줄이 계속 늘어날 수 있으므로 나머지는
+ * "+N" 배지로 접어 행 높이가 무한정 늘어나지 않게 합니다. 전체 목록은
+ * 상세 페이지에서 그대로 확인할 수 있습니다.
+ */
+const MAX_VISIBLE_STYLE_TAGS = 5;
+const MAX_VISIBLE_SPACE_MOODS = 1;
 
 /** 카테고리별 정의된 속성 키만 골라 라벨/값 쌍으로 만듭니다. */
 const buildDetailAttributeRows = (
@@ -87,6 +99,53 @@ const CatalogRow = ({ item, onOpenDetail }: CatalogRowProps) => {
         <p className="mt-1 font-mono text-xs font-bold text-neutral-400">
           {item.sku}
         </p>
+        {(item.styleTags && item.styleTags.length > 0) ||
+        (item.spaceMoods && item.spaceMoods.length > 0) ? (
+          <>
+            {item.styleTags && item.styleTags.length > 0 ? (
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                {item.styleTags
+                  .slice(0, MAX_VISIBLE_STYLE_TAGS)
+                  .map((tag) => (
+                    <span
+                      className="inline-flex items-center gap-0.5 rounded-full bg-primary-20 px-2 py-0.5 text-[10px] font-bold text-primary-700"
+                      key={`style-${tag}`}
+                    >
+                      <Tag size={10} />
+                      {tag}
+                    </span>
+                  ))}
+                {item.styleTags.length > MAX_VISIBLE_STYLE_TAGS ? (
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-400">
+                    +{item.styleTags.length - MAX_VISIBLE_STYLE_TAGS}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {item.spaceMoods && item.spaceMoods.length > 0 ? (
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                {item.spaceMoods
+                  .slice(0, MAX_VISIBLE_SPACE_MOODS)
+                  .map((mood) => (
+                    <span
+                      className="inline-flex max-w-[220px] items-center gap-0.5 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-500"
+                      key={`mood-${mood}`}
+                    >
+                      <Home className="shrink-0" size={10} />
+                      <span className="min-w-0 truncate">{mood}</span>
+                    </span>
+                  ))}
+                {item.spaceMoods.length > MAX_VISIBLE_SPACE_MOODS ? (
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-400">
+                    +{item.spaceMoods.length - MAX_VISIBLE_SPACE_MOODS}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          '준비중입니다.'
+        )}
       </div>
       <p className="truncate text-xs text-neutral-500">
         {item.brand ?? 'null'}
@@ -216,6 +275,39 @@ const SkuDetailView = ({ item, onBack }: SkuDetailViewProps) => {
             </div>
           </div>
 
+          {detail.spaceMoods.length > 0 || detail.styleTags.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-neutral-100 p-4">
+              <p className="text-xs font-bold text-neutral-500">
+                공간 분위기 · 스타일 태그
+              </p>
+              <p className="mt-0.5 text-[11px] text-neutral-400">
+                승인된 태깅 결과를 모아 보여줍니다. 별도 컬럼 없이 조회할 때마다
+                다시 계산됩니다.
+              </p>
+              {detail.styleTags.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {detail.styleTags.map((tag) => (
+                    <span
+                      className="rounded-full bg-primary-20 px-2.5 py-1 text-xs font-bold text-primary-700"
+                      key={tag}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {detail.spaceMoods.length > 0 ? (
+                <ul className="mt-3 space-y-1.5">
+                  {detail.spaceMoods.map((mood) => (
+                    <li className="text-sm text-neutral-700" key={mood}>
+                      &ldquo;{mood}&rdquo;
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="mt-4 rounded-xl border border-neutral-100 p-4">
             <p className="text-xs font-bold text-neutral-500">기본 정보</p>
             <dl className="mt-3 space-y-2">
@@ -316,7 +408,7 @@ export const CatalogPanel = () => {
                 className="h-11 w-full rounded-md border border-neutral-200 bg-white pl-10 pr-3 text-sm text-neutral-800 outline-none transition-shadow placeholder:text-neutral-400 focus:border-primary focus:ring-3 focus:ring-primary-50"
                 id="catalog-search"
                 onChange={(event) => handleQueryChange(event.target.value)}
-                placeholder="예: 엠버, SOF-EMB-350-GR"
+                placeholder="1인용 브라운 가죽 빈백 의자"
                 value={query}
               />
             </div>

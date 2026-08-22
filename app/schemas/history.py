@@ -32,6 +32,8 @@ class TaggingHistoryListItem(pydantic.BaseModel):
     """태깅 이력 목록의 결과 한 건입니다."""
 
     result_id: int
+    scene_image_id: int
+    object_idx: int
     sku_code: str
     product_name: str
     object_name: str | None
@@ -42,6 +44,7 @@ class TaggingHistoryListItem(pydantic.BaseModel):
     # 생기면 가장 최근 요청의 상태를 쓰고, 요청이 없으면 None입니다.
     approval_status: ApprovalStatus | None = None
     style_tags: list[str] = pydantic.Field(default_factory=list)
+    sku_image_url: str | None = None
     scene_image: HistorySceneImage
 
 
@@ -97,6 +100,7 @@ class TaggingHistoryDetail(pydantic.BaseModel):
     created_by: str
     created_at: datetime.datetime
     similarity_score: int | None
+    approval_status: ApprovalStatus | None = None
     scene_image: HistoryDetailSceneImage
     detected_object: HistoryDetectedObject
     matched_sku: HistoryMatchedSku

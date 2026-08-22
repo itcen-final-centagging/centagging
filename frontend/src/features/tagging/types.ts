@@ -89,6 +89,14 @@ export interface SkuCandidate {
   subCategory?: string | null;
   brand?: string | null;
   price?: number | null;
+  /**
+   * 승인(ACTIVE)된 태깅 결과의 공간 분위기 요약을 다시 모아 채운
+   * 값입니다. 별도 컬럼이 아니라 조회할 때마다 새로 계산되며, 아직
+   * 승인된 태깅 결과가 없으면 빈 배열입니다.
+   */
+  spaceMoods?: string[];
+  /** 같은 방식으로 모은 스타일 태그입니다. */
+  styleTags?: string[];
   attrs: Record<string, unknown>;
   category: string | null;
   color: string | null;
@@ -131,9 +139,54 @@ export interface TaggingHistory {
   approvalStatus: ApprovalStatus | null;
   id: string;
   imageName: string;
+  objectIdx: number;
   objectName: string;
   productName: string;
   savedAt: string;
+  sceneImage: {
+    bbox: HistoryBoundingBox | null;
+    id: string;
+    imageUrl: string | null;
+  };
   sku: string;
+  skuImageUrl: string | null;
   tags: TaggingValues;
+}
+
+export interface HistoryBoundingBox {
+  xmax: number;
+  xmin: number;
+  ymax: number;
+  ymin: number;
+}
+
+/** 태깅 이력 한 건의 검수 상세 화면 데이터입니다. */
+export interface TaggingHistoryDetail {
+  approvalStatus: ApprovalStatus | null;
+  createdAt: string;
+  createdBy: string;
+  detectedObject: {
+    attrs: Record<string, unknown>;
+    bbox: HistoryBoundingBox | null;
+    category: string | null;
+    subCategory: string | null;
+    vlmMood: VlmMood | null;
+  };
+  id: string;
+  matchedSku: {
+    attrs: Record<string, unknown>;
+    brand: string | null;
+    category: string | null;
+    imageUrl: string | null;
+    price: number | null;
+    productName: string;
+    sku: string;
+    subCategory: string | null;
+  };
+  sceneImage: {
+    imageName: string;
+    imageUrl: string | null;
+  };
+  similarityScore: number | null;
+  xaiResult: XaiResult | null;
 }

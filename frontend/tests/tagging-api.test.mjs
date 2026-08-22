@@ -172,6 +172,8 @@ test('history results are mapped from the backend response', async (t) => {
           items: [
             {
               result_id: 91,
+              scene_image_id: 71,
+              object_idx: 2,
               sku_code: 'CHR-2041',
               product_name: 'work chair',
               object_name: 'chair',
@@ -180,6 +182,7 @@ test('history results are mapped from the backend response', async (t) => {
               created_at: '2026-08-11T00:00:00Z',
               approval_status: 'REJECTED',
               style_tags: ['minimal'],
+              sku_image_url: '/sku-images/chair.png',
               scene_image: {
                 image_url: '/uploads/scene.png',
                 origin_name: 'scene.png',
@@ -199,16 +202,23 @@ test('history results are mapped from the backend response', async (t) => {
 
   const history = await fetchTaggingHistory();
 
-  assert.equal(requestUrl, '/history/results');
+  assert.equal(requestUrl, '/api/history/results');
   assert.deepEqual(history, [
     {
       approvalStatus: 'REJECTED',
       id: '91',
+      objectIdx: 2,
       imageName: 'scene.png',
       objectName: 'chair',
       productName: 'work chair',
       savedAt: '2026-08-11T00:00:00Z',
+      sceneImage: {
+        id: '71',
+        bbox: { xmin: 10, ymin: 20, xmax: 30, ymax: 40 },
+        imageUrl: '/uploads/scene.png',
+      },
       sku: 'CHR-2041',
+      skuImageUrl: '/sku-images/chair.png',
       tags: {
         category: '',
         color: '',
@@ -219,6 +229,98 @@ test('history results are mapped from the backend response', async (t) => {
       },
     },
   ]);
+});
+
+test('history detail is mapped from the backend response', async (t) => {
+  const { fetchTaggingHistoryDetail } = await loadTaggingApi(t);
+  const originalFetch = globalThis.fetch;
+  let requestUrl;
+  globalThis.fetch = async (input) => {
+    requestUrl = input;
+    return new Response(
+      JSON.stringify({
+        status: 'success',
+        data: {
+          result_id: 91,
+          created_by: 'mvp-user',
+          created_at: '2026-08-11T00:00:00Z',
+          similarity_score: 92,
+          approval_status: 'ACTIVE',
+          scene_image: {
+            image_url: '/uploads/scene.png',
+            origin_name: 'scene.png',
+          },
+          detected_object: {
+            category: '의자',
+            sub_category: '사무용 의자',
+            attrs: { color: '블랙' },
+            bbox: { xmin: 10, ymin: 20, xmax: 30, ymax: 40 },
+            vlm_mood: { summary: '차분한 공간', tags: ['미니멀'] },
+          },
+          matched_sku: {
+            sku_code: 'CHR-2041',
+            product_name: 'work chair',
+            brand: 'center',
+            price: 100000,
+            image_url: '/sku-images/chair.png',
+            category: '의자',
+            sub_category: '사무용 의자',
+            attrs: { material: '패브릭' },
+          },
+          xai_result: {
+            summary: '형태가 유사합니다.',
+            criteria: [
+              {
+                label: '구조',
+                score: 30,
+                comment: '등받이 형태가 유사합니다.',
+              },
+            ],
+          },
+        },
+        meta: { request_id: 'request-123' },
+      }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    );
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const detail = await fetchTaggingHistoryDetail('91');
+
+  assert.equal(requestUrl, '/api/history/results/91');
+  assert.deepEqual(detail, {
+    approvalStatus: 'ACTIVE',
+    createdAt: '2026-08-11T00:00:00Z',
+    createdBy: 'mvp-user',
+    detectedObject: {
+      attrs: { color: '블랙' },
+      bbox: { xmin: 10, ymin: 20, xmax: 30, ymax: 40 },
+      category: '의자',
+      subCategory: '사무용 의자',
+      vlmMood: { summary: '차분한 공간', tags: ['미니멀'] },
+    },
+    id: '91',
+    matchedSku: {
+      attrs: { material: '패브릭' },
+      brand: 'center',
+      category: '의자',
+      imageUrl: '/sku-images/chair.png',
+      price: 100000,
+      productName: 'work chair',
+      sku: 'CHR-2041',
+      subCategory: '사무용 의자',
+    },
+    sceneImage: { imageName: 'scene.png', imageUrl: '/uploads/scene.png' },
+    similarityScore: 92,
+    xaiResult: {
+      criteria: [
+        { label: '구조', score: 30, comment: '등받이 형태가 유사합니다.' },
+      ],
+      summary: '형태가 유사합니다.',
+    },
+  });
 });
 
 test('save request uses its backend contract without refreshing history', async (t) => {

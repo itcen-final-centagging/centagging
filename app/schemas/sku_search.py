@@ -2,7 +2,7 @@
 
 import typing
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SkuSearchItem(BaseModel):
@@ -16,6 +16,10 @@ class SkuSearchItem(BaseModel):
     brand: str | None
     price: int | None
     similarity_score: float
+    # 승인(ACTIVE)된 tagging_result.vlm_mood를 매 조회 시 다시 모아 채운
+    # 값입니다. 별도 컬럼이 아니라 항상 최신 승인 상태를 반영합니다.
+    space_moods: list[str] = Field(default_factory=list)
+    style_tags: list[str] = Field(default_factory=list)
 
 
 class SkuSearchData(BaseModel):
@@ -44,6 +48,10 @@ class SkuDetailData(BaseModel):
     attrs: dict[str, typing.Any]
     image_url: str | None
     sku_image_id: int | None
+    # 승인(ACTIVE)된 tagging_result.vlm_mood를 매 조회 시 다시 모아 채운
+    # 값입니다. 별도 컬럼이 아니라 항상 최신 승인 상태를 반영합니다.
+    space_moods: list[str] = Field(default_factory=list)
+    style_tags: list[str] = Field(default_factory=list)
 
 
 class SkuDetailResponse(BaseModel):
