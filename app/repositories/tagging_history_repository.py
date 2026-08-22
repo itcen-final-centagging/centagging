@@ -60,6 +60,12 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            COALESCE(object_data.metadata,
                     si.object_metadata -> tr.object_idx)
                ->> 'category' AS object_category,
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               ->> 'sub_category' AS object_sub_category,
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               -> 'attributes' AS object_attrs,
            sc.sku_code,
            sc.product_name,
            sc.brand,
@@ -69,7 +75,8 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            sc.sub_category,
            sc.attributes,
            tr.xai_result,
-           tr.vlm_mood
+           tr.vlm_mood,
+           approval_data.status AS approval_status
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -85,6 +92,13 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
        ) object_data ON TRUE
  LEFT JOIN sku_image sku_img
         ON sku_img.sku_image_id = tr.sku_image_id
+ LEFT JOIN LATERAL (
+           SELECT a.status
+             FROM approval a
+            WHERE a.tagging_result_id = tr.result_id
+            ORDER BY a.requested_at DESC, a.request_id DESC
+            LIMIT 1
+       ) approval_data ON TRUE
      WHERE tr.result_id = :result_id
     """)
 
@@ -164,14 +178,15 @@ async def get_tagging_history_detail(
             "similarity_score": (
                 round(float(score) * 100) if score is not None else None
             ),
+            "approval_status": row["approval_status"],
             "scene_image": {
                 "image_url": row["scene_image_url"],
                 "origin_name": row["origin_name"],
             },
             "detected_object": {
                 "category": row["object_category"],
-                "sub_category": None,
-                "attrs": {},
+                "sub_category": row["object_sub_category"],
+                "attrs": row["object_attrs"] or {},
                 "bbox": row["bbox"],
                 "vlm_mood": row["vlm_mood"],
             },

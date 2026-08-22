@@ -113,6 +113,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "ymax": 800,
             },
             "object_category": "의자",
+            "object_sub_category": "학생·사무용의자",
+            "object_attrs": {"color": "블랙", "material": "패브릭"},
             "vlm_mood": {
                 "summary": "차분한 홈오피스 분위기입니다.",
                 "tags": ["미니멀", "홈오피스"],
@@ -129,6 +131,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "summary": "형태와 색상이 유사합니다.",
                 "criteria": [],
             },
+            "approval_status": "ACTIVE",
         }
         self.session = _FakeSession(rows, detail_row)
         self.app = fastapi.FastAPI()
@@ -253,7 +256,19 @@ class TaggingHistoryApiTest(unittest.TestCase):
             "-> 'bbox_coord' AS bbox",
             query,
         )
-        self.assertNotIn("'attribute'", query)
+        self.assertIn(
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
+            "->> 'sub_category' AS object_sub_category",
+            query,
+        )
+        self.assertIn(
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
+            "-> 'attributes' AS object_attrs",
+            query,
+        )
+        self.assertIn("approval_data.status AS approval_status", query)
         self.assertIn("tr.vlm_mood", query)
 
     def test_returns_saved_tagging_history_detail(self) -> None:
@@ -270,7 +285,14 @@ class TaggingHistoryApiTest(unittest.TestCase):
             {"xmin": 100, "ymin": 200, "xmax": 500, "ymax": 800},
         )
         self.assertEqual(data["detected_object"]["category"], "의자")
-        self.assertEqual(data["detected_object"]["attrs"], {})
+        self.assertEqual(
+            data["detected_object"]["sub_category"], "학생·사무용의자"
+        )
+        self.assertEqual(
+            data["detected_object"]["attrs"],
+            {"color": "블랙", "material": "패브릭"},
+        )
+        self.assertEqual(data["approval_status"], "ACTIVE")
         self.assertEqual(
             data["detected_object"]["vlm_mood"],
             {

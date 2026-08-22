@@ -97,6 +97,7 @@ class TaggingHistoryDetail(pydantic.BaseModel):
     created_by: str
     created_at: datetime.datetime
     similarity_score: int | None
+    approval_status: ApprovalStatus | None = None
     scene_image: HistoryDetailSceneImage
     detected_object: HistoryDetectedObject
     matched_sku: HistoryMatchedSku
