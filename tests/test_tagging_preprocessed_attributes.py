@@ -1,6 +1,7 @@
 """보정 크롭 기반 속성 추출 테스트입니다."""
 
 import asyncio
+import io
 import types
 import unittest.mock
 
@@ -90,3 +91,27 @@ def test_fused_input_uses_corrected_image_and_extracted_attributes() -> None:
             "has_wheels: 있음",
         ]
     )
+
+
+def test_xai_input_uses_preprocessed_crop_bytes() -> None:
+    """XAI 요청에는 원본 바이트 대신 보정 Crop의 JPEG 바이트를 전달한다."""
+    raw_image = Image.new("RGB", (20, 20), color=(10, 10, 10))
+    corrected_image = Image.new("RGB", (20, 20), color=(200, 200, 200))
+    crop = CroppedObject(
+        crop_index=7,
+        bbox=BoundingBox(xmin=0, ymin=0, xmax=1000, ymax=1000),
+        image=raw_image,
+        image_bytes=b"raw-crop",
+    )
+
+    xai_crop = tagging_service.TaggingService._build_xai_crops(
+        [crop],
+        {7: corrected_image},
+    )[0]
+
+    assert xai_crop.crop_index == crop.crop_index
+    assert xai_crop.bbox == crop.bbox
+    assert xai_crop.image is corrected_image
+    assert xai_crop.image_bytes != crop.image_bytes
+    with Image.open(io.BytesIO(xai_crop.image_bytes)) as decoded:
+        assert decoded.convert("RGB").getpixel((10, 10)) == (200, 200, 200)
