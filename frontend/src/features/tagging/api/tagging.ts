@@ -615,7 +615,7 @@ export const searchCatalogItems = async (
 
 export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
   const response = await requestJson<ApiSuccessResponse<ApiHistoryListData>>(
-    `${API_BASE_URL}/history/results`,
+    `${API_BASE_URL}/api/history/results`,
   );
   return response.data.items.map(toHistory);
 };
@@ -625,7 +625,7 @@ export const fetchTaggingHistoryDetail = async (
   resultId: string,
 ): Promise<TaggingHistoryDetail> => {
   const response = await requestJson<ApiSuccessResponse<ApiHistoryDetail>>(
-    `${API_BASE_URL}/history/results/${encodeURIComponent(resultId)}`,
+    `${API_BASE_URL}/api/history/results/${encodeURIComponent(resultId)}`,
   );
   return toHistoryDetail(response.data);
 };

@@ -48,23 +48,16 @@ const AttributeList = ({ attrs }: { attrs: Record<string, unknown> }) => {
   );
 };
 
-const BoundingBox = ({
-  bbox,
-  scaleX,
-  scaleY,
-}: {
-  bbox: HistoryBoundingBox;
-  scaleX: number;
-  scaleY: number;
-}) => (
+/** 탐지 결과는 이미지 크기와 무관한 0~1000 정규화 좌표입니다. */
+const BoundingBox = ({ bbox }: { bbox: HistoryBoundingBox }) => (
   <span
     aria-label="탐지 객체 영역"
     className="pointer-events-none absolute border-2 border-primary bg-primary/10"
     style={{
-      height: (bbox.ymax - bbox.ymin) * scaleY,
-      left: bbox.xmin * scaleX,
-      top: bbox.ymin * scaleY,
-      width: (bbox.xmax - bbox.xmin) * scaleX,
+      height: `${(bbox.ymax - bbox.ymin) / 10}%`,
+      left: `${bbox.xmin / 10}%`,
+      top: `${bbox.ymin / 10}%`,
+      width: `${(bbox.xmax - bbox.xmin) / 10}%`,
     }}
   />
 );
@@ -74,7 +67,6 @@ export const HistoryDetailPage = () => {
   const [detail, setDetail] = useState<TaggingHistoryDetail>();
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
-  const [imageScale, setImageScale] = useState({ x: 1, y: 1 });
 
   const isValidResultId = Boolean(resultId && /^\d+$/.test(resultId));
   const loadDetail = useCallback(async (): Promise<void> => {
@@ -101,13 +93,6 @@ export const HistoryDetailPage = () => {
   useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
-
-  const updateImageScale = (image: HTMLImageElement) => {
-    setImageScale({
-      x: image.clientWidth / image.naturalWidth,
-      y: image.clientHeight / image.naturalHeight,
-    });
-  };
 
   return (
     <div className="px-6 py-6 pb-10">
@@ -173,15 +158,10 @@ export const HistoryDetailPage = () => {
                   <img
                     alt={detail.sceneImage.imageName}
                     className="block max-h-[620px] max-w-full object-contain"
-                    onLoad={(event) => updateImageScale(event.currentTarget)}
                     src={detail.sceneImage.imageUrl}
                   />
                   {detail.detectedObject.bbox ? (
-                    <BoundingBox
-                      bbox={detail.detectedObject.bbox}
-                      scaleX={imageScale.x}
-                      scaleY={imageScale.y}
-                    />
+                    <BoundingBox bbox={detail.detectedObject.bbox} />
                   ) : null}
                 </div>
               </div>

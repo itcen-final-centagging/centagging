@@ -200,7 +200,7 @@ test('history results are mapped from the backend response', async (t) => {
 
   const history = await fetchTaggingHistory();
 
-  assert.equal(requestUrl, '/history/results');
+  assert.equal(requestUrl, '/api/history/results');
   assert.deepEqual(history, [
     {
       approvalStatus: 'REJECTED',
@@ -281,7 +281,7 @@ test('history detail is mapped from the backend response', async (t) => {
 
   const detail = await fetchTaggingHistoryDetail('91');
 
-  assert.equal(requestUrl, '/history/results/91');
+  assert.equal(requestUrl, '/api/history/results/91');
   assert.deepEqual(detail, {
     approvalStatus: 'ACTIVE',
     createdAt: '2026-08-11T00:00:00Z',
