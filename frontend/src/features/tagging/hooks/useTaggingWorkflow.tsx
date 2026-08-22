@@ -12,6 +12,7 @@ import { useSkuSelections } from './useSkuSelections';
 import { useTaggingObjectEditor } from './useTaggingObjectEditor';
 import {
   analyzeImage,
+  fetchSearchCandidateMood,
   saveTaggingReview,
   searchCatalogItems,
   updateSceneObjects,
@@ -26,6 +27,7 @@ import type {
   SkuCandidate,
   TaggingValues,
   UploadedImage,
+  VlmMood,
   WorkflowStage,
 } from '../types';
 
@@ -110,6 +112,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     onMinimumObjectError: handleMinimumObjectError,
   });
   const {
+    applySkuMood,
     clearSelectedSku,
     confirmedSelections,
     removeSkuSelection,
@@ -335,10 +338,38 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
     [],
   );
 
+  // 검색으로 고른 SKU의 후보 카드(detectedObjects/selectedObject)에
+  // 뒤늦게 도착한 vlm_mood를 채워 넣습니다. confirmedSelections/검수 화면에
+  // 쓰는 사본은 useSkuSelections의 applySkuMood가 별도로 갱신합니다.
+  const applyCandidateMood = useCallback(
+    (targetObjectId: string, skuCode: string, vlmMood: VlmMood): void => {
+      const mergeMood = (object: FurnitureObject): FurnitureObject => {
+        // 그 사이 사용자가 다른 SKU를 다시 선택했다면 이 응답은 버립니다.
+        if (object.candidates[0]?.sku !== skuCode) return object;
+        return {
+          ...object,
+          candidates: object.candidates.map((candidate, index) =>
+            index === 0 ? { ...candidate, vlmMood } : candidate,
+          ),
+        };
+      };
+      setDetectedObjects((objects) =>
+        objects.map((object) =>
+          object.id === targetObjectId ? mergeMood(object) : object,
+        ),
+      );
+      setSelectedObject((object) =>
+        object && object.id === targetObjectId ? mergeMood(object) : object,
+      );
+    },
+    [setDetectedObjects, setSelectedObject],
+  );
+
   const addCatalogSkuToCandidates = useCallback(
     (sku: SkuCandidate): void => {
       if (!selectedObject) return;
       const targetObjectId = selectedObject.id;
+      const targetObject = selectedObject;
 
       // 이미 후보 목록에 있는 SKU(AI 추천 후보 또는 이전에 검색으로 추가한
       // 후보 포함)를 다시 선택하면 알려주고 중복 추가하지 않습니다.
@@ -380,8 +411,39 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
       );
       selectSku(sku);
       setStage('recommend');
+
+      // 검색으로 고른 SKU도 AI 추천 후보와 마찬가지로 VLM이 공간 분위기·
+      // 스타일 태그를 계산해줍니다.
+      if (analysisId && analysisMode !== 'mock') {
+        fetchSearchCandidateMood(
+          analysisId,
+          {
+            bbox: targetObject.bbox,
+            category: targetObject.category,
+            name: targetObject.name,
+            objectIdx: targetObject.objectIdx,
+          },
+          sku.sku,
+        )
+          .then((vlmMood) => {
+            applyCandidateMood(targetObjectId, sku.sku, vlmMood);
+            applySkuMood(targetObjectId, sku.sku, vlmMood);
+          })
+          .catch(() => {
+
+          });
+      }
     },
-    [selectSku, selectedObject, setDetectedObjects, setSelectedObject],
+    [
+      analysisId,
+      analysisMode,
+      applyCandidateMood,
+      applySkuMood,
+      selectSku,
+      selectedObject,
+      setDetectedObjects,
+      setSelectedObject,
+    ],
   );
 
   const saveTagging = useCallback(
