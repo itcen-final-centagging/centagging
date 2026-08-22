@@ -1,5 +1,13 @@
 import { useState, type FormEvent } from 'react';
-import { ChevronLeft, ChevronRight, Search, SearchX, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Home,
+  Search,
+  SearchX,
+  Tag,
+  X,
+} from 'lucide-react';
 
 import { Button } from '@/commons/components/Button';
 import {
@@ -23,6 +31,16 @@ const formatCategoryPath = (
   if (!category) return '카테고리 미지정';
   return subCategory ? `${category} · ${subCategory}` : category;
 };
+
+/**
+ * 검색 결과 행 하나에 한 번에 노출할 스타일 태그·공간 분위기 개수입니다.
+ * 스타일 태그 줄과 공간 분위기 줄을 따로 표시하며(태그가 위, 분위기가
+ * 아래), 승인 이력이 많은 SKU는 각 줄이 계속 늘어날 수 있으므로 나머지는
+ * "+N" 배지로 접어 행 높이가 무한정 늘어나지 않게 합니다. 전체 목록은
+ * 상세 화면에서 그대로 확인할 수 있습니다.
+ */
+const MAX_VISIBLE_STYLE_TAGS = 5;
+const MAX_VISIBLE_SPACE_MOODS = 1;
 
 type SkuCatalogSearchDialogProps = {
   onClose: () => void;
@@ -152,6 +170,38 @@ export const SkuCatalogSearchDialog = ({
                   <p className="mt-1 text-xs text-text-tertiary">
                     {formatCategoryPath(detail.category, detail.subCategory)}
                   </p>
+                  {detail.spaceMoods.length > 0 ||
+                  detail.styleTags.length > 0 ? (
+                    <div className="mt-3 rounded-xl bg-bg-secondary p-4">
+                      <p className="text-xs font-bold text-text-tertiary">
+                        공간 분위기 · 스타일 태그
+                      </p>
+                      {detail.styleTags.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {detail.styleTags.map((tag) => (
+                            <span
+                              className="rounded-full bg-primary-20 px-2.5 py-1 text-xs font-bold text-primary-700"
+                              key={tag}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {detail.spaceMoods.length > 0 ? (
+                        <ul className="mt-2 space-y-1">
+                          {detail.spaceMoods.map((mood) => (
+                            <li
+                              className="text-sm text-text-primary"
+                              key={mood}
+                            >
+                              &ldquo;{mood}&rdquo;
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <dl className="mt-4 space-y-2 rounded-xl bg-bg-secondary p-4 text-sm">
                     <div className="flex items-center justify-between">
                       <dt className="text-text-tertiary">SKU 코드</dt>
@@ -239,6 +289,61 @@ export const SkuCatalogSearchDialog = ({
                           <p className="mt-0.5 font-mono text-[11px] text-text-tertiary">
                             {item.sku}
                           </p>
+                          {(item.styleTags && item.styleTags.length > 0) ||
+                          (item.spaceMoods && item.spaceMoods.length > 0) ? (
+                            <>
+                              {item.styleTags &&
+                              item.styleTags.length > 0 ? (
+                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                  {item.styleTags
+                                    .slice(0, MAX_VISIBLE_STYLE_TAGS)
+                                    .map((tag) => (
+                                      <span
+                                        className="inline-flex items-center gap-0.5 rounded-full bg-primary-20 px-2 py-0.5 text-[10px] font-bold text-primary-700"
+                                        key={`style-${tag}`}
+                                      >
+                                        <Tag size={10} />
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  {item.styleTags.length >
+                                  MAX_VISIBLE_STYLE_TAGS ? (
+                                    <span className="rounded-full bg-bg-secondary px-2 py-0.5 text-[10px] font-bold text-text-quaternary">
+                                      +
+                                      {item.styleTags.length -
+                                        MAX_VISIBLE_STYLE_TAGS}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {item.spaceMoods &&
+                              item.spaceMoods.length > 0 ? (
+                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                  {item.spaceMoods
+                                    .slice(0, MAX_VISIBLE_SPACE_MOODS)
+                                    .map((mood) => (
+                                      <span
+                                        className="inline-flex max-w-[220px] items-center gap-0.5 rounded-full bg-bg-secondary px-2 py-0.5 text-[10px] font-bold text-text-tertiary"
+                                        key={`mood-${mood}`}
+                                      >
+                                        <Home className="shrink-0" size={10} />
+                                        <span className="min-w-0 truncate">
+                                          {mood}
+                                        </span>
+                                      </span>
+                                    ))}
+                                  {item.spaceMoods.length >
+                                  MAX_VISIBLE_SPACE_MOODS ? (
+                                    <span className="rounded-full bg-bg-secondary px-2 py-0.5 text-[10px] font-bold text-text-quaternary">
+                                      +
+                                      {item.spaceMoods.length -
+                                        MAX_VISIBLE_SPACE_MOODS}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </>
+                          ) : null}
                         </div>
                         <p className="shrink-0 text-sm font-bold text-text-secondary">
                           {formatPrice(item.price)}
