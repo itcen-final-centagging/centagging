@@ -37,6 +37,7 @@ export interface FurnitureObject {
    * 서버가 객체 목록을 다시 색인하므로, 이 값은 화면 상태에만 사용합니다.
    */
   isNew?: boolean;
+  attrsDirty?: boolean;
   metadata: ExtractedMetadata;
   name: string;
   objectIdx: number;
@@ -49,6 +50,7 @@ export interface ExtractedMetadata {
   description: string | null;
   keyFeatures: string[];
   subCategory: string | null;
+  vlmMood?: VlmMood;
 }
 
 export interface RubricEvaluation {
@@ -87,6 +89,14 @@ export interface SkuCandidate {
   subCategory?: string | null;
   brand?: string | null;
   price?: number | null;
+  /**
+   * 승인(ACTIVE)된 태깅 결과의 공간 분위기 요약을 다시 모아 채운
+   * 값입니다. 별도 컬럼이 아니라 조회할 때마다 새로 계산되며, 아직
+   * 승인된 태깅 결과가 없으면 빈 배열입니다.
+   */
+  spaceMoods?: string[];
+  /** 같은 방식으로 모은 스타일 태그입니다. */
+  styleTags?: string[];
   attrs: Record<string, unknown>;
   category: string | null;
   color: string | null;

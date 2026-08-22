@@ -27,7 +27,7 @@ from app.services.image_processing_service import (
     parse_image_to_bytes,
     read_sku_image_bytes,
 )
-from app.services.image_preprocessing_service import preprocess_for_embedding
+from app.services.object_attribute_extraction_service import ObjectAttributeExtractionService
 from app.services.fused_metadata import build_metadata_text
 from app.services.similar_sku_service import (
     FusedEmbeddingInput,
@@ -41,7 +41,6 @@ from app.services.xai_scoring_service import (
 )
 
 DETECTED_STATUS = "DETECTED"
-ATTRIBUTE_EXTRACTION_CONCURRENCY = 3
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,8 +75,11 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         self.gemini_service = gemini_service
         self.similar_sku_service = similar_sku_service
         self.xai_scoring_service = xai_scoring_service
-        self._attribute_semaphore = asyncio.Semaphore(
-            ATTRIBUTE_EXTRACTION_CONCURRENCY
+        self.object_attribute_extraction_service = (
+            ObjectAttributeExtractionService(
+                settings=settings,
+                gemini_service=gemini_service,
+            )
         )
 
     async def get_sku_candidates(
@@ -117,6 +119,11 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             else list(scene.object_metadata)
         )
 
+        object_by_idx = {
+            int(item.get("object_idx", index)): item
+            for index, item in enumerate(object_metadata)
+        }
+
         category_by_idx = {
             int(item.get("object_idx", index)): item.get("category", "")
             for index, item in enumerate(object_metadata)
@@ -134,11 +141,12 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 crop for crop in crops if crop.crop_index in requested_idxs
             ]
 
-        preprocessed_images = await self._preprocess_crops(crops)
-        attributes_by_idx = await self._extract_attributes(
-            crops,
-            category_by_idx,
-            preprocessed_images,
+        preprocessed_images = await self.object_attribute_extraction_service.preprocess_crops(crops)
+        attributes_by_idx = await self._resolve_attributes(
+            crops=crops,
+            category_by_idx=category_by_idx,
+            object_by_idx=object_by_idx,
+            preprocessed_images=preprocessed_images,
         )
         fused_inputs = self._build_fused_embedding_inputs(
             crops,
@@ -177,6 +185,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
 
             if attribute_result is not None:
                 detected.attrs = attribute_result.attributes
+                detected.vlm_mood = attribute_result.vlm_mood
 
         return result
 
@@ -277,73 +286,77 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                     return evaluation.xai_result.vlm_mood
         return VlmMood()
 
-    async def _extract_attributes(
+    async def _resolve_attributes(
         self,
         crops: list[CroppedObject],
         category_by_idx: dict[int, str],
+        object_by_idx: dict[int, dict[str, object]],
         preprocessed_images: dict[int, Image.Image],
     ) -> dict[int, FurnitureAttributeResult | None]:
-        """보정 크롭별 카테고리 규격에 맞춰 속성을 추출합니다."""
-        extraction_targets = []
+        """기존 속성을 재사용하고 필요한 객체만 다시 추출합니다."""
         attributes_by_idx: dict[int, FurnitureAttributeResult | None] = {}
-        for crop in crops:
-            category = category_by_idx.get(crop.crop_index, "")
-            if not category:
-                attributes_by_idx[crop.crop_index] = None
-                continue
-            preprocessed_image = preprocessed_images.get(crop.crop_index)
-            if preprocessed_image is None:
-                attributes_by_idx[crop.crop_index] = None
-                continue
-            extraction_targets.append((crop, category, preprocessed_image))
+        extraction_targets: list[CroppedObject] = []
 
-        extraction_results = await asyncio.gather(
-            *(
-                self._extract_attributes_for_crop(crop, category, image)
-                for crop, category, image in extraction_targets
+        for crop in crops:
+            item = object_by_idx.get(crop.crop_index, {})
+            should_extract = bool(
+                item.get("needs_attribute_extraction", True)
+            )
+
+            if not should_extract:
+                reusable_result = self._to_attribute_result(item)
+
+                if reusable_result is not None:
+                    attributes_by_idx[crop.crop_index] = reusable_result
+                    continue
+
+            extraction_targets.append(crop)
+
+        extracted_attributes = (
+            await self.object_attribute_extraction_service.extract_for_crops(
+                extraction_targets,
+                category_by_idx,
+                preprocessed_images,
             )
         )
-        attributes_by_idx.update(
-            (crop.crop_index, result)
-            for (crop, _, _), result in zip(
-                extraction_targets, extraction_results
-            )
-        )
+        attributes_by_idx.update(extracted_attributes)
+
         return attributes_by_idx
 
-    async def _extract_attributes_for_crop(
-        self,
-        crop: CroppedObject,
-        category: str,
-        image: Image.Image,
-    ) -> FurnitureAttributeResult:
-        """보정 크롭의 속성 추출 Vertex AI 요청 수를 제한합니다."""
-        async with self._attribute_semaphore:
-            return await asyncio.to_thread(
-                self.gemini_service.extract_furniture_attributes,
-                image,
-                category,
-            )
+    @staticmethod
+    def _to_attribute_result(
+        item: dict[str, object],
+    ) -> FurnitureAttributeResult | None:
+        """요청에 포함된 검증 완료 속성을 재사용 가능한 DTO로 변환합니다."""
+        category = item.get("category")
+        attrs = item.get("attrs")
+        sub_category = item.get("sub_category")
+        vlm_mood = item.get("vlm_mood")
 
-    async def _preprocess_crops(
-        self,
-        crops: list[CroppedObject],
-    ) -> dict[int, Image.Image]:
-        """속성 추출과 융합 임베딩에서 공유할 크롭 보정 결과를 만듭니다."""
-        processed = await asyncio.gather(
-            *(
-                asyncio.to_thread(
-                    preprocess_for_embedding,
-                    crop.image,
-                    self.settings,
-                )
-                for crop in crops
-            )
+        if not isinstance(category, str) or not category:
+            return None
+
+        if not isinstance(attrs, dict):
+            return None
+
+        if not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in attrs.items()
+        ):
+            return None
+
+        if sub_category is not None and not isinstance(sub_category, str):
+            return None
+
+        if vlm_mood is not None and not isinstance(vlm_mood, dict):
+            return None
+
+        return FurnitureAttributeResult(
+            category=category,
+            sub_category=sub_category,
+            attributes=attrs,
+            vlm_mood=VlmMood.model_validate(vlm_mood or {}),
         )
-        return {
-            crop.crop_index: result.image
-            for crop, result in zip(crops, processed)
-        }
 
     @staticmethod
     def _build_fused_embedding_inputs(

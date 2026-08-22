@@ -10,6 +10,7 @@ from google.genai import errors
 
 _LOGGER = logging.getLogger(__name__)
 _RATE_LIMIT_RETRY_DELAYS_SECONDS = (1.0, 2.0)
+_RETRYABLE_STATUS_CODES = frozenset({429, 500, 503})
 _Result = typing.TypeVar("_Result")
 RateLimitCallback = typing.Callable[[float], float | None]
 
@@ -22,7 +23,7 @@ def call_with_rate_limit_retry(
     jitter_seconds: float = 0.0,
     rate_limit_callback: RateLimitCallback | None = None,
 ) -> _Result:
-    """429 응답만 지정된 백오프로 재시도해 결과를 반환합니다.
+    """일시적인 Vertex AI 오류를 지정된 백오프로 재시도해 결과를 반환합니다.
 
     마지막 시도도 429이면 원본 예외를 다시 발생시켜 호출자가 기존
     도메인 오류 및 폴백 정책으로 처리하게 합니다.
@@ -38,18 +39,20 @@ def call_with_rate_limit_retry(
     for retry_delay in delays:
         try:
             return operation()
-        except errors.ClientError as error:
-            if getattr(error, "code", None) != 429:
+        except errors.APIError as error:
+            status_code = getattr(error, "code", None)
+            if status_code not in _RETRYABLE_STATUS_CODES:
                 raise
             actual_delay = retry_delay + random.uniform(0, jitter_seconds)
-            if rate_limit_callback is not None:
+            if status_code == 429 and rate_limit_callback is not None:
                 callback_delay = rate_limit_callback(actual_delay)
                 if callback_delay is not None:
                     actual_delay = max(actual_delay, callback_delay)
             _LOGGER.warning(
-                "Vertex AI 요청 한도 초과로 재시도합니다: operation=%s "
-                "delay_seconds=%s",
+                "Vertex AI 일시 오류로 재시도합니다: operation=%s "
+                "status_code=%s delay_seconds=%s",
                 operation_name,
+                status_code,
                 round(actual_delay, 2),
             )
             time.sleep(actual_delay)

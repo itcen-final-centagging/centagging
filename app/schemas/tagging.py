@@ -88,6 +88,10 @@ class EditedSceneObject(BaseModel):
     object_idx: int = Field(ge=0)
     category: str = Field(min_length=1, max_length=100)
     bbox_coord: BoundingBox
+    sub_category: str | None = None
+    attrs: dict[str, str] = Field(default_factory=dict)
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
+    needs_attribute_extraction: bool = True
 
 
 class SceneObjectUpdateRequest(BaseModel):
@@ -114,6 +118,7 @@ class DetectedObject(BaseModel):
 
     # furniture attribute extraction 결과
     attrs: dict[str, str] = Field(default_factory=dict)
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
     # XAI가 관찰한 객체 속성
     xai_attrs: dict[str, str] = Field(default_factory=dict)
@@ -145,6 +150,7 @@ class ObjectMetadata(BaseModel):
     sub_category: str | None
     bbox_coord: BoundingBox
     attrs: dict[str, str]
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
 
 class SkuMatching(BaseModel):

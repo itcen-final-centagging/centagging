@@ -39,6 +39,10 @@ class SkuCatalog(Base):  # pylint: disable=too-few-public-methods
     sub_category: orm.Mapped[typing.Optional[str]] = orm.mapped_column(
         sqlalchemy.String(50)
     )
+    # 상품 핵심 특징 목록입니다. 텍스트 임베딩 조립에 쓰입니다.
+    key_features: orm.Mapped[list[typing.Any]] = orm.mapped_column(
+        postgresql.JSONB, nullable=False, default=list
+    )
     attributes: orm.Mapped[dict[str, typing.Any]] = orm.mapped_column(
         postgresql.JSONB, nullable=False, default=dict
     )

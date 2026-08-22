@@ -262,6 +262,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
 
         return {
           ...object,
+          attrsDirty: recommendation ? false : object.attrsDirty,
           category: recommendation?.category ?? object.category,
           metadata: {
             ...object.metadata,
@@ -269,6 +270,7 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
             subCategory:
               recommendation?.sub_category ?? object.metadata.subCategory,
             attributes: recommendation?.attrs ?? object.metadata.attributes,
+            vlmMood: recommendation?.vlm_mood ?? object.metadata.vlmMood,
           },
           candidates: recommendation?.sku_candidates ?? [],
           xaiAttrs: recommendation?.xai_attrs ?? object.xaiAttrs ?? {},

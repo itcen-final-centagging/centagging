@@ -12,6 +12,7 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.models.sku import SkuCatalog, SkuImage
 from app.schemas import sku_search as sku_search_schema
+from app.services import sku_text_embedding
 from app.services.gemini_service import GeminiConfigurationError, GeminiService
 from app.services.sku_image_storage import SkuImageStorage
 
@@ -22,9 +23,35 @@ DEFAULT_RESULT_LIMIT = 5
 # 크기를 그대로 사용합니다 — 코사인 유사도만으로는 놓치는 케이스를
 # 재정렬 단계에서 건져올 여지를 주기 위함입니다.
 CANDIDATE_POOL_SIZE = 30
+# 화면에 보여줄 스타일 태그의 최소 개수입니다. 실제 연출 이미지 태그가
+# 이 개수에 못 미칠 때만 scripts.seed.seed_demo_vlm_moods로 채운 데모
+# 태그를 뒤에 채워 넣습니다(app.services.sku_text_embedding.
+# prioritize_display_moods 참고).
+MIN_DISPLAY_STYLE_TAG_COUNT = 5
 _HALFVEC = pgvector_sa.HALFVEC(EMBEDDING_DIMENSIONS)
 
 _LOGGER = logging.getLogger(__name__)
+
+# 검색 결과에 공간 분위기·스타일 태그를 얹기 위한 배치 조회입니다.
+# app.services.approval_service._reindex_sku_text_embedding과 같은
+# 대상(승인된 tagging_result.vlm_mood)을 다시 모으되, sku_catalog에는
+# 별도 컬럼을 두지 않고 매 검색마다 다시 읽습니다.
+#
+# is_seed는 scripts.seed.seed_demo_vlm_moods가 만든 가짜 연출 이미지를
+# 가려내기 위한 표시입니다. 그 스크립트는 scene_image.image_url을 항상
+# '/uploads/seed/vlm-mood-seed-{sku_id}.jpg' 형태로 만들므로(실제 업로드
+# 이미지는 이 경로를 쓰지 않습니다), 별도 DB 컬럼 없이 이 경로 패턴만
+# 보고 실제 연출 이미지와 데모 시드를 구분합니다.
+_SELECT_ACTIVE_VLM_MOODS_BY_SKU_IDS = sqlalchemy.text("""
+    SELECT tr.sku_id, tr.vlm_mood,
+           (si.image_url LIKE '/uploads/seed/%') AS is_seed
+      FROM tagging_result tr
+      JOIN approval a ON a.tagging_result_id = tr.result_id
+      JOIN scene_image si ON si.scene_image_id = tr.scene_image_id
+     WHERE tr.sku_id IN :sku_ids
+       AND a.status = 'ACTIVE'
+       AND tr.vlm_mood IS NOT NULL
+    """).bindparams(sqlalchemy.bindparam("sku_ids", expanding=True))
 
 
 class SkuSearchQueryError(RuntimeError):
@@ -38,6 +65,64 @@ def _to_public_url(
     if not stored_path:
         return None
     return sku_image_storage.public_url(stored_path)
+
+
+async def _fetch_active_moods_by_sku_ids(
+    session: sqlalchemy_async.AsyncSession,
+    sku_ids: collections.abc.Iterable[int],
+) -> dict[int, tuple[list[str], list[str]]]:
+    """SKU별 승인된 공간 분위기 요약·스타일 태그를 배치로 모읍니다.
+
+    승인 최종 트리거(app.services.approval_service의
+    _reindex_sku_text_embedding)와 같은 대상을 다시 모으되, 화면 표시용
+    으로는 실제 연출 이미지에서 얻은 값을 우선하고 데모 시드
+    (scripts.seed.seed_demo_vlm_moods)로 채운 값은 실제 태그가
+    MIN_DISPLAY_STYLE_TAG_COUNT에 못 미칠 때만 채워 넣습니다
+    (app.services.sku_text_embedding.prioritize_display_moods 참고). 이
+    조회가 실패해도 검색 자체를 막으면 안 되므로 예외를 삼키고 빈
+    결과로 대체합니다.
+
+    Args:
+        session: 비동기 SQLAlchemy 세션입니다.
+        sku_ids: 조회할 sku_id 목록입니다.
+
+    Returns:
+        sku_id -> (공간 분위기 요약 목록, 스타일 태그 목록)입니다. 승인된
+        태깅 결과가 없는 SKU는 키 자체가 없습니다.
+    """
+    unique_sku_ids = sorted({int(sku_id) for sku_id in sku_ids})
+    if not unique_sku_ids:
+        return {}
+
+    try:
+        result = await session.execute(
+            _SELECT_ACTIVE_VLM_MOODS_BY_SKU_IDS,
+            {"sku_ids": unique_sku_ids},
+        )
+        real_moods_by_sku_id: dict[int, list[typing.Any]] = {}
+        seed_moods_by_sku_id: dict[int, list[typing.Any]] = {}
+        for sku_id, vlm_mood, is_seed in result.all():
+            bucket = (
+                seed_moods_by_sku_id if is_seed else real_moods_by_sku_id
+            )
+            bucket.setdefault(int(sku_id), []).append(vlm_mood)
+    except Exception:  # noqa: BLE001 - 조회 실패가 검색을 막으면 안 됨
+        _LOGGER.warning(
+            "공간 분위기·스타일 태그 조회 실패 - 빈 값으로 대체합니다.",
+            exc_info=True,
+        )
+        return {}
+
+    all_sku_ids = set(real_moods_by_sku_id) | set(seed_moods_by_sku_id)
+    moods_by_sku_id: dict[int, tuple[list[str], list[str]]] = {
+        sku_id: sku_text_embedding.prioritize_display_moods(
+            real_moods_by_sku_id.get(sku_id, []),
+            seed_moods_by_sku_id.get(sku_id, []),
+            min_tag_count=MIN_DISPLAY_STYLE_TAG_COUNT,
+        )
+        for sku_id in all_sku_ids
+    }
+    return moods_by_sku_id
 
 
 def _to_rerank_candidate(
@@ -154,7 +239,9 @@ async def search_skus(
 
     1차로 코사인 유사도 상위 CANDIDATE_POOL_SIZE개를 후보 풀로 뽑고,
     Gemini로 검색어 조건에 맞게 재정렬한 뒤 상위 limit개를 반환합니다.
-    재정렬이 실패하면 코사인 유사도 순서를 그대로 사용합니다.
+    재정렬이 실패하면 코사인 유사도 순서를 그대로 사용합니다. 각 결과에는
+    승인(ACTIVE)된 tagging_result.vlm_mood를 다시 모은 공간 분위기·스타일
+    태그도 함께 담기며, 이 조회가 실패해도 검색 결과 자체는 반환합니다.
 
     Args:
         session: 비동기 SQLAlchemy 세션입니다.
@@ -196,6 +283,7 @@ async def search_skus(
     main_image = orm.aliased(SkuImage, name="main_image")
     stmt = (
         sqlalchemy.select(
+            SkuCatalog.sku_id,
             SkuCatalog.sku_code,
             SkuCatalog.product_name,
             SkuCatalog.category,
@@ -220,6 +308,10 @@ async def search_skus(
 
     rows = (await session.execute(stmt)).mappings().all()
 
+    moods_by_sku_id = await _fetch_active_moods_by_sku_ids(
+        session, (row["sku_id"] for row in rows)
+    )
+
     items = [
         sku_search_schema.SkuSearchItem(
             sku_code=row["sku_code"],
@@ -232,6 +324,8 @@ async def search_skus(
             similarity_score=round(
                 max(0.0, min(100.0, row["similarity"] * 100)), 1
             ),
+            space_moods=moods_by_sku_id.get(row["sku_id"], ([], []))[0],
+            style_tags=moods_by_sku_id.get(row["sku_id"], ([], []))[1],
         )
         for row in rows
     ]
@@ -254,7 +348,9 @@ async def get_sku_detail(
         sku_code: 조회할 SKU 코드입니다.
 
     Returns:
-        SKU 상세 정보이며, 존재하지 않으면 None입니다.
+        SKU 상세 정보이며, 존재하지 않으면 None입니다. 승인(ACTIVE)된
+        tagging_result.vlm_mood를 다시 모은 공간 분위기·스타일 태그도
+        함께 담깁니다.
     """
     main_image = orm.aliased(SkuImage, name="main_image")
     stmt = (
@@ -283,6 +379,11 @@ async def get_sku_detail(
     if row is None:
         return None
 
+    moods_by_sku_id = await _fetch_active_moods_by_sku_ids(
+        session, [row["sku_id"]]
+    )
+    space_moods, style_tags = moods_by_sku_id.get(row["sku_id"], ([], []))
+
     return sku_search_schema.SkuDetailData(
         sku_id=row["sku_id"],
         sku_code=row["sku_code"],
@@ -294,6 +395,8 @@ async def get_sku_detail(
         attrs=row["attributes"] or {},
         image_url=_to_public_url(sku_image_storage, row["image_url"]),
         sku_image_id=row["sku_image_id"],
+        space_moods=space_moods,
+        style_tags=style_tags,
     )
 
 

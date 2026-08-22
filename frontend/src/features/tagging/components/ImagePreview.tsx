@@ -2,6 +2,7 @@ import { useRef, type PointerEvent } from 'react';
 import { ImageOff } from 'lucide-react';
 
 import type { FurnitureObject, UploadedImage } from '@/features/tagging/types';
+import { buildObjectDisplayNames } from '@/features/tagging/utils/objectDisplayName';
 import { cn } from '@/lib/utils';
 
 interface ImagePreviewProps {
@@ -106,6 +107,7 @@ export const ImagePreview = ({
   showBoxes = false,
   showOnlySelectedBoxes = false,
 }: ImagePreviewProps) => {
+  const displayNames = buildObjectDisplayNames(objects);
   const previewRef = useRef<HTMLDivElement>(null);
   const operationRef = useRef<PointerOperation | undefined>(undefined);
   const suppressBoxClickRef = useRef(false);
@@ -238,6 +240,7 @@ export const ImagePreview = ({
               })
               .map((object) => {
                 const [ymin, xmin, ymax, xmax] = object.bbox;
+                const displayName = displayNames.get(object.id) ?? object.name;
                 return (
                   <div
                     className={cn(
@@ -269,7 +272,7 @@ export const ImagePreview = ({
                       width: `${Math.max(1, (xmax - xmin) / 10)}%`,
                     }}
                   >
-                    <span>{object.name}</span>
+                    <span>{displayName}</span>
                     {isEditing && selectedObjectIds.includes(object.id) ? (
                       <button
                         aria-label={`${object.name} 영역 크기 조정`}

@@ -7,6 +7,9 @@
     python -m scripts.embedding.build_embeddings --skip-images --force-text  텍스트만
     python -m scripts.embedding.build_embeddings --force-text --force-images
     python -m scripts.embedding.build_embeddings --check-image-index
+    python -m scripts.embedding.build_embeddings --skip-images --force-text --active-mood-only
+        지금 ACTIVE 승인된 vlm_mood가 있는 SKU만 텍스트 재임베딩
+        (sku.json 순서/--limit과 무관하게 대상만 정확히 골라낸다)
 
 단계:
     1. sku.json 로드
@@ -36,6 +39,7 @@ from typing import Any
 
 from PIL import Image
 
+from app.services import sku_text_embedding
 from app.services.fused_metadata import build_metadata_text
 from app.services.image_preprocessing_service import preprocess_for_embedding
 from scripts.embedding import db, gemini_embed, storage
@@ -136,18 +140,47 @@ def embed_texts(
     result: RunResult,
     dry_run: bool,
     force: bool,
+    active_mood_only: bool = False,
 ) -> None:
-    """sku.json 기준으로 텍스트 임베딩을 만들어 저장한다."""
-    already_done = set() if force or dry_run else db.fetch_text_embedded_sku_ids(conn)
+    """sku.json 기준 텍스트에 승인 누적 공간 분위기·스타일 태그를 더해
+    텍스트 임베딩을 만들어 저장한다.
 
-    for sku in skus:
+    검수 최종 승인 시점의 자동 재생성
+    (app.services.approval_service._reindex_sku_text_embedding)과 같은
+    입력을 재현하기 위해, 매번 tagging_result의 승인된(ACTIVE) vlm_mood를
+    다시 모아 텍스트에 반영한다. 이미 임베딩된 SKU를 건너뛰는 기존 규칙은
+    그대로 유지하므로, 승인 이후 누적분을 배치로 다시 반영하려면
+    --force-text가 필요하다.
+
+    active_mood_only가 True면, 지금 ACTIVE 승인된 vlm_mood가 하나라도
+    있는 SKU만 대상으로 좁힌다. sku.json 안에서의 순서나 --limit과
+    무관하게 "방금 승인 데이터가 채워진 SKU만" 정확히 골라 재임베딩할
+    때 쓴다(예: 대량 시드를 나눠서 돌리는 중 지금까지 처리된 만큼만
+    반영하고 싶을 때). dry_run과 함께 쓰면 대상 집계에 필요한 조회조차
+    건너뛰므로 조합하지 않는다(main()에서 미리 막는다).
+    """
+    already_done = set() if force or dry_run else db.fetch_text_embedded_sku_ids(conn)
+    active_moods_by_sku = (
+        {} if dry_run else db.fetch_active_vlm_moods_by_sku_id(conn)
+    )
+    if active_mood_only:
+        skus = [sku for sku in skus if sku["sku_id"] in active_moods_by_sku]
+
+    for index, sku in enumerate(skus, start=1):
         sku_id = sku["sku_id"]
         if sku_id in already_done:
             result.text_skipped_existing += 1
             continue
 
         try:
-            text = build_embedding_text(sku)
+            summaries, tags = sku_text_embedding.collect_active_moods(
+                active_moods_by_sku.get(sku_id, [])
+            )
+            text = sku_text_embedding.append_mood_lines(
+                build_embedding_text(sku),
+                mood_summaries=summaries,
+                style_tags=tags,
+            )
             if dry_run:
                 result.text_embedded += 1
                 continue
@@ -156,11 +189,15 @@ def embed_texts(
             db.update_text_embedding(conn, sku_id, embedding)
             conn.commit()
             result.text_embedded += 1
+            print(f"[{index}/{len(skus)}][텍스트 임베딩] sku_id={sku_id} 완료")
         except Exception as error:  # noqa: BLE001
             conn.rollback()
             message = _format_error(error)
             result.text_failed.append((sku_id, message))
-            print(f"[실패][텍스트 임베딩] sku_id={sku_id}: {message}")
+            print(
+                f"[{index}/{len(skus)}][실패][텍스트 임베딩] "
+                f"sku_id={sku_id}: {message}"
+            )
 
 
 def embed_images(
@@ -326,6 +363,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force-text", action="store_true", help="기존 텍스트 임베딩도 재계산")
     parser.add_argument("--force-images", action="store_true", help="기존 이미지 임베딩도 재계산")
     parser.add_argument(
+        "--active-mood-only",
+        action="store_true",
+        help=(
+            "지금 ACTIVE 승인된 vlm_mood가 있는 SKU만 텍스트 재임베딩 "
+            "대상으로 좁힌다(--dry-run과는 함께 쓸 수 없다)"
+        ),
+    )
+    parser.add_argument(
         "--check-image-index",
         action="store_true",
         help="현재 융합 파이프라인 기준 SKU 이미지 색인 상태만 점검",
@@ -340,6 +385,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.active_mood_only and args.dry_run:
+        raise SystemExit(
+            "--active-mood-only는 --dry-run과 함께 쓸 수 없습니다."
+        )
     settings = storage.get_settings()
     if args.check_image_index:
         status_conn = db.connect(settings.database)
@@ -364,7 +413,15 @@ def main() -> None:
         upsert_metadata(conn, skus, result, args.dry_run)
 
         if not args.skip_text:
-            embed_texts(conn, skus, settings, result, args.dry_run, args.force_text)
+            embed_texts(
+                conn,
+                skus,
+                settings,
+                result,
+                args.dry_run,
+                args.force_text,
+                active_mood_only=args.active_mood_only,
+            )
 
         if not args.skip_images:
             embed_images(

@@ -143,6 +143,38 @@ def update_text_embedding(
         )
 
 
+def fetch_active_vlm_moods_by_sku_id(
+    conn: psycopg.Connection,
+) -> dict[int, list[dict[str, Any]]]:
+    """SKU별로 승인된(ACTIVE) 태깅 결과의 vlm_mood 목록을 모아 돌려준다.
+
+    검수 최종 승인 트리거(app.services.approval_service의
+    _reindex_sku_text_embedding)와 같은 대상을 다시 모아, 오프라인
+    배치(--force-text)로도 같은 텍스트 임베딩을 재생성할 수 있게 한다.
+
+    Args:
+        conn: DB 연결이다.
+
+    Returns:
+        sku_id -> 승인된 vlm_mood 딕셔너리 목록이다. vlm_mood가 비어
+        있거나 승인되지 않은(ACTIVE가 아닌) 태깅 결과는 제외한다.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT tr.sku_id, tr.vlm_mood
+              FROM tagging_result tr
+              JOIN approval a ON a.tagging_result_id = tr.result_id
+             WHERE a.status = 'ACTIVE'
+               AND tr.vlm_mood IS NOT NULL
+            """
+        )
+        moods_by_sku: dict[int, list[dict[str, Any]]] = {}
+        for sku_id, vlm_mood in cur.fetchall():
+            moods_by_sku.setdefault(sku_id, []).append(vlm_mood)
+        return moods_by_sku
+
+
 def fetch_sku_ids_by_code(conn: psycopg.Connection) -> dict[str, int]:
     """sku_code -> sku_id 매핑을 돌려준다.
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   ArrowRight,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   LoaderCircle,
@@ -17,12 +18,19 @@ import {
   withCurrentValue,
 } from '@/features/tagging/constants/catalogSpec';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
+import {
+  buildObjectDisplayNames,
+  getObjectCategoryName,
+} from '@/features/tagging/utils/objectDisplayName';
 import { cn } from '@/lib/utils';
 
 const RESULTS_PER_PAGE = 5;
 
 export const DetectionPanel = () => {
   const [page, setPage] = useState(1);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    () => new Set(),
+  );
   // 편집 모드가 아닐 때 목록 카드와 이미지 박스를 마우스 오버로 연동합니다.
   const [hoveredObjectId, setHoveredObjectId] = useState<string>();
   const {
@@ -50,6 +58,20 @@ export const DetectionPanel = () => {
     const start = (currentPage - 1) * RESULTS_PER_PAGE;
     return detectedObjects.slice(start, start + RESULTS_PER_PAGE);
   }, [currentPage, detectedObjects]);
+  const displayNames = useMemo(
+    () => buildObjectDisplayNames(detectedObjects),
+    [detectedObjects],
+  );
+  const visibleObjectGroups = useMemo(() => {
+    const groups = new Map<string, typeof visibleObjects>();
+
+    visibleObjects.forEach((object) => {
+      const category = getObjectCategoryName(object);
+      groups.set(category, [...(groups.get(category) ?? []), object]);
+    });
+
+    return [...groups.entries()];
+  }, [visibleObjects]);
 
   const handleObjectCardClick = (object: (typeof visibleObjects)[number]) => {
     if (isEditing) focusObjectForEditing(object);
@@ -74,6 +96,20 @@ export const DetectionPanel = () => {
 
   const handleNextPage = (): void => {
     setPage(currentPage + 1);
+  };
+
+  const toggleCategory = (category: string): void => {
+    setCollapsedCategories((categories) => {
+      const nextCategories = new Set(categories);
+
+      if (nextCategories.has(category)) {
+        nextCategories.delete(category);
+      } else {
+        nextCategories.add(category);
+      }
+
+      return nextCategories;
+    });
   };
 
   return (
@@ -131,7 +167,7 @@ export const DetectionPanel = () => {
             <p className="mt-1.5 text-sm text-neutral-500">
               {isEditing
                 ? '객체별 카테고리를 수정하거나 불필요한 박스를 삭제할 수 있습니다.'
-                : '탐지 근거와 신뢰도를 확인해 편집할 객체를 선택하세요.'}
+                : '탐지 근거를 확인해 편집할 객체를 선택하세요.'}
             </p>
           </div>
         </div>
@@ -150,10 +186,34 @@ export const DetectionPanel = () => {
         ) : null}
 
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-          {visibleObjects.map((object) => {
+          {visibleObjectGroups.map(([category, objects]) => (
+            <section key={category}>
+              <button
+                aria-expanded={!collapsedCategories.has(category)}
+                className="mb-2 flex w-full items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-neutral-50"
+                onClick={() => toggleCategory(category)}
+                type="button"
+              >
+                <ChevronDown
+                  className={cn(
+                    'size-4 text-neutral-400 transition-transform',
+                    collapsedCategories.has(category) && '-rotate-90',
+                  )}
+                />
+                <span className="text-xs font-extrabold text-neutral-700">
+                  {category}
+                </span>
+                <span className="text-[11px] font-semibold text-neutral-400">
+                  {objects.length}개
+                </span>
+              </button>
+              {!collapsedCategories.has(category) ? (
+                <div className="space-y-3">
+                  {objects.map((object) => {
             const isSelected =
               isEditing && selectedObjectIds.includes(object.id);
             const isHovered = hoveredObjectId === object.id;
+            const displayName = displayNames.get(object.id) ?? object.name;
             return (
               <article
                 className={cn(
@@ -179,13 +239,13 @@ export const DetectionPanel = () => {
                   <span className="flex items-start justify-between gap-3">
                     <span>
                       <span className="block text-sm font-extrabold text-neutral-800">
-                        {object.name}
+                        {displayName}
                       </span>
                     </span>
                     <span className="shrink-0 rounded-full bg-success-50 px-2 py-1 text-[11px] font-bold text-success-600">
                       {object.confidence === null
                         ? '신뢰도 미제공'
-                        : `${object.confidence * 100}%`}
+                        : `${Math.round(object.confidence * 100)}%`}
                     </span>
                   </span>
                 </button>
@@ -241,7 +301,11 @@ export const DetectionPanel = () => {
                 ) : null}
               </article>
             );
-          })}
+                  })}
+                </div>
+              ) : null}
+            </section>
+          ))}
         </div>
 
         {totalPages > 1 ? (
