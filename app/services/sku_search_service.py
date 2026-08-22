@@ -1,6 +1,7 @@
 """SKU 카탈로그의 텍스트 임베딩 기반 유사도 검색 기능을 제공합니다."""
 
 import collections.abc
+import dataclasses
 import logging
 import typing
 
@@ -293,4 +294,62 @@ async def get_sku_detail(
         attrs=row["attributes"] or {},
         image_url=_to_public_url(sku_image_storage, row["image_url"]),
         sku_image_id=row["sku_image_id"],
+    )
+
+
+@dataclasses.dataclass(frozen=True)
+class SkuImageForScoring:
+    """VLM 채점에 쓸 SKU 대표 이미지의 원본 저장 경로입니다.
+
+    ``get_sku_detail``과 달리 image_url을 공개 URL로 바꾸지 않고 DB에
+    저장된 경로 그대로 담습니다. ``read_sku_image_bytes``가 이 원본
+    경로를 기준으로 파일을 읽기 때문입니다.
+    """
+
+    sku_id: int
+    sku_image_id: int
+    image_url: str
+
+
+async def get_sku_image_for_scoring(
+    session: sqlalchemy_async.AsyncSession,
+    sku_code: str,
+) -> SkuImageForScoring | None:
+    """VLM 채점에 필요한 SKU 대표(MAIN) 이미지의 저장 경로를 조회합니다.
+
+    전체 카탈로그 검색으로 선택한 SKU도 AI 추천 후보와 동일한 XAI
+    채점(``XaiScoringService``)을 거칠 수 있도록, 그 입력으로 쓸 원본
+    이미지 경로만 가볍게 조회합니다.
+
+    Args:
+        session: 비동기 SQLAlchemy 세션입니다.
+        sku_code: 조회할 SKU 코드입니다.
+
+    Returns:
+        MAIN 이미지 정보이며, SKU나 대표 이미지가 없으면 None입니다.
+    """
+    main_image = orm.aliased(SkuImage, name="main_image")
+    stmt = (
+        sqlalchemy.select(
+            SkuCatalog.sku_id,
+            main_image.sku_image_id,
+            main_image.image_url,
+        )
+        .join(
+            main_image,
+            sqlalchemy.and_(
+                main_image.sku_id == SkuCatalog.sku_id,
+                main_image.image_type == "MAIN",
+            ),
+        )
+        .where(SkuCatalog.sku_code == sku_code)
+    )
+    row = (await session.execute(stmt)).mappings().first()
+    if row is None:
+        return None
+
+    return SkuImageForScoring(
+        sku_id=row["sku_id"],
+        sku_image_id=row["sku_image_id"],
+        image_url=row["image_url"],
     )

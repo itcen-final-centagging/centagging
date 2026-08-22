@@ -200,3 +200,21 @@ class SkuMatchingResult(BaseModel):
 
     processing_status: typing.Literal["CONFIRMED"] = "CONFIRMED"
     result_ids: list[int]
+
+
+class SearchCandidateMoodRequest(BaseModel):
+    """전체 카탈로그 검색으로 선택한 SKU의 VLM 분위기 계산 요청입니다."""
+
+    object: EditedSceneObject
+    sku_code: str = Field(min_length=1)
+
+
+class SearchCandidateMoodResult(BaseModel):
+    """검색으로 선택한 SKU의 VLM 분위기 계산 결과입니다.
+
+    match_source가 SEARCH인 태깅 결과는 순위 근거(xai_result)를 저장할
+    수 없으므로(SkuMatching.validate_source_consistency), vlm_mood만
+    반환합니다.
+    """
+
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)

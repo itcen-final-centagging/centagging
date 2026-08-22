@@ -7,7 +7,10 @@ from app.api.examples import (
     AI_JOB_NOT_READY_RESPONSE,
     SCENE_IMAGE_NOT_FOUND_RESPONSE,
     SCENE_OBJECT_UPDATE_REQUEST_EXAMPLE,
+    SEARCH_CANDIDATE_MOOD_REQUEST_EXAMPLE,
+    SEARCH_CANDIDATE_MOOD_SUCCESS_RESPONSE,
     SKU_MATCHING_REQUEST_EXAMPLE,
+    SKU_NOT_FOUND_RESPONSE,
     SKU_RECOMMENDATION_ACCEPTED_RESPONSE,
     TAGGING_RESULT_SAVE_SUCCESS_RESPONSE,
     TAGGING_RESULT_UNPROCESSABLE_RESPONSE,
@@ -15,7 +18,8 @@ from app.api.examples import (
     VALIDATION_ERROR_RESPONSE,
 )
 from app.core import database
-from app.dependencies import get_sku_match_service
+from app.core.error_codes import ErrorCode
+from app.dependencies import get_sku_match_service, get_tagging_service
 from app.models.ai_job import AiJobType
 from app.repositories import ai_job_repository, scene_image_repository
 from app.repositories.scene_image_repository import SceneImageNotFoundError
@@ -23,10 +27,13 @@ from app.schemas import ai_job as ai_job_schema
 from app.schemas import common as common_schema
 from app.schemas.tagging import (
     SceneObjectUpdateRequest,
+    SearchCandidateMoodRequest,
+    SearchCandidateMoodResult,
     SkuMatchingRequest,
     SkuMatchingResult,
 )
 from app.services import sku_match_service as sku_match
+from app.services.tagging_service import SkuNotFoundError, TaggingService
 
 router = APIRouter(prefix="/tagging", tags=["tagging"])
 
@@ -264,4 +271,75 @@ async def save_tagging_results(
             processing_status="CONFIRMED",
             result_ids=result_ids,
         )
+    )
+
+
+@router.post(
+    "/scenes/{scene_id}/search-candidates/mood",
+    response_model=common_schema.SuccessResponse[SearchCandidateMoodResult],
+    summary="검색으로 선택한 SKU의 VLM 분위기·스타일 태그 계산",
+    description=(
+        "전체 카탈로그 검색으로 선택한 SKU에 대해, AI 추천 후보와 같은 XAI "
+        "채점 방식으로 크롭과 SKU 이미지를 비교해 공간 분위기와 스타일 "
+        "태그를 계산합니다. match_source가 SEARCH인 결과는 순위 근거"
+        "(xai_result)를 저장할 수 없으므로 vlm_mood만 반환합니다. VLM "
+        "채점 자체가 실패해도 SKU 선택 흐름을 막지 않도록, 실패 시 빈 "
+        "vlm_mood(200)를 반환합니다."
+    ),
+    response_description=(
+        "공통 성공 응답으로 공간 분위기 요약과 스타일 태그를 반환합니다."
+    ),
+    responses={
+        200: SEARCH_CANDIDATE_MOOD_SUCCESS_RESPONSE,
+        404: {
+            "description": "연출 이미지 또는 SKU 코드를 찾지 못한 경우입니다.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "scene_not_found": SCENE_IMAGE_NOT_FOUND_RESPONSE[
+                            "content"
+                        ]["application/json"]["example"],
+                        "sku_not_found": SKU_NOT_FOUND_RESPONSE["content"][
+                            "application/json"
+                        ]["example"],
+                    }
+                }
+            },
+        },
+        422: VALIDATION_ERROR_RESPONSE,
+    },
+)
+async def score_search_candidate_mood(
+    scene_id: int = Path(
+        description="크롭을 잘라낼 연출 이미지 ID입니다.",
+        openapi_examples={"scene": {"summary": "연출 이미지", "value": 101}},
+    ),
+    mood_request: SearchCandidateMoodRequest = Body(
+        openapi_examples={
+            "search_selected_sofa": {
+                "summary": "검색으로 선택한 소파 SKU의 분위기를 계산하는 경우",
+                "value": SEARCH_CANDIDATE_MOOD_REQUEST_EXAMPLE,
+            }
+        },
+    ),
+    tagging_service: TaggingService = Depends(get_tagging_service),
+) -> common_schema.SuccessResponse[SearchCandidateMoodResult]:
+    """검색으로 선택한 SKU의 VLM 공간 분위기·스타일 태그를 계산합니다."""
+    try:
+        vlm_mood = await tagging_service.score_search_selected_sku(
+            scene_id, mood_request.object, mood_request.sku_code
+        )
+    except SceneImageNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except SkuNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": ErrorCode.SKU_NOT_FOUND.value,
+                "message": ErrorCode.SKU_NOT_FOUND.default_message,
+            },
+        ) from error
+
+    return common_schema.success_response(
+        SearchCandidateMoodResult(vlm_mood=vlm_mood)
     )
