@@ -259,19 +259,6 @@ export const DetectionPanel = () => {
                       {object.description ??
                         '탐지 API가 근거 설명을 제공하지 않았습니다.'}
                     </p>
-                    {object.metadata.vlmMood?.summary ? (
-                      <div className="mt-3 rounded-md bg-neutral-50 p-2 text-neutral-600">
-                        <p className="font-semibold text-neutral-700">객체 분위기</p>
-                        <p className="mt-1 leading-5">
-                          {object.metadata.vlmMood.summary}
-                        </p>
-                        {object.metadata.vlmMood.tags.length > 0 ? (
-                          <p className="mt-1 text-neutral-500">
-                            {object.metadata.vlmMood.tags.join(' · ')}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </details>
                 ) : null}
 
