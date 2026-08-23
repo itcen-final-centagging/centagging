@@ -14,11 +14,27 @@ class MatchedSkuImage(BaseModel):
 
 
 class XaiCriterion(BaseModel):
-    """루브릭 기준 1건의 점수와 근거입니다."""
+    """XAI 판정 근거 1건입니다.
 
-    label: typing.Literal["구조", "색상", "디테일", "맥락"]
-    score: int = Field(ge=0, le=30)
-    comment: str
+    v2까지는 루브릭 기준(구조/색상/디테일/맥락)의 점수를 담았고, v3부터는
+    메타데이터 1건의 일치 여부를 담습니다. 화면과 저장 구조를 그대로 쓰기
+    위해 배열과 필드 이름을 유지합니다.
+
+    crop 판독값은 ``DetectedObject.xai_readings``에 crop당 한 번만 있고
+    SKU 값은 ``SkuCandidate.attrs``에 이미 있으므로, 여기서는 ``key``로
+    참조만 합니다. 후보 5건에 같은 사실을 반복해 담지 않습니다.
+    """
+
+    # v2는 구조/색상/디테일/맥락을 넣었습니다. v3는 비워 둡니다.
+    label: str = ""
+    comment: str = ""
+
+    # v3에서 추가한 필드입니다.
+    key: str = ""
+    verdict: typing.Literal["MATCH", "MISMATCH", "UNKNOWN"] | None = None
+
+    # v1·v2 이력 호환용입니다. v3 응답에서는 항상 None입니다.
+    score: int | None = Field(default=None, ge=0, le=30)
 
 
 class VlmMood(BaseModel):
@@ -28,11 +44,40 @@ class VlmMood(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class XaiCropReading(BaseModel):
+    """crop 이미지에서 판독한 비교 항목 1건입니다.
+
+    비교 항목 정의와 crop 판독값을 겸합니다. crop 하나의 속성이므로
+    후보 수와 무관하게 crop당 한 번만 내려갑니다.
+
+    화면 표시명은 담지 않습니다. 프론트엔드가 ``skuAttributes.ts``의
+    ``ATTRIBUTE_LABELS``로 key를 한글 라벨로 바꾸고 있어, 백엔드가 같은
+    표를 또 들고 있으면 같은 화면에서 문구가 갈립니다.
+    """
+
+    key: str
+    # crop에서 값을 특정하지 못하면 빈 문자열입니다.
+    value: str = ""
+    # value가 비었을 때 그 사유입니다.
+    note: str = ""
+
+
 class XaiResult(BaseModel):
     """XAI 판정 요약입니다."""
 
     summary: str
     criteria: list[XaiCriterion] = Field(default_factory=list)
+
+    # v3에서 추가한 필드입니다.
+    common: str = ""
+    difference: str = ""
+    # 화면의 "XAI 메타데이터 일치도" 표시는 XAI 항목 판정 비율이 아니라
+    # 후보 선정에 사용한 이미지 임베딩 유사도입니다.
+    match_rate: int | None = Field(default=None, ge=0, le=100)
+
+    # v1·v2 이력 호환용입니다. v3에서는 채우지 않습니다.
+    # vlm_mood는 속성 추출 단계가 같은 crop으로 이미 뽑아 DetectedObject에
+    # 넣고, crop 판독값은 xai_readings가 대신하므로 XAI가 다시 담지 않습니다.
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
     xai_attrs: dict[str, str] = Field(default_factory=dict)
 
@@ -121,7 +166,12 @@ class DetectedObject(BaseModel):
     vlm_mood: VlmMood = Field(default_factory=VlmMood)
 
     # XAI가 관찰한 객체 속성
+    # v3에서는 xai_readings 중 판독에 성공한 항목으로 채웁니다.
     xai_attrs: dict[str, str] = Field(default_factory=dict)
+
+    # XAI 비교 항목 정의와 crop 판독값입니다. 후보마다 반복하지 않고
+    # crop당 한 번만 내려가며, 후보의 criteria는 key로 이 목록을 참조합니다.
+    xai_readings: list[XaiCropReading] = Field(default_factory=list)
 
     sku_candidates: list[SkuCandidate]
 
