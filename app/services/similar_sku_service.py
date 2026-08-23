@@ -47,6 +47,7 @@ class FusedEmbeddingInput:
 
     image: Image.Image
     metadata_text: str
+    category: str
 
 
 class SimilarSku(pydantic.BaseModel):
@@ -121,7 +122,12 @@ class SimilarSkuService:
 
         detected_objects = []
         for crop, embedding in zip(crops, embeddings):
-            similar_skus = await self._find_skus_for_crop(crop, embedding)
+            fused_input = fused_inputs.get(crop.crop_index)
+            similar_skus = await self._find_skus_for_crop(
+                crop,
+                embedding,
+                category=fused_input.category if fused_input else "",
+            )
             detected_objects.append(
                 DetectedObject(
                     object_idx=crop.crop_index,
@@ -138,6 +144,7 @@ class SimilarSkuService:
         self,
         crop: CroppedObject,
         embedding: list[float] | BaseException,
+        category: str,
     ) -> list["SimilarSku"]:
         """임베딩 1건으로 유사 SKU를 조회합니다.
 
@@ -158,7 +165,7 @@ class SimilarSkuService:
             return []
 
         try:
-            return await self.find_similar_skus(embedding)
+            return await self.find_similar_skus(embedding, category=category)
         except SimilarSkuQueryError:
             _LOGGER.exception(
                 "유사 SKU 조회 실패로 후보를 비웁니다: crop_index=%s",
@@ -224,6 +231,7 @@ class SimilarSkuService:
     async def find_similar_skus(
         self,
         embedding: collections.abc.Sequence[float],
+        category: str,
         limit: int = DEFAULT_RESULT_LIMIT,
     ) -> list[SimilarSku]:
         """호환되는 파이프라인 벡터 중 코사인 거리가 가까운 SKU를 조회합니다.
@@ -244,6 +252,9 @@ class SimilarSkuService:
                 f"합니다. 현재 {len(embedding)} 차원입니다."
             )
 
+        if not category:
+            return []
+
         query_vector = sqlalchemy.cast(list(embedding), _HALFVEC)
         distance = (
             sqlalchemy.cast(SkuImage.embedding, _HALFVEC)
@@ -253,11 +264,14 @@ class SimilarSkuService:
 
         candidate = (
             sqlalchemy.select(SkuImage.sku_id, distance)
+            .join(SkuCatalog, SkuCatalog.sku_id == SkuImage.sku_id)
             .where(
                 SkuImage.embedding.is_not(None),
                 SkuImage.embedding_pipeline_version
                 == self.settings.embedding_pipeline_version,
                 SkuImage.embedding_image_sha256.is_not(None),
+                SkuCatalog.category == category,
+                distance <= self.settings.similar_sku_max_cosine_distance,
             )
             .order_by(distance)
             .limit(CANDIDATE_LIMIT)

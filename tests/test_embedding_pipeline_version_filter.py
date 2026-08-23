@@ -29,7 +29,7 @@ class _Session:
         return _Result()
 
 
-def test_similarity_query_filters_pipeline_version() -> None:
+def test_similarity_query_filters_category_and_distance() -> None:
     """새 쿼리 벡터와 구 카탈로그 벡터가 섞여 검색되지 않는다."""
     session = _Session()
     service = similar_sku_service.SimilarSkuService(
@@ -38,12 +38,14 @@ def test_similarity_query_filters_pipeline_version() -> None:
         settings=types.SimpleNamespace(
             sku_image_root="data/images",
             embedding_pipeline_version="2026-08-21.1",
+            similar_sku_max_cosine_distance=0.35,
         ),
     )
 
     asyncio.run(
         service.find_similar_skus(
-            [0.1] * similar_sku_service.EMBEDDING_DIMENSIONS
+            [0.1] * similar_sku_service.EMBEDDING_DIMENSIONS,
+            category="chair",
         )
     )
 
@@ -52,3 +54,10 @@ def test_similarity_query_filters_pipeline_version() -> None:
     assert "sku_image.embedding_pipeline_version" in sql
     assert "embedding_pipeline_version" in sql
     assert "sku_image.embedding_image_sha256" in sql
+    assert "sku_catalog.category" in sql
+    assert "distance" in sql
+    compiled_params = session.statement.compile(
+        dialect=postgresql.dialect()
+    ).params
+    assert "chair" in compiled_params.values()
+    assert 0.35 in compiled_params.values()

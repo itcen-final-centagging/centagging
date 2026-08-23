@@ -49,6 +49,7 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
             ORDER BY a.requested_at DESC, a.request_id DESC
             LIMIT 1
        ) approval_data ON TRUE
+     WHERE si.image_url NOT LIKE '/uploads/seed/%'
      ORDER BY tr.created_at DESC, tr.result_id DESC
     """)
 
@@ -105,6 +106,7 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
             LIMIT 1
        ) approval_data ON TRUE
      WHERE tr.result_id = :result_id
+       AND si.image_url NOT LIKE '/uploads/seed/%'
     """)
 
 

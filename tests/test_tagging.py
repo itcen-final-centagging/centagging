@@ -229,6 +229,7 @@ class SimilarSkuRecommendationTest(unittest.IsolatedAsyncioTestCase):
             {
                 0: similar_sku_service.FusedEmbeddingInput(
                     image=crop.image,
+                    category="chair",
                     metadata_text="카테고리: 의자",
                 )
             },
