@@ -374,6 +374,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                         else None
                     ),
                 ),
+                category=category_by_idx.get(crop.crop_index, ""),
             )
         return fused_inputs
 
