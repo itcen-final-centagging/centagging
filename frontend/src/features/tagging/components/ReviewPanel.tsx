@@ -25,9 +25,12 @@ import { cn } from '@/lib/utils';
  * VLM이 crop 이미지에서 추출한 스타일 태그 목록입니다.
  * 검수 화면의 스타일 태그 선택지는 이 값만 사용합니다.
  */
-const getVlmStyleTags = (sku: SkuCandidate): string[] => [
+const getVlmStyleTags = (
+  object: FurnitureObject,
+  sku: SkuCandidate,
+): string[] => [
   ...new Set(
-    (sku.vlmMood?.tags ?? [])
+    (object.metadata.vlmMood?.tags ?? sku.vlmMood?.tags ?? [])
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0),
   ),
@@ -95,9 +98,13 @@ const buildDefaultValues = (
     ),
     materials: buildDefaultMaterials(category, object, sku),
     // 공간 분위기는 crop 이미지를 VLM이 해석한 결과를 기본값으로 씁니다.
-    mood: sku.vlmMood?.summary ?? object.metadata.description ?? '',
+    mood:
+      object.metadata.vlmMood?.summary ||
+      sku.vlmMood?.summary ||
+      object.metadata.description ||
+      '',
     // 스타일 태그도 VLM이 crop에서 추출한 태그를 기본 선택으로 둡니다.
-    styleTags: getVlmStyleTags(sku),
+    styleTags: getVlmStyleTags(object, sku),
     subCategory: object.metadata.subCategory ?? sku.subCategory ?? 'null',
   };
 };
@@ -136,7 +143,7 @@ export const ReviewPanel = () => {
     buildDefaultValues(currentObject, currentSku);
   const isReviewed = reviewedIds[currentObject.id] === true;
   // 스타일 태그 선택지와 SKU 상세 속성은 현재 확정한 SKU 기준으로 만듭니다.
-  const styleTagOptions = getVlmStyleTags(currentSku);
+  const styleTagOptions = getVlmStyleTags(currentObject, currentSku);
   const skuAttributeRows = buildSkuAttributeRows(
     currentSku,
     currentObject.category,
