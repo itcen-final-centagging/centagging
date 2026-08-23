@@ -49,9 +49,10 @@ XAI_CONCURRENCY = 3
 
 THINKING_BUDGET = 0
 
-# 모델이 판정·판독하지 않은 항목에 붙이는 근거입니다.
-MISSING_VERDICT_COMMENT = "모델이 해당 항목을 판정하지 않았습니다."
-MISSING_READING_NOTE = "모델이 해당 항목을 판독하지 않았습니다."
+# 재요청 후에도 모델 응답에서 누락된 항목에 붙이는 사용자용 근거입니다.
+# 모델 내부 동작을 그대로 노출하지 않고 시각 정보 부족으로 안내합니다.
+MISSING_VERDICT_COMMENT = "해당 항목을 충분히 비교하기 어려워 판단할 수 없습니다."
+MISSING_READING_NOTE = "해당 항목의 시각 정보가 충분하지 않아 판단하기 어렵습니다."
 
 
 class ScoringCandidate(BaseModel):
@@ -265,6 +266,21 @@ class XaiScoringService:
         async with self._score_semaphore:
             try:
                 score_result = await asyncio.to_thread(self.score_all, [crop])
+                crop_scores = self._align_crop_index(
+                    crop, list(score_result.crops)
+                )
+                if not self._is_complete_response(crop, crop_scores):
+                    _LOGGER.warning(
+                        "XAI 응답 항목 누락으로 한 번 재요청합니다: "
+                        "crop_index=%s",
+                        crop.crop_index,
+                    )
+                    score_result = await asyncio.to_thread(
+                        self.score_all, [crop]
+                    )
+                    crop_scores = self._align_crop_index(
+                        crop, list(score_result.crops)
+                    )
             except GeminiRateLimitError:
                 _LOGGER.warning(
                     "Gemini 요청 한도 초과, crop_index=%s는 "
@@ -281,7 +297,43 @@ class XaiScoringService:
                 )
                 return []
 
-        return self._align_crop_index(crop, list(score_result.crops))
+        return crop_scores
+
+    @staticmethod
+    def _is_complete_response(
+        crop: ScoringCrop,
+        crop_scores: list[MetadataCropScore],
+    ) -> bool:
+        """필수 crop 판독과 후보별 판정이 모두 반환됐는지 확인합니다.
+
+        프롬프트만으로 배열의 필수 key 개수를 강제할 수 없으므로, 누락을
+        서버가 검출해 ``_score_one_crop``에서 한 번 재요청할 수 있게 합니다.
+        """
+        if len(crop_scores) != 1:
+            return False
+
+        crop_score = crop_scores[0]
+        expected_reading_keys = set(_comparison_keys(crop.category))
+        readings = {reading.key: reading for reading in crop_score.crop_readings}
+        if set(readings) != expected_reading_keys:
+            return False
+
+        evaluations = {
+            evaluation.sku_id: evaluation
+            for evaluation in crop_score.evaluations
+        }
+        expected_sku_ids = {candidate.sku_code for candidate in crop.candidates}
+        if set(evaluations) != expected_sku_ids:
+            return False
+
+        readable_keys = {
+            key for key, reading in readings.items() if reading.value
+        }
+        return all(
+            readable_keys
+            <= {verdict.key for verdict in evaluation.xai_result.verdicts}
+            for evaluation in evaluations.values()
+        )
 
     @staticmethod
     def _align_crop_index(
