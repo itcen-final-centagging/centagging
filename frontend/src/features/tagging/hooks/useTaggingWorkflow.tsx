@@ -274,6 +274,8 @@ export const TaggingWorkflowProvider = ({ children }: PropsWithChildren) => {
           },
           candidates: recommendation?.sku_candidates ?? [],
           xaiAttrs: recommendation?.xai_attrs ?? object.xaiAttrs ?? {},
+          xaiReadings:
+            recommendation?.xaiReadings ?? object.xaiReadings ?? [],
         };
       });
       if (
