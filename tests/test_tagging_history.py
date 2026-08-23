@@ -271,7 +271,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
         self.assertIn(
             "COALESCE(object_data.metadata, "
             "si.object_metadata -> tr.object_idx) "
-            "-> 'attributes' AS object_attrs",
+            "-> 'attrs' AS object_attrs",
             query,
         )
         self.assertIn("approval_data.status AS approval_status", query)

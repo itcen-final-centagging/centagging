@@ -70,7 +70,7 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
                ->> 'sub_category' AS object_sub_category,
            COALESCE(object_data.metadata,
                     si.object_metadata -> tr.object_idx)
-               -> 'attributes' AS object_attrs,
+               -> 'attrs' AS object_attrs,
            sc.sku_code,
            sc.product_name,
            sc.brand,
