@@ -155,6 +155,129 @@ def test_normalize_attributes_keeps_only_allowed_keys_and_values() -> None:
     }
 
 
+def test_build_evidence_descriptors_uses_only_category_attributes() -> None:
+    """근거에는 객체별 카테고리 속성만 사용합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "의자",
+        {
+            "color": "블랙",
+            "style": "모던",
+            "chair_type": "학생·사무용의자",
+            "material": "메쉬",
+            "has_wheels": "있음",
+            "has_backrest": "모름",
+        },
+    )
+
+    assert descriptors == [
+        "메쉬 소재",
+        "바퀴가 있는 구조",
+    ]
+
+
+def test_build_evidence_descriptors_uses_storage_attributes() -> None:
+    """수납장 전용 구조 속성도 사용자용 근거에 포함합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "서랍·수납장",
+        {
+            "storage_type": "주방 수납장",
+            "door_type": "여닫이형",
+            "has_drawer": "있음",
+            "pattern": "무지",
+        },
+    )
+
+    assert descriptors[:3] == [
+        "여닫이형 구조",
+        "서랍이 있는 구조",
+    ]
+
+
+def test_build_evidence_descriptors_excludes_category_classification() -> None:
+    """세부 유형처럼 카테고리를 재분류하는 값은 근거에서 제외합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "진열장·책장",
+        {
+            "storage_type": "장식장",
+            "material": "원목",
+            "door_type": "유리도어",
+        },
+    )
+
+    assert descriptors == ["원목 소재", "유리 도어 구조"]
+
+
+def test_build_evidence_descriptors_avoids_repeated_attribute_names() -> None:
+    """값에 이미 포함된 단어를 속성 이름으로 반복하지 않습니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "테이블·식탁·책상",
+        {
+            "leg_type": "4다리",
+            "wood_tone": "밝은 우드톤",
+            "seating_capacity": "4인",
+        },
+    )
+
+    assert descriptors == ["4다리 구조", "밝은 우드톤"]
+
+
+def test_build_evidence_descriptors_excludes_uncertain_visual_attributes() -> (
+    None
+):
+    """이미지에서 직접 검증하기 어려운 속성은 근거에서 제외합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "매트리스",
+        {
+            "size": "퀸(Q)",
+            "firmness": "미디엄",
+            "thickness": "21~30cm",
+            "features": "항균",
+        },
+    )
+
+    assert descriptors == ["두께 21~30cm"]
+
+
+def test_build_evidence_descriptors_excludes_unconfirmed_absence() -> None:
+    """가림으로 오판할 수 있는 구조 부재 값은 근거에서 제외합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "의자",
+        {
+            "material": "원목",
+            "has_wheels": "없음",
+            "has_backrest": "있음",
+            "has_armrest": "모름",
+        },
+    )
+
+    assert descriptors == ["원목 소재", "등받이가 있는 구조"]
+
+
+def test_build_evidence_descriptors_formats_category_phrases() -> None:
+    """카테고리별 수량과 구조 속성을 자연스러운 표현으로 변환합니다."""
+    bed_descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "침대",
+        {
+            "bed_type": "수납침대",
+            "thickness": "21~30cm",
+            "product_type": "프레임+매트리스",
+        },
+    )
+    vanity_descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "화장대·콘솔",
+        {
+            "storage_type": "서랍형",
+            "has_mirror": "있음",
+        },
+    )
+
+    assert bed_descriptors == ["프레임·매트리스 구성"]
+    assert vanity_descriptors == [
+        "거울이 있는 구조",
+        "서랍형 수납 구조",
+    ]
+
+
 def test_validate_result_clears_invalid_sub_category() -> None:
     """허용되지 않은 소분류는 제거하고 유효한 속성은 유지합니다."""
     result = FurnitureAttributeResult(
