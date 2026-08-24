@@ -56,12 +56,11 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
           className="flex items-center gap-2.5"
           to={isAdminMode ? '/admin' : '/'}
         >
-          <span
-            className="flex size-7 items-center justify-center rounded-md text-sm font-extrabold text-white shadow-sm"
-            style={{ background: 'var(--gradient-primary)' }}
-          >
-            C
-          </span>
+          <img
+            alt="ITCEN"
+            className="size-7 rounded-md shadow-sm"
+            src="/itcen-favicon.png"
+          />
           <span>
             <span className="block text-sm font-extrabold leading-none tracking-[-0.03em] text-text-primary">
               CenTagging
@@ -161,7 +160,7 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
           </div>
         </div>
         <p className="py-3 text-center text-[11px] font-semibold text-text-quaternary">
-          Powered by CenTagging
+          Powered by ITCEN
         </p>
       </div>
     </aside>

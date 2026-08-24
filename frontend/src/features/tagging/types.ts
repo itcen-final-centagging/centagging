@@ -42,6 +42,7 @@ export interface FurnitureObject {
   name: string;
   objectIdx: number;
   xaiAttrs?: Record<string, string>;
+  xaiReadings?: XaiCropReading[];
 }
 
 export interface ExtractedMetadata {
@@ -67,14 +68,27 @@ export interface RubricEvaluation {
 
 export interface XaiCriterion {
   comment: string;
-  label: string;
-  score: number;
+  /** v3 메타데이터 비교의 속성 키입니다. */
+  key?: string;
+  /** 구 루브릭 응답과의 호환을 위해 남겨 둔 표시명입니다. */
+  label?: string;
+  score?: number | null;
+  verdict?: 'MATCH' | 'MISMATCH' | 'UNKNOWN' | null;
 }
 
 export interface XaiResult {
+  common?: string;
   criteria: XaiCriterion[];
+  difference?: string;
+  matchRate?: number | null;
   summary: string;
   xaiAttrs?: Record<string, string>;
+}
+
+export interface XaiCropReading {
+  key: string;
+  note: string;
+  value: string;
 }
 
 export interface VlmMood {

@@ -49,6 +49,7 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
             ORDER BY a.requested_at DESC, a.request_id DESC
             LIMIT 1
        ) approval_data ON TRUE
+     WHERE si.image_url NOT LIKE '/uploads/seed/%'
      ORDER BY tr.created_at DESC, tr.result_id DESC
     """)
 
@@ -70,7 +71,7 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
                ->> 'sub_category' AS object_sub_category,
            COALESCE(object_data.metadata,
                     si.object_metadata -> tr.object_idx)
-               -> 'attributes' AS object_attrs,
+               -> 'attrs' AS object_attrs,
            sc.sku_code,
            sc.product_name,
            sc.brand,
@@ -105,6 +106,7 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
             LIMIT 1
        ) approval_data ON TRUE
      WHERE tr.result_id = :result_id
+       AND si.image_url NOT LIKE '/uploads/seed/%'
     """)
 
 

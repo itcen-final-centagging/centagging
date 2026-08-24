@@ -44,6 +44,7 @@ class Settings:  # pylint: disable=too-many-instance-attributes
     gemini_rerank_model: str = "gemini-2.5-flash-lite"
     image_preprocess_enabled: bool = True
     embedding_pipeline_version: str = "2026-08-21.1"
+    similar_sku_max_cosine_distance: float = 0.35
     image_max_side: int = 1024
     quality_blur_laplacian_threshold: float = 180.0
     quality_denoise_h: int = 3
@@ -81,6 +82,9 @@ def get_settings() -> Settings:
         image_preprocess_enabled=_env_bool("IMAGE_PREPROCESS_ENABLED", True),
         embedding_pipeline_version=os.getenv(
             "EMBEDDING_PIPELINE_VERSION", "2026-08-21.1"
+        ),
+        similar_sku_max_cosine_distance=float(
+            os.getenv("SIMILAR_SKU_MAX_COSINE_DISTANCE", "0.35")
         ),
         image_max_side=int(os.getenv("IMAGE_MAX_SIDE", "1024")),
         quality_blur_laplacian_threshold=float(

@@ -15,11 +15,24 @@ import {
   APPROVAL_STATUS_STYLES,
 } from '@/features/approvals/constants/approvalStatus';
 import { fetchTaggingHistoryDetail } from '@/features/tagging/api/tagging';
+import { ATTRIBUTE_LABELS } from '@/features/tagging/constants/skuAttributes';
 import type {
   HistoryBoundingBox,
   TaggingHistoryDetail,
 } from '@/features/tagging/types';
 import { cn } from '@/lib/utils';
+
+const XAI_VERDICT_LABELS = {
+  MATCH: '일치',
+  MISMATCH: '불일치',
+  UNKNOWN: '판단 불가',
+} as const;
+
+const XAI_VERDICT_STYLES = {
+  MATCH: 'bg-emerald-50 text-emerald-700',
+  MISMATCH: 'bg-rose-50 text-rose-700',
+  UNKNOWN: 'bg-amber-50 text-amber-700',
+} as const;
 
 const formatDateTime = (value: string): string => {
   const date = new Date(value);
@@ -284,7 +297,7 @@ export const HistoryDetailPage = () => {
                     <dd className="mt-1 text-lg font-bold text-text-primary">
                       {detail.similarityScore === null
                         ? '-'
-                        : `${detail.similarityScore}점`}
+                        : `${detail.similarityScore}%`}
                     </dd>
                   </div>
                   <div>
@@ -315,21 +328,43 @@ export const HistoryDetailPage = () => {
                         <p className="text-sm text-text-secondary">
                           {detail.xaiResult.summary}
                         </p>
-                        <div className="mt-3 space-y-2">
+                        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
                           {detail.xaiResult.criteria.map((criterion, index) => (
                             <div
-                              className="rounded-lg bg-neutral-50 px-3 py-2"
-                              key={`${criterion.label}-${index}`}
+                              className="rounded-lg bg-neutral-50 px-3 py-3"
+                              key={`${criterion.key ?? criterion.label}-${index}`}
                             >
-                              <p className="text-sm font-bold text-text-primary">
-                                {criterion.label} · {criterion.score}점
-                              </p>
-                              <p className="mt-1 text-xs text-text-secondary">
-                                {criterion.comment}
-                              </p>
+                              <dt className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-text-secondary">
+                                  {(criterion.key
+                                    ? ATTRIBUTE_LABELS[criterion.key]
+                                    : criterion.label) || '판정 항목'}
+                                </span>
+                                {criterion.verdict ? (
+                                  <span
+                                    className={cn(
+                                      'shrink-0 rounded-full px-2 py-1 text-[11px] font-bold',
+                                      XAI_VERDICT_STYLES[criterion.verdict],
+                                    )}
+                                  >
+                                    {XAI_VERDICT_LABELS[criterion.verdict]}
+                                  </span>
+                                ) : typeof criterion.score === 'number' ? (
+                                  <span className="shrink-0 text-sm font-bold text-text-primary">
+                                    {criterion.score}점
+                                  </span>
+                                ) : (
+                                  <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">
+                                    판단 불가
+                                  </span>
+                                )}
+                              </dt>
+                              <dd className="mt-2 text-sm leading-5 text-text-primary">
+                                {criterion.comment || '판단 근거가 없습니다.'}
+                              </dd>
                             </div>
                           ))}
-                        </div>
+                        </dl>
                       </div>
                     ) : null}
                   </div>

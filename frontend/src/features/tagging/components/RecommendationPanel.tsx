@@ -12,12 +12,21 @@ import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ObjectCropPreview } from '@/features/tagging/components/ImagePreview';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
-import {
-  getRubricScores,
-  getRubricTotal,
-} from '@/features/tagging/utils/rubric';
+import { ATTRIBUTE_LABELS } from '@/features/tagging/constants/skuAttributes';
 import { buildSkuAttributeRows } from '@/features/tagging/utils/skuAttributes';
 import { cn } from '@/lib/utils';
+
+const VERDICT_LABELS = {
+  MATCH: '일치',
+  MISMATCH: '불일치',
+  UNKNOWN: '판단 불가',
+} as const;
+
+const VERDICT_STYLES = {
+  MATCH: 'bg-emerald-50 text-emerald-700',
+  MISMATCH: 'bg-rose-50 text-rose-700',
+  UNKNOWN: 'bg-amber-50 text-amber-700',
+} as const;
 
 export const RecommendationPanel = () => {
   const {
@@ -56,9 +65,34 @@ export const RecommendationPanel = () => {
 
   if (!focusedCandidate) return null;
 
-  const rubricScores = getRubricScores(focusedCandidate);
-  const rubricTotal = getRubricTotal(focusedCandidate, rubricScores);
   const isConfirmed = selectedSku?.sku === focusedCandidate.sku;
+  const metadataCriteria = (focusedCandidate.xaiResult?.criteria ?? []).filter(
+    (criterion) => criterion.key,
+  );
+  const cropReadings = new Map(
+    (selectedObject?.xaiReadings ?? []).map((reading) => [
+      reading.key,
+      reading,
+    ]),
+  );
+  const verdictCounts = metadataCriteria.reduce(
+    (counts, criterion) => {
+      if (criterion.verdict) counts[criterion.verdict] += 1;
+      return counts;
+    },
+    { MATCH: 0, MISMATCH: 0, UNKNOWN: 0 },
+  );
+  const similarity =
+    focusedCandidate.metadataScore ?? focusedCandidate.score;
+  const comparisonCount = metadataCriteria.length;
+  const hasSimilarityResult =
+    similarity !== null || comparisonCount > 0;
+  const verdictPercentage = (
+    verdict: keyof typeof VERDICT_LABELS,
+  ): number =>
+    comparisonCount === 0
+      ? 0
+      : (verdictCounts[verdict] / comparisonCount) * 100;
 
   // 소규모 배열 조합이라 useMemo 없이 매 렌더마다 계산해도 무방합니다.
   // (아래 return null 분기 뒤라 훅으로 두면 훅 규칙에 걸립니다.)
@@ -199,7 +233,7 @@ export const RecommendationPanel = () => {
                             />
                           </span>
                           <span className="text-[11px] font-extrabold text-emerald-700">
-                            {candidate.score}점
+                            {candidate.score}%
                           </span>
                         </span>
                       ) : null}
@@ -231,24 +265,12 @@ export const RecommendationPanel = () => {
                   : focusedCandidate.sku}
               </p>
             </div>
-            {/* 카탈로그 검색으로 추가한 SKU는 후보 목록 최상단 위치로 이미
-                구분되므로 별도 표시 없이 점수가 있을 때만 노출합니다. */}
-            {focusedCandidate.score !== null ? (
-              <div className="text-left sm:text-right">
-                <p className="text-2xl font-extrabold tracking-[-0.04em] text-emerald-700">
-                  {focusedCandidate.score}점
-                </p>
-                <p className="text-[11px] font-semibold text-text-tertiary">
-                  최종 매칭 점수
-                </p>
-              </div>
-            ) : null}
           </div>
 
           <div
             className={cn(
               'mt-5 grid gap-4',
-              focusedCandidate.score !== null &&
+              hasSimilarityResult &&
                 'lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.92fr)]',
             )}
           >
@@ -278,71 +300,146 @@ export const RecommendationPanel = () => {
                 </div>
               </div>
             </div>
-            {focusedCandidate.score !== null && (
+            {hasSimilarityResult && (
               <div className="rounded-xl border border-border p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-text-secondary">
-                    VLM 루브릭 채점
-                  </p>
-                  <span className="text-sm font-extrabold text-text-primary">
-                    {rubricTotal === null ? '—' : `${rubricTotal}점`}
+                <p className="text-xs font-bold text-text-secondary">
+                  유사도
+                </p>
+                <div className="mt-3 flex items-end gap-2">
+                  <span className="text-4xl font-extrabold tracking-[-0.05em] text-blue-700">
+                    {similarity === null ? '—' : `${similarity}%`}
+                  </span>
+                  <span className="pb-1 text-xs font-semibold text-text-tertiary">
+                    {comparisonCount}개 비교 중 {verdictCounts.MATCH}개 일치
                   </span>
                 </div>
-                <div className="mt-4 space-y-3">
-                  {rubricScores.map(({ key, label, maximum, score }) => {
-                    const percentage =
-                      score === null ? 0 : (score / maximum) * 100;
-                    return (
-                      <div
-                        className="grid grid-cols-[42px_minmax(0,1fr)_44px] items-center gap-2"
-                        key={key}
-                      >
-                        <span className="text-xs font-semibold text-text-secondary">
-                          {label}
-                        </span>
-                        <span className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                {comparisonCount > 0 ? (
+                  <>
+                    <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-neutral-100">
+                      <span
+                        className="bg-emerald-600"
+                        style={{ width: `${verdictPercentage('MATCH')}%` }}
+                      />
+                      <span
+                        className="bg-rose-500"
+                        style={{ width: `${verdictPercentage('MISMATCH')}%` }}
+                      />
+                      <span
+                        className="bg-amber-500"
+                        style={{ width: `${verdictPercentage('UNKNOWN')}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold text-text-secondary">
+                      {(Object.keys(VERDICT_LABELS) as Array<
+                        keyof typeof VERDICT_LABELS
+                      >).map((verdict) => (
+                        <span className="flex items-center gap-1" key={verdict}>
                           <span
-                            className="block h-full rounded-full bg-emerald-600"
-                            style={{ width: `${percentage}%` }}
+                            className={cn(
+                              'h-2 w-2 rounded-full',
+                              verdict === 'MATCH' && 'bg-emerald-600',
+                              verdict === 'MISMATCH' && 'bg-rose-500',
+                              verdict === 'UNKNOWN' && 'bg-amber-500',
+                            )}
                           />
+                          {VERDICT_LABELS[verdict]} {verdictCounts[verdict]}
                         </span>
-                        <span className="text-right text-xs font-bold text-emerald-700">
-                          {score === null
-                            ? '—'
-                            : `${score}점/${maximum}점`}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="mt-4 border-t border-neutral-100 pt-3 text-xs leading-5 text-text-secondary">
-                  {focusedCandidate.xaiResult?.summary ??
-                    focusedCandidate.rubric?.xaiReason ??
-                    focusedCandidate.xaiReason ??
-                    '—'}
-                </p>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
               </div>
             )}
           </div>
 
-          <div className="mt-5">
-            <p className="text-xs font-bold text-text-secondary">
-              SKU 카탈로그 속성
-            </p>
-            <dl className="mt-2 divide-y divide-neutral-100 border-y border-neutral-100">
-              {attributeRows.map(([label, value]) => (
-                <div
-                  className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 px-2 py-3"
-                  key={label}
-                >
-                  <dt className="text-xs text-text-tertiary">{label}</dt>
-                  <dd className="text-xs font-bold text-text-primary">
-                    {value}
-                  </dd>
+          {metadataCriteria.length > 0 ? (
+            <div className="mt-5">
+              <p className="text-xs font-bold text-text-secondary">
+                메타데이터 단위 검증
+              </p>
+              <div className="mt-2 overflow-x-auto rounded-xl border border-neutral-100">
+                <table className="w-full min-w-[720px] text-left text-xs">
+                  <thead className="bg-bg-tertiary text-text-tertiary">
+                    <tr>
+                      <th className="px-3 py-2 font-bold">메타데이터</th>
+                      <th className="px-3 py-2 font-bold">Crop 이미지 판독</th>
+                      <th className="px-3 py-2 font-bold">SKU 카탈로그 값</th>
+                      <th className="px-3 py-2 font-bold">판정</th>
+                      <th className="px-3 py-2 font-bold">판단 근거</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {metadataCriteria.map((criterion) => {
+                      const key = criterion.key as string;
+                      const reading = cropReadings.get(key);
+                      const verdict = criterion.verdict ?? 'UNKNOWN';
+                      return (
+                        <tr key={key}>
+                          <td className="px-3 py-3 font-bold text-text-primary">
+                            {ATTRIBUTE_LABELS[key] ?? key}
+                          </td>
+                          <td className="px-3 py-3 text-text-secondary">
+                            {reading?.value || reading?.note || '판단 불가'}
+                          </td>
+                          <td className="px-3 py-3 text-text-secondary">
+                            {String(focusedCandidate.attrs[key] ?? '정보 없음')}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-1 text-[11px] font-bold',
+                                VERDICT_STYLES[verdict],
+                              )}
+                            >
+                              {VERDICT_LABELS[verdict]}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 leading-5 text-text-secondary">
+                            {criterion.comment || '판단 근거가 없습니다.'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-xs font-bold text-emerald-700">공통점</p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-900">
+                    {focusedCandidate.xaiResult?.common || '확인된 공통점이 없습니다.'}
+                  </p>
                 </div>
-              ))}
-            </dl>
-          </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-bold text-amber-700">차이점 · 확인 필요</p>
+                  <p className="mt-1 text-xs leading-5 text-amber-900">
+                    {focusedCandidate.xaiResult?.difference || '확인된 차이점이 없습니다.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {metadataCriteria.length === 0 ? (
+            <div className="mt-5">
+              <p className="text-xs font-bold text-text-secondary">
+                SKU 카탈로그 속성
+              </p>
+              <dl className="mt-2 divide-y divide-neutral-100 border-y border-neutral-100">
+                {attributeRows.map(([label, value]) => (
+                  <div
+                    className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 px-2 py-3"
+                    key={label}
+                  >
+                    <dt className="text-xs text-text-tertiary">{label}</dt>
+                    <dd className="text-xs font-bold text-text-primary">
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : null}
 
           <div className="mt-6 flex flex-col-reverse gap-3 border-t border-neutral-100 pt-5 sm:flex-row sm:justify-between">
             <Button
