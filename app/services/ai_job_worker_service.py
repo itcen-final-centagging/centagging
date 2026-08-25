@@ -78,7 +78,7 @@ def _build_detected_objects(
 def _build_enriched_evidence(
     category: str,
     attrs: dict[str, str],
-    fallback_evidence: str | None = None,
+    original_evidence: str,
 ) -> str:
     """추출된 객체 속성을 기반으로 화면용 탐지 근거를 생성합니다."""
     descriptors = furniture_attribute_rules.build_evidence_descriptors(
@@ -86,17 +86,12 @@ def _build_enriched_evidence(
     )
 
     if not descriptors:
-        if fallback_evidence and fallback_evidence.strip():
-            normalized_fallback = fallback_evidence.strip()
-            if normalized_fallback.endswith("판단했습니다."):
-                return normalized_fallback
-            return (
-                f"{normalized_fallback.rstrip('.')}. 해당 형태와 구조를 근거로 "
-                f"{category}로 판단했습니다."
-            )
+        normalized_evidence = original_evidence.strip()
+        if normalized_evidence.endswith("판단했습니다."):
+            return normalized_evidence
         return (
-            f"객체의 형태와 구조가 {category}의 특징과 일치해 "
-            f"해당 카테고리로 판단했습니다."
+            f"{normalized_evidence.rstrip('.')}. 해당 형태와 구조를 근거로 "
+            f"{category}로 판단했습니다."
         )
 
     return f"{', '.join(descriptors[:3])} 등이 확인되어 {category}로 판단했습니다."
@@ -158,7 +153,7 @@ async def _detect_scene(
         detection.evidence = _build_enriched_evidence(
             category=detection.category,
             attrs=detection.attrs,
-            fallback_evidence=detection.evidence,
+            original_evidence=detection.evidence,
         )
 
     _mark_detection_succeeded(scene)

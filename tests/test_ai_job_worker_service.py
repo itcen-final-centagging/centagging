@@ -122,6 +122,7 @@ def test_build_enriched_evidence_uses_visible_attributes() -> None:
             "has_wheels": "없음",
             "has_backrest": "있음",
         },
+        original_evidence="등받이와 좌판 구조가 보이는 의자입니다.",
     )
 
     assert evidence == (
@@ -140,7 +141,7 @@ def test_build_enriched_evidence_uses_structural_fallback() -> None:
             "firmness": "미디엄",
             "features": "항균",
         },
-        fallback_evidence=(
+        original_evidence=(
             "누빔 표면과 직사각형 쿠션 구조가 확인되는 매트리스입니다."
         ),
     )
