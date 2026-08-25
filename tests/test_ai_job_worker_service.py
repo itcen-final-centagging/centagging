@@ -112,6 +112,45 @@ def _settings(storage_root: str) -> config.Settings:
     )
 
 
+def test_build_enriched_evidence_uses_visible_attributes() -> None:
+    """시각적으로 확인 가능한 속성만 화면용 근거에 사용합니다."""
+    evidence = ai_job_worker_service._build_enriched_evidence(
+        category="의자",
+        attrs={
+            "chair_type": "인테리어의자",
+            "material": "원목",
+            "has_wheels": "없음",
+            "has_backrest": "있음",
+        },
+    )
+
+    assert evidence == (
+        "원목 소재, 등받이가 있는 구조 등이 확인되어 "
+        "의자로 판단했습니다."
+    )
+
+
+def test_build_enriched_evidence_uses_structural_fallback() -> None:
+    """신뢰할 속성 근거가 없으면 위치 없는 구조 기반 근거를 사용합니다."""
+    evidence = ai_job_worker_service._build_enriched_evidence(
+        category="매트리스",
+        attrs={
+            "mattress_type": "스프링",
+            "size": "퀸(Q)",
+            "firmness": "미디엄",
+            "features": "항균",
+        },
+        fallback_evidence=(
+            "누빔 표면과 직사각형 쿠션 구조가 확인되는 매트리스입니다."
+        ),
+    )
+
+    assert evidence == (
+        "누빔 표면과 직사각형 쿠션 구조가 확인되는 매트리스입니다. "
+        "해당 형태와 구조를 근거로 매트리스로 판단했습니다."
+    )
+
+
 class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
     unittest.IsolatedAsyncioTestCase
 ):
@@ -263,7 +302,7 @@ class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes
         )
         self.failure_mock.assert_not_awaited()
 
-    async def test_requeues_failed_detection_when_attempts_remain(self) -> None:
+    async def test_requeues_failed_detection_before_last_attempt(self) -> None:
         """탐지 실패에 재시도가 남으면 장면을 pending으로 유지합니다."""
         self.detection_mock.side_effect = RuntimeError("temporary error")
 

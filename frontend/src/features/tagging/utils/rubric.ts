@@ -43,7 +43,8 @@ export const RUBRIC_DEFINITIONS: readonly RubricDefinition[] = [
   },
 ];
 
-const normalizeLabel = (label: string): string => label.trim().toLowerCase();
+const normalizeLabel = (label?: string): string =>
+  (label ?? '').trim().toLowerCase();
 
 export const getRubricScores = (
   candidate: Pick<SkuCandidate, 'rubric' | 'xaiResult'>,

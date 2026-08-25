@@ -25,7 +25,6 @@ from app.services.image_processing_service import (
     CroppedObject,
     crop_scene_objects,
     parse_image_to_bytes,
-    read_sku_image_bytes,
 )
 from app.services.object_attribute_extraction_service import ObjectAttributeExtractionService
 from app.services.fused_metadata import build_metadata_text
@@ -34,8 +33,6 @@ from app.services.similar_sku_service import (
     SimilarSkuService,
 )
 from app.services.xai_scoring_service import (
-    ScoringCandidate,
-    ScoringCrop,
     XaiObjectResult,
     XaiScoringService,
 )
@@ -162,9 +159,11 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         )
 
         # 3) XAI 근거 산출
+        # 카테고리는 4단계에서 채우지만 XAI가 비교 항목을 정하는 데 먼저
+        # 필요하므로, 확정된 category_by_idx를 그대로 넘깁니다.
         xai_crops = self._build_xai_crops(crops, preprocessed_images)
         xai_results = await self.xai_scoring_service.score_detected_objects(
-            xai_crops, result.objects
+            xai_crops, result.objects, category_by_idx
         )
         self._apply_xai_results(result.objects, xai_results)
 
@@ -197,23 +196,25 @@ class TaggingService:  # pylint: disable=too-few-public-methods
     ) -> VlmMood:
         """전체 카탈로그 검색으로 선택한 SKU의 공간 분위기·스타일 태그를 계산합니다.
 
-        AI 추천 흐름과 같은 XAI 채점(``XaiScoringService``)을 크롭 1건 ×
-        후보 1건으로 좁혀 실행하고, 거기서 얻은 ``vlm_mood``만 돌려줍니다.
-        검색으로 확정한 결과는 순위 근거(xai_result)를 저장할 수 없으므로
-        (``SkuMatching.validate_source_consistency``) 점수·criteria는
-        쓰지 않고 버립니다.
+        ``vlm_mood``는 연출 이미지 crop에서만 결정되는 값이라 SKU 후보와
+        무관합니다. 그래서 XAI를 거치지 않고 AI 추천 흐름과 같은 속성 추출
+        서비스(``ObjectAttributeExtractionService``)를 크롭 1건으로 실행해
+        같은 값을 얻습니다. 검색으로 확정한 결과는 순위 근거(xai_result)를
+        저장할 수 없으므로(``SkuMatching.validate_source_consistency``)
+        판정 결과는 애초에 만들지 않습니다.
 
-        VLM 채점 자체가 실패해도 SKU 선택 흐름을 막지 않도록, 크롭·SKU
-        이미지를 읽지 못했거나 채점이 실패하면 빈 VlmMood를 반환합니다.
+        속성 추출이 실패해도 SKU 선택 흐름을 막지 않도록, 크롭을 만들지
+        못했거나 추출이 실패하면 빈 VlmMood를 반환합니다.
 
         Args:
             scene_image_id: 크롭을 잘라낼 연출 이미지 ID입니다.
             object_edit: 크롭 대상 객체의 바운딩 박스·카테고리입니다.
-            sku_code: 검색으로 선택한 SKU 코드입니다.
+            sku_code: 검색으로 선택한 SKU 코드입니다. 카탈로그에 있는
+                코드인지 확인하는 데만 씁니다.
 
         Returns:
             VLM이 크롭에서 읽어낸 공간 분위기 요약과 스타일 태그입니다.
-            채점에 실패하면 빈 VlmMood입니다.
+            추출에 실패하면 빈 VlmMood입니다.
 
         Raises:
             SceneImageNotFoundError: 장면 이미지가 없는 경우입니다.
@@ -244,47 +245,27 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         if crop is None:
             return VlmMood()
 
-        candidate_image_bytes = await asyncio.to_thread(
-            read_sku_image_bytes,
-            sku_image.image_url,
-            self.settings.sku_image_root,
-            self.settings.image_storage_root,
-        )
-        if candidate_image_bytes is None:
-            _LOGGER.warning(
-                "검색 SKU 이미지를 읽지 못해 VLM 분위기 계산을 건너뜁니다: "
-                "sku_code=%s",
-                sku_code,
-            )
-            return VlmMood()
-
-        scoring_crop = ScoringCrop(
-            crop_index=crop.crop_index,
-            crop_image_bytes=crop.image_bytes,
-            candidates=[
-                ScoringCandidate(
-                    sku_code=sku_code, image_bytes=candidate_image_bytes
-                )
-            ],
-        )
-
         try:
-            score_result = await asyncio.to_thread(
-                self.xai_scoring_service.score_all, [scoring_crop]
+            attributes_by_idx = (
+                await self.object_attribute_extraction_service.extract_for_crops(
+                    [crop],
+                    {crop.crop_index: object_edit.category},
+                )
             )
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception(
-                "검색 SKU VLM 분위기 채점 실패, 빈 값으로 대체합니다: "
+                "검색 SKU VLM 분위기 추출 실패, 빈 값으로 대체합니다: "
                 "sku_code=%s",
                 sku_code,
             )
             return VlmMood()
 
-        for crop_score in score_result.crops:
-            for evaluation in crop_score.evaluations:
-                if evaluation.sku_id == sku_code:
-                    return evaluation.xai_result.vlm_mood
-        return VlmMood()
+        attribute_result = attributes_by_idx.get(crop.crop_index)
+        return (
+            attribute_result.vlm_mood
+            if attribute_result is not None
+            else VlmMood()
+        )
 
     async def _resolve_attributes(
         self,
@@ -387,6 +368,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                         else None
                     ),
                 ),
+                category=category_by_idx.get(crop.crop_index, ""),
             )
         return fused_inputs
 
@@ -419,13 +401,24 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         detected_objects: list[DetectedObject],
         xai_results: dict[int, XaiObjectResult],
     ) -> None:
-        """XAI 결과 중 XAI 속성과 후보 평가만 탐지 객체에 반영합니다."""
+        """XAI 결과를 탐지 객체와 각 SKU 후보에 반영합니다.
+
+        crop 판독값은 후보와 무관한 crop의 속성이라 ``xai_readings``에
+        객체 단위로 한 번만 담고, 후보별 판정과 근거만 각 후보의
+        ``xai_result``에 담습니다.
+
+        후보 순위는 임베딩 유사도로 결정하므로 여기서 재정렬하지 않고,
+        ``similarity_score``도 임베딩 유사도 그대로 둡니다. 화면의 XAI
+        메타데이터 일치도도 같은 값을 사용하므로 후보별 ``match_rate``에
+        복사합니다.
+        """
         for detected in detected_objects:
             xai_result = xai_results.get(detected.object_idx)
             if xai_result is None:
                 continue
 
             detected.xai_attrs = xai_result.xai_attrs
+            detected.xai_readings = xai_result.readings
             evaluations = {
                 evaluation.sku_id: evaluation
                 for evaluation in xai_result.evaluations
@@ -435,13 +428,9 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 evaluation = evaluations.get(candidate.sku_code)
                 if evaluation is None:
                     continue
-                candidate.similarity_score = evaluation.total_score
-                candidate.xai_result = evaluation.xai_result
-
-            detected.sku_candidates.sort(
-                key=lambda candidate: candidate.similarity_score,
-                reverse=True,
-            )
+                candidate.xai_result = evaluation.xai_result.model_copy(
+                    update={"match_rate": candidate.similarity_score}
+                )
 
     def _resolve_image_path(self, scene: SceneImage) -> pathlib.Path:
         """``scene_image.image_url``을 실제 저장소 경로로 변환합니다.

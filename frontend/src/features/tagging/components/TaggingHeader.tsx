@@ -24,9 +24,7 @@ const STEP_STAGES: WorkflowStage[] = [
 
 const getActiveStep = (stage: WorkflowStage): number => {
   if (stage === 'upload' || stage === 'analyzing') return 0;
-  if (stage === 'detect' || stage === 'not-found' || stage === 'redetecting') {
-    return 1;
-  }
+  if (stage === 'detect') return 1;
   // 유사 SKU 추천 로딩(recommending)도 SKU 선택 단계로 표시합니다.
   if (
     stage === 'recommending' ||

@@ -1235,7 +1235,7 @@ const SubmissionReview = ({
             </>
           ) : (
             <p className="rounded-xl bg-bg-muted px-4 py-3 text-sm font-semibold text-text-secondary">
-              최종 관리자의 승인 후 시스템 카탈로그와 태깅 검색에 반영됩니다.
+              시스템 관리자의 승인 후 시스템 카탈로그와 태깅 검색에 반영됩니다.
             </p>
           )}
         </div>

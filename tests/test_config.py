@@ -15,6 +15,7 @@ def test_fused_pipeline_settings_have_stable_defaults() -> None:
     assert settings.embedding_pipeline_version == "2026-08-21.1"
     assert settings.image_max_side == 1024
     assert settings.quality_blur_laplacian_threshold == 180.0
+    assert settings.similar_sku_max_cosine_distance == 0.35
     assert settings.lighting_moderate_median == 60.0
     assert settings.lighting_severe_median == 30.0
 
@@ -27,6 +28,7 @@ def test_fused_pipeline_settings_read_environment_overrides() -> None:
         "IMAGE_MAX_SIDE": "768",
         "QUALITY_BLUR_LAPLACIAN_THRESHOLD": "200",
         "LIGHTING_SEVERE_GAMMA": "0.55",
+        "SIMILAR_SKU_MAX_COSINE_DISTANCE": "0.30",
     }
     with unittest.mock.patch.dict(os.environ, overrides, clear=True):
         settings = config.get_settings()
@@ -36,3 +38,4 @@ def test_fused_pipeline_settings_read_environment_overrides() -> None:
     assert settings.image_max_side == 768
     assert settings.quality_blur_laplacian_threshold == 200.0
     assert settings.lighting_severe_gamma == 0.55
+    assert settings.similar_sku_max_cosine_distance == 0.30

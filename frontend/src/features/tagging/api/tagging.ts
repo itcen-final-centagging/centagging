@@ -9,6 +9,7 @@ import type {
   TaggingValues,
   VlmMood,
   XaiCriterion,
+  XaiCropReading,
 } from '../types';
 
 type ApiBoundingBox = {
@@ -61,7 +62,10 @@ type DevCandidate = {
   sku_code: string;
   sub_category: string | null;
   xai_result: {
+    common?: string;
     criteria: XaiCriterion[];
+    difference?: string;
+    match_rate?: number | null;
     summary: string;
     vlm_mood: VlmMood;
     xai_attrs?: Record<string, string>;
@@ -76,12 +80,17 @@ type DevRecommendationObject = {
   confidence: number;
   attrs: Record<string, string>;
   xai_attrs?: Record<string, string>;
+  xai_readings?: XaiCropReading[];
   vlm_mood: VlmMood;
   sku_candidates: DevCandidate[];
 };
 
-type RecommendationObject = Omit<DevRecommendationObject, 'sku_candidates'> & {
+type RecommendationObject = Omit<
+  DevRecommendationObject,
+  'sku_candidates' | 'xai_readings'
+> & {
   sku_candidates: SkuCandidate[];
+  xaiReadings: XaiCropReading[];
 };
 
 type DevRecommendationData = {
@@ -177,7 +186,6 @@ type ApiHistoryDetail = {
 
 export type TaggingAnalysis = {
   analysisId: string;
-  mode: 'live' | 'mock' | null;
   objects: FurnitureObject[];
 };
 
@@ -301,7 +309,8 @@ const toDevCandidate = (
   kind: toKind(candidate.category, candidate.sub_category),
   material: nullableText(candidate.attrs.material),
   matchRank: candidateIndex + 1,
-  metadataScore: null,
+  metadataScore:
+    candidate.xai_result.match_rate ?? candidate.similarity_score,
   name: candidate.product_name,
   rubric: null,
   score: candidate.similarity_score,
@@ -312,7 +321,10 @@ const toDevCandidate = (
   vlmMood: candidate.xai_result.vlm_mood,
   xaiReason: nullableText(candidate.xai_result.summary),
   xaiResult: {
+    common: candidate.xai_result.common,
     criteria: candidate.xai_result.criteria,
+    difference: candidate.xai_result.difference,
+    matchRate: candidate.xai_result.match_rate ?? candidate.similarity_score,
     summary: candidate.xai_result.summary,
     xaiAttrs: candidate.xai_result.xai_attrs ?? {},
   },
@@ -486,22 +498,8 @@ const toHistoryDetail = (detail: ApiHistoryDetail): TaggingHistoryDetail => ({
   xaiResult: detail.xai_result,
 });
 
-export const analyzeImage = async (
-  file: File,
-  targetDescription?: string,
-): Promise<TaggingAnalysis> => {
+export const analyzeImage = async (file: File): Promise<TaggingAnalysis> => {
   const formData = new FormData();
-
-  if (targetDescription) {
-    formData.append('image', file);
-    formData.append('target_description', targetDescription);
-    await requestJson(`${API_BASE_URL}/api/v1/taggings/analyze`, {
-      body: formData,
-      method: 'POST',
-    });
-    throw new Error('재탐지 인터페이스가 구현되지 않았습니다.');
-  }
-
   formData.append('file', file);
   const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
     `${API_BASE_URL}/tagging`,
@@ -516,7 +514,6 @@ export const analyzeImage = async (
 
   return {
     analysisId: String(accepted.data.scene_image_id),
-    mode: null,
     objects: detectionResult.objects.map((detection) => ({
       bbox: toBbox(detection.bbox_coord),
       candidates: [],
@@ -604,6 +601,7 @@ export const updateSceneObjects = async (
       {
         ...object,
         sku_candidates: object.sku_candidates.map(toDevCandidate),
+        xaiReadings: object.xai_readings ?? [],
       },
     ]),
   );
