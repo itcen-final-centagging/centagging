@@ -1,7 +1,6 @@
 """가구 객체 탐지 프롬프트 v2를 정의합니다."""
 
 import json
-from collections.abc import Mapping
 
 PROMPT_VERSION = "v2"
 
@@ -10,30 +9,24 @@ FURNITURE_DETECTION_PROMPT_TEMPLATE = """
 
 ## 목표와 입력
 
-이미지 전체 또는 지정된 ROI에서 선택 가능한 가구를 물리적 객체당 하나씩
-찾으세요. 다음 입력 계약을 사용합니다.
+이미지 전체에서 선택 가능한 가구를 물리적 객체당 하나씩 찾으세요. 다음 입력
+계약을 사용합니다.
 
 - 허용 카테고리: {allowed_categories}
 - 좌표: 0~{coordinate_max} 범위의 정규화 정수
 - 근거 언어: {evidence_language}
-- ROI: {roi_instruction}
-- 최소 가시 비율: 약 {min_visible_ratio_percent}%
 
 ## 필수 판정 순서
 
 각 후보를 다음 순서로 한 번씩 판정하세요.
 
-1. ROI가 있으면 보이는 범위로 만든 박스의 중심점이 ROI 안인지 확인합니다.
-2. 다른 가구의 부품이 아닌 독립된 물리적 가구인지 확인합니다.
-3. 허용 카테고리 하나를 구분할 수 있는 구조가 실제로 보이는지 확인합니다.
-4. 예상 전체 외형 중 약 {min_visible_ratio_percent}% 이상이 보이는지 확인합니다.
-   정확한 면적 계산이 아니라, 카테고리를 구분하는 주요 구조의 가시성을
-   기준으로 판단합니다.
-5. 1~4를 모두 만족하면 confidence와 관계없이 반환 대상으로 확정한 뒤,
+1. 다른 가구의 부품이 아닌 독립된 물리적 가구인지 확인합니다.
+2. 허용 카테고리 하나를 구분할 수 있는 구조가 실제로 보이는지 확인합니다.
+3. 1~2를 모두 만족하면 confidence와 관계없이 반환 대상으로 확정한 뒤,
    실제로 보이는 외곽에 밀착한 박스를 만듭니다.
 
 confidence를 먼저 정한 뒤 객체를 제외하지 마세요. 구조를 추측해야 하거나
-1~4 중 하나라도 만족하지 않으면 반환하지 마세요.
+1~2 중 하나라도 만족하지 않으면 반환하지 마세요.
 
 ## 객체 분리와 제외
 
@@ -55,9 +48,22 @@ confidence를 먼저 정한 뒤 객체를 제외하지 마세요. 구조를 추�
   `0 <= ymin < ymax <= {coordinate_max}`를 만족해야 합니다.
 - 실제로 보이는 가구의 최외곽만 감싸고, 숨은 부분·그림자·인접 객체·여백은
   포함하지 마세요.
-- 중심점은 `((xmin+xmax)/2, (ymin+ymax)/2)`입니다.
-- ROI는 포함 여부만 결정합니다. 중심점이 ROI 안이면 ROI 밖으로 이어진 실제
-  가시 외곽까지 반환하고, ROI 경계로 박스를 자르지 마세요.
+
+## 가림 객체 좌표
+
+- 대상 객체의 `bbox_coord` 내부에서 탐지 대상이 아닌 전경 물체가 대상 가구의
+  실제 구조를 물리적으로 가릴 때만 `occluder_bbox_coord`에 그 전경 물체의
+  가시 외곽 좌표를 반환합니다.
+- 가림 객체가 없으면 `occluder_bbox_coord`는 `null`로 반환합니다.
+- 허용 카테고리로 별도 탐지되는 다른 가구는 대상 박스와 겹쳐 보여도 가림
+  객체로 반환하지 않습니다.
+- 두 탐지 박스의 좌표가 겹친다는 이유만으로 가림 객체라고 판단하지 않습니다.
+- 대상 객체의 실제 구조가 가려졌는지 불분명하면 `occluder_bbox_coord`는
+  `null`로 반환합니다.
+- 대상 객체 자신의 부품, 그림자, 반사와 단순 배경은 가림 객체로 판단하지
+  않습니다.
+- 가시 면적 비율과 최종 포함 여부는 계산하지 마세요. 서버는 가림 객체 좌표가
+  대상 박스 내부와 실제로 교차할 때만 교차 면적을 계산하여 판정합니다.
 
 ## 내부 탐지 confidence와 탐지 근거
 
@@ -89,6 +95,12 @@ confidence를 먼저 정한 뒤 객체를 제외하지 마세요. 구조를 추�
         "xmax": 631,
         "ymax": 977
       }},
+      "occluder_bbox_coord": {{
+        "xmin": 410,
+        "ymin": 690,
+        "xmax": 631,
+        "ymax": 977
+      }},
       "evidence": "하얀 색 가죽의 소파입니다.",
       "confidence": 0.82
     }}
@@ -100,24 +112,10 @@ confidence를 먼저 정한 뒤 객체를 제외하지 마세요. 구조를 추�
 {{"detections": []}}
 
 반환 전에 허용 category, 중복, 좌표 범위와 순서, 내부 탐지 근거 언어를 한 번
-검증하세요. 각 객체에는 `category`, `bbox_coord`, `evidence`, `confidence`만
-두고 검증 과정이나 JSON 밖의 설명은 출력하지 마세요.
+검증하세요. 각 객체에는 `category`, `bbox_coord`, `occluder_bbox_coord`,
+`evidence`, `confidence`만 두고 검증 과정이나 JSON 밖의 설명은 출력하지
+마세요.
 """.strip()
-
-
-def _build_roi_instruction(
-    roi_bbox: Mapping[str, float] | None,
-) -> str:
-    """ROI 지정 여부에 맞는 탐지 범위 지시문을 생성합니다."""
-    if roi_bbox is None:
-        return "지정되지 않음. 이미지 전체를 탐지합니다."
-
-    return (
-        "정규화 좌표 기준 "
-        f"xmin={roi_bbox['xmin']}, ymin={roi_bbox['ymin']}, "
-        f"xmax={roi_bbox['xmax']}, ymax={roi_bbox['ymax']}입니다. "
-        "객체 중심점의 포함 여부를 판단하는 데만 사용합니다."
-    )
 
 
 def build_furniture_detection_prompt(
@@ -125,13 +123,8 @@ def build_furniture_detection_prompt(
     allowed_categories: list[str],
     coordinate_max: int = 1000,
     evidence_language: str = "한글",
-    roi_bbox: Mapping[str, float] | None = None,
-    min_visible_ratio_percent: int = 50,
 ) -> str:
     """탐지 요청에 사용할 가구 탐지 프롬프트 v2를 생성합니다."""
-    if not 0 <= min_visible_ratio_percent <= 100:
-        raise ValueError("최소 가시 비율은 0에서 100 사이여야 합니다.")
-
     return FURNITURE_DETECTION_PROMPT_TEMPLATE.format(
         allowed_categories=json.dumps(
             allowed_categories,
@@ -139,6 +132,4 @@ def build_furniture_detection_prompt(
         ),
         coordinate_max=coordinate_max,
         evidence_language=evidence_language,
-        roi_instruction=_build_roi_instruction(roi_bbox),
-        min_visible_ratio_percent=min_visible_ratio_percent,
     )

@@ -33,6 +33,10 @@ class GeminiRawDetection(BaseModel):
 
     category: str = Field(min_length=1)
     bbox_coord: GeminiBoundingBox
+    occluder_bbox_coord: GeminiBoundingBox | None = Field(
+        default=None,
+        description="대상 객체를 가리는 전경 객체의 0~1000 정규화 좌표",
+    )
     evidence: str = Field(min_length=1)
     confidence: float = Field(
         ge=0,
