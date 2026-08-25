@@ -1,7 +1,9 @@
 import type { FurnitureObject } from '@/features/tagging/types';
 
 export const getObjectCategoryName = (object: FurnitureObject): string =>
-  object.category?.trim() || object.name.trim() || '가구';
+  object.category?.normalize('NFC').trim() ||
+  object.name.normalize('NFC').trim() ||
+  '가구';
 
 /** 동일 카테고리 객체만 objectIdx 순서로 화면용 번호를 부여합니다. */
 export const buildObjectDisplayNames = (

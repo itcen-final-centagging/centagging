@@ -186,7 +186,6 @@ type ApiHistoryDetail = {
 
 export type TaggingAnalysis = {
   analysisId: string;
-  mode: 'live' | 'mock' | null;
   objects: FurnitureObject[];
 };
 
@@ -499,22 +498,8 @@ const toHistoryDetail = (detail: ApiHistoryDetail): TaggingHistoryDetail => ({
   xaiResult: detail.xai_result,
 });
 
-export const analyzeImage = async (
-  file: File,
-  targetDescription?: string,
-): Promise<TaggingAnalysis> => {
+export const analyzeImage = async (file: File): Promise<TaggingAnalysis> => {
   const formData = new FormData();
-
-  if (targetDescription) {
-    formData.append('image', file);
-    formData.append('target_description', targetDescription);
-    await requestJson(`${API_BASE_URL}/api/v1/taggings/analyze`, {
-      body: formData,
-      method: 'POST',
-    });
-    throw new Error('재탐지 인터페이스가 구현되지 않았습니다.');
-  }
-
   formData.append('file', file);
   const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
     `${API_BASE_URL}/tagging`,
@@ -529,7 +514,6 @@ export const analyzeImage = async (
 
   return {
     analysisId: String(accepted.data.scene_image_id),
-    mode: null,
     objects: detectionResult.objects.map((detection) => ({
       bbox: toBbox(detection.bbox_coord),
       candidates: [],

@@ -86,12 +86,15 @@ def _build_enriched_evidence(
     )
 
     if not descriptors:
-        return original_evidence
+        normalized_evidence = original_evidence.strip()
+        if normalized_evidence.endswith("판단했습니다."):
+            return normalized_evidence
+        return (
+            f"{normalized_evidence.rstrip('.')}. 해당 형태와 구조를 근거로 "
+            f"{category}로 판단했습니다."
+        )
 
-    return (
-        f"{', '.join(descriptors[:3])} 등의 특징을 근거로 "
-        f"{category} 카테고리로 판단했습니다."
-    )
+    return f"{', '.join(descriptors[:3])} 등이 확인되어 {category}로 판단했습니다."
 
 
 def _mark_detection_succeeded(scene: SceneImage) -> None:

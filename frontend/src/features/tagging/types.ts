@@ -1,13 +1,9 @@
 import type { ApprovalStatus } from '@/features/approvals/api/approvals';
 
-export type AnalysisScenario = 'detected' | 'not-detected';
-
 export type WorkflowStage =
   | 'upload'
   | 'analyzing'
   | 'detect'
-  | 'not-found'
-  | 'redetecting'
   | 'recommending'
   | 'recommend'
   | 'catalog'

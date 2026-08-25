@@ -126,15 +126,13 @@ def test_build_enriched_evidence_uses_visible_attributes() -> None:
     )
 
     assert evidence == (
-        "원목 소재, 등받이가 있는 구조 등의 특징을 근거로 "
-        "의자 카테고리로 판단했습니다."
+        "원목 소재, 등받이가 있는 구조 등이 확인되어 "
+        "의자로 판단했습니다."
     )
 
 
-def test_build_enriched_evidence_keeps_original_without_attributes() -> None:
-    """신뢰할 속성 근거가 없으면 기존 객체 탐지 근거를 유지합니다."""
-    original_evidence = "직사각형 외곽 구조가 확인되는 매트리스입니다."
-
+def test_build_enriched_evidence_uses_structural_fallback() -> None:
+    """신뢰할 속성 근거가 없으면 위치 없는 구조 기반 근거를 사용합니다."""
     evidence = ai_job_worker_service._build_enriched_evidence(
         category="매트리스",
         attrs={
@@ -143,10 +141,15 @@ def test_build_enriched_evidence_keeps_original_without_attributes() -> None:
             "firmness": "미디엄",
             "features": "항균",
         },
-        original_evidence=original_evidence,
+        original_evidence=(
+            "누빔 표면과 직사각형 쿠션 구조가 확인되는 매트리스입니다."
+        ),
     )
 
-    assert evidence == original_evidence
+    assert evidence == (
+        "누빔 표면과 직사각형 쿠션 구조가 확인되는 매트리스입니다. "
+        "해당 형태와 구조를 근거로 매트리스로 판단했습니다."
+    )
 
 
 class ProcessNextAiJobTest(  # pylint: disable=too-many-instance-attributes

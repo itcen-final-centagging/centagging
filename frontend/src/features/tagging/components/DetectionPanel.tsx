@@ -18,6 +18,7 @@ import {
   withCurrentValue,
 } from '@/features/tagging/constants/catalogSpec';
 import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
+import type { FurnitureObject } from '@/features/tagging/types';
 import {
   buildObjectDisplayNames,
   getObjectCategoryName,
@@ -25,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const RESULTS_PER_PAGE = 5;
+type ObjectGroup = [category: string, objects: FurnitureObject[]];
 
 export const DetectionPanel = () => {
   const [page, setPage] = useState(1);
@@ -49,41 +51,60 @@ export const DetectionPanel = () => {
     updateObjectCategory,
     uploadedImage,
   } = useTaggingWorkflow();
-  const totalPages = Math.max(
-    1,
-    Math.ceil(detectedObjects.length / RESULTS_PER_PAGE),
-  );
-  const currentPage = Math.min(page, totalPages);
-  const visibleObjects = useMemo(() => {
-    const start = (currentPage - 1) * RESULTS_PER_PAGE;
-    return detectedObjects.slice(start, start + RESULTS_PER_PAGE);
-  }, [currentPage, detectedObjects]);
-  const displayNames = useMemo(
-    () => buildObjectDisplayNames(detectedObjects),
-    [detectedObjects],
-  );
-  const visibleObjectGroups = useMemo(() => {
-    const groups = new Map<string, typeof visibleObjects>();
+  const objectGroupPages = useMemo(() => {
+    const groups = new Map<string, FurnitureObject[]>();
 
-    visibleObjects.forEach((object) => {
+    detectedObjects.forEach((object) => {
       const category = getObjectCategoryName(object);
       groups.set(category, [...(groups.get(category) ?? []), object]);
     });
 
-    return [...groups.entries()];
-  }, [visibleObjects]);
+    const pages: ObjectGroup[][] = [];
+    let currentPageGroups: ObjectGroup[] = [];
+    let currentPageObjectCount = 0;
 
-  const handleObjectCardClick = (object: (typeof visibleObjects)[number]) => {
+    groups.forEach((objects, category) => {
+      if (
+        currentPageGroups.length > 0 &&
+        currentPageObjectCount + objects.length > RESULTS_PER_PAGE
+      ) {
+        pages.push(currentPageGroups);
+        currentPageGroups = [];
+        currentPageObjectCount = 0;
+      }
+
+      currentPageGroups.push([category, objects]);
+      currentPageObjectCount += objects.length;
+
+      if (currentPageObjectCount >= RESULTS_PER_PAGE) {
+        pages.push(currentPageGroups);
+        currentPageGroups = [];
+        currentPageObjectCount = 0;
+      }
+    });
+
+    if (currentPageGroups.length > 0) pages.push(currentPageGroups);
+    return pages;
+  }, [detectedObjects]);
+  const totalPages = Math.max(1, objectGroupPages.length);
+  const currentPage = Math.min(page, totalPages);
+  const visibleObjectGroups = objectGroupPages[currentPage - 1] ?? [];
+  const displayNames = useMemo(
+    () => buildObjectDisplayNames(detectedObjects),
+    [detectedObjects],
+  );
+
+  const handleObjectCardClick = (object: FurnitureObject) => {
     if (isEditing) focusObjectForEditing(object);
   };
 
-  const handleObjectToggle = (object: (typeof visibleObjects)[number]) => {
+  const handleObjectToggle = (object: FurnitureObject) => {
     if (!isEditing) return;
     toggleObjectSelection(object);
   };
 
   const handleCategoryChange = (
-    object: (typeof visibleObjects)[number],
+    object: FurnitureObject,
     category: string,
   ) => {
     focusObjectForEditing(object);
