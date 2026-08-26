@@ -240,7 +240,7 @@ export const AdminCatalogPage = () => {
 
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
-            aria-label="SKU 코드 또는 상품명 검색"
+            aria-label="상품 유사도 검색"
             className="h-10 flex-1 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-quaternary focus:border-blue-500"
             onChange={(event) =>
               setFilters((current) => ({
@@ -248,7 +248,7 @@ export const AdminCatalogPage = () => {
                 q: event.target.value,
               }))
             }
-            placeholder="SKU 코드 또는 상품명 검색"
+            placeholder="예) 1인용 브라운 가죽 빈백 의자"
             value={filters.q ?? ''}
           />
           <button

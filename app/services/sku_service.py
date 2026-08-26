@@ -5,6 +5,7 @@ import pathlib
 import typing
 import uuid
 
+import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import sqlalchemy
 from sqlalchemy import orm
 from sqlalchemy.ext import asyncio as sqlalchemy_async
@@ -19,6 +20,15 @@ from app.services.gemini_service import GeminiService
 _UPLOAD_SUBDIR = "sku"
 _ALLOWED_IMAGE_MIME_TYPES = {"image/jpeg", "image/png"}
 _MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
+# 카탈로그 검색어(q)를 텍스트 임베딩 코사인 유사도로 정렬하는 데 씁니다.
+# app.services.sku_search_service의 검색 SKU와 같은
+# sku_catalog.text_embedding 컬럼·차원을 그대로 재사용합니다.
+_CATALOG_SEARCH_EMBEDDING_DIMENSIONS = 3072
+_CATALOG_SEARCH_HALFVEC = pgvector_sa.HALFVEC(
+    _CATALOG_SEARCH_EMBEDDING_DIMENSIONS
+)
+_CATALOG_SEARCH_RESULT_LIMIT = 30
 
 
 class SkuConfigurationError(RuntimeError):
@@ -361,13 +371,23 @@ def _validate_catalog_filters(filters: sku_schema.SkuCatalogFilters) -> None:
 async def list_skus(
     session: sqlalchemy_async.AsyncSession,
     filters: typing.Optional[sku_schema.SkuCatalogFilters] = None,
+    gemini_service: typing.Optional[GeminiService] = None,
 ) -> collections.abc.Sequence[typing.Any]:
     """등록된 SKU를 최신순으로 대표 이미지와 함께 조회합니다.
+
+    검색어(``filters.q``)가 있으면 app.services.sku_search_service와 같은
+    방식으로 검색어를 텍스트 임베딩으로 바꿔
+    ``sku_catalog.text_embedding``과의 코사인 유사도 상위
+    ``_CATALOG_SEARCH_RESULT_LIMIT``건만 반환합니다(임베딩이 없는 SKU는
+    제외). 검색어가 없으면 기존처럼 전체 목록을 최신 등록순으로
+    반환합니다.
 
     Args:
         session: 비동기 DB 세션입니다.
         filters: 대분류/소분류/색상/스타일/검색어 필터입니다. 지정하지
             않으면 전체 목록을 반환합니다.
+        gemini_service: 검색어를 임베딩할 때 쓰는 서비스입니다. 검색어가
+            있는데 이 값이 없으면 SkuFilterValidationError를 던집니다.
 
     Returns:
         ``(SkuCatalog, main_image_url)`` 튜플의 목록입니다. 대표
@@ -378,12 +398,41 @@ async def list_skus(
     Raises:
         SkuFilterValidationError: 필터 값이나 조합이 유효하지 않은
             경우입니다.
+        GeminiConfigurationError: 검색어가 있는데 Gemini 인증이
+            설정되지 않은 경우입니다.
+        GeminiEmbeddingError: 검색어 임베딩 호출이 실패한 경우입니다.
     """
     filters = filters or sku_schema.SkuCatalogFilters()
     _validate_catalog_filters(filters)
 
+    keyword = filters.q.strip() if filters.q and filters.q.strip() else None
+    distance = None
+    if keyword is not None:
+        if gemini_service is None:
+            raise SkuFilterValidationError(
+                "검색어를 처리하려면 gemini_service가 필요합니다."
+            )
+        embedding = gemini_service.embed_text(keyword)
+        if len(embedding) != _CATALOG_SEARCH_EMBEDDING_DIMENSIONS:
+            raise SkuFilterValidationError(
+                "임베딩 벡터 차원은 "
+                f"{_CATALOG_SEARCH_EMBEDDING_DIMENSIONS} 차원이어야 합니다. "
+                f"현재 {len(embedding)} 차원입니다."
+            )
+        query_vector = sqlalchemy.cast(list(embedding), _CATALOG_SEARCH_HALFVEC)
+        distance = sqlalchemy.cast(
+            sku_models.SkuCatalog.text_embedding, _CATALOG_SEARCH_HALFVEC
+        ).cosine_distance(query_vector)
+
+    select_columns: list[typing.Any] = [
+        sku_models.SkuCatalog,
+        sku_models.SkuImage.image_url,
+    ]
+    if distance is not None:
+        select_columns.append(distance.label("distance"))
+
     deduped = (
-        sqlalchemy.select(sku_models.SkuCatalog, sku_models.SkuImage.image_url)
+        sqlalchemy.select(*select_columns)
         .distinct(sku_models.SkuCatalog.sku_id)
         .outerjoin(
             sku_models.SkuImage,
@@ -414,15 +463,9 @@ async def list_skus(
             sku_models.SkuCatalog.attributes["pattern"].astext
             == filters.pattern
         )
-    if filters.q is not None and filters.q.strip():
-        keyword = filters.q.strip()
+    if keyword is not None:
         deduped = deduped.where(
-            sqlalchemy.or_(
-                sku_models.SkuCatalog.sku_code == keyword,
-                sqlalchemy.func.lower(sku_models.SkuCatalog.product_name).like(
-                    f"%{keyword.lower()}%"
-                ),
-            )
+            sku_models.SkuCatalog.text_embedding.is_not(None)
         )
     deduped = deduped.order_by(
         sku_models.SkuCatalog.sku_id,
@@ -431,9 +474,13 @@ async def list_skus(
 
     subquery = deduped.subquery()
     sku_alias = orm.aliased(sku_models.SkuCatalog, subquery)
-    stmt = sqlalchemy.select(sku_alias, subquery.c.image_url).order_by(
-        subquery.c.created_at.desc()
-    )
+    stmt = sqlalchemy.select(sku_alias, subquery.c.image_url)
+    if keyword is not None:
+        stmt = stmt.order_by(subquery.c.distance).limit(
+            _CATALOG_SEARCH_RESULT_LIMIT
+        )
+    else:
+        stmt = stmt.order_by(subquery.c.created_at.desc())
     result = await session.execute(stmt)
     return result.all()
 

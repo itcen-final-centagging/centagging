@@ -8,9 +8,15 @@ from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app import dependencies
 from app.core import config, database
+from app.core.error_codes import ErrorCode
 from app.schemas import common as common_schema
 from app.schemas import sku as sku_schema
 from app.services import sku_service
+from app.services.gemini_service import (
+    GeminiConfigurationError,
+    GeminiEmbeddingError,
+    GeminiService,
+)
 from app.services.sku_image_storage import SkuImageStorage
 
 router = fastapi.APIRouter(prefix="/sku", tags=["sku"])
@@ -142,8 +148,8 @@ async def extract_metadata(
         image: 분석 대상 이미지입니다.
 
     Returns:
-        추출된 category, sub_category, attributes입니다. 
-        
+        추출된 category, sub_category, attributes입니다.
+
     Raises:
         fastapi.HTTPException: 이미지가 유효하지 않거나(422) AI 설정이
             없거나(503) 호출이 실패한 경우(502)입니다.
@@ -208,31 +214,56 @@ async def list_sku_catalog(
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
+    gemini_service: GeminiService = fastapi.Depends(
+        dependencies.get_gemini_service
+    ),
 ) -> common_schema.SuccessResponse[sku_schema.SkuCatalogListResponse]:
     """등록된 전체 SKU 목록을 최신순으로 조회합니다.
 
     신규 SKU 등록이 실제로 저장됐는지 확인하는 용도이자, 관리자
-    카탈로그 화면의 목록·필터 조회에도 쓰인다.
+    카탈로그 화면의 목록·필터 조회에도 쓰인다. 검색어(q)가 있으면
+    app.services.sku_search_service의 SKU 검색과 같은 방식으로 텍스트
+    임베딩 코사인 유사도 순으로 정렬한다.
 
     Args:
-        filters: 대분류/소분류/색상/스타일 쿼리 파라미터입니다.
+        filters: 대분류/소분류/색상/스타일/검색어 쿼리 파라미터입니다.
             sub_category는 category 없이는 지정할 수 없습니다(먼저
             대분류를 선택해야 합니다).
         session: 비동기 DB 세션입니다.
+        gemini_service: 검색어 텍스트 임베딩에 쓰는 서비스입니다.
 
     Returns:
         대표 이미지 경로를 포함한 SKU 목록입니다.
 
     Raises:
-        fastapi.HTTPException: 필터 값이나 조합이 유효하지 않은
-            경우입니다(422).
+        fastapi.HTTPException: 필터 값이나 조합이 유효하지 않으면 422,
+            검색어가 있는데 Gemini 인증이 설정되지 않았으면 503,
+            검색어 임베딩이 실패하면 502를 반환합니다.
     """
     try:
-        rows = await sku_service.list_skus(session, filters=filters)
+        rows = await sku_service.list_skus(
+            session, filters=filters, gemini_service=gemini_service
+        )
     except sku_service.SkuFilterValidationError as error:
         raise fastapi.HTTPException(
             status_code=fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(error),
+        ) from error
+    except GeminiConfigurationError as error:
+        raise fastapi.HTTPException(
+            status_code=503,
+            detail={
+                "code": ErrorCode.SERVICE_UNAVAILABLE.value,
+                "message": "검색 기능이 아직 설정되지 않았습니다.",
+            },
+        ) from error
+    except GeminiEmbeddingError as error:
+        raise fastapi.HTTPException(
+            status_code=502,
+            detail={
+                "code": ErrorCode.UPSTREAM_ERROR.value,
+                "message": "검색어 처리 중 오류가 발생했습니다.",
+            },
         ) from error
 
     storage = SkuImageStorage(config.get_settings().sku_image_root)
