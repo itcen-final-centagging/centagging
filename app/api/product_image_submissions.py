@@ -32,7 +32,7 @@ def _is_super_admin(user: dependencies.AdminUser) -> bool:
     response_model=common_schema.SuccessResponse[
         submission_schema.ProductImageSubmissionBatchResponse
     ],
-    status_code=fastapi.status.HTTP_201_CREATED,
+    status_code=fastapi.status.HTTP_202_ACCEPTED,
 )
 async def create_product_image_drafts(
     images: list[fastapi.UploadFile] = fastapi.File(...),

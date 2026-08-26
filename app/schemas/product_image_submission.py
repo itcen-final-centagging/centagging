@@ -2,6 +2,7 @@
 
 import datetime
 import typing
+import uuid
 
 import pydantic
 
@@ -23,6 +24,7 @@ class ProductImageSubmissionItem(pydantic.BaseModel):
     target_type: SubmissionTargetType | None = None
     image_url: str
     image_type: SkuImageType
+    job_id: uuid.UUID | None = None
     target_sku_code: str | None = None
     target_product_name: str | None = None
     target_main_image_url: str | None = None
@@ -38,6 +40,30 @@ class ProductImageSubmissionItem(pydantic.BaseModel):
     final_sku_image_id: int | None = None
 
 
+class ProductImageSubmissionCandidateSku(pydantic.BaseModel):
+    """추천 당시 함께 제시됐던 후보 SKU 1건입니다.
+
+    match_rank는 추천 후보 배열에서의 순번(1부터)이다. 검색으로 직접
+    선택해 연결한 SKU가 후보 목록에 없으면 이 항목을 맨 앞에 끼워
+    넣고 via_search=True, match_rank=0으로 표시한다.
+    """
+
+    sku_id: int
+    sku_code: str
+    product_name: str
+    match_rank: int
+    brand: str | None = None
+    price: int | None = None
+    category: str | None = None
+    sub_category: str | None = None
+    attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
+    image_url: str | None = None
+    similarity_score: float | None = None
+    xai_common: str = ""
+    xai_difference: str = ""
+    via_search: bool = False
+
+
 class ProductImageSubmissionDetail(ProductImageSubmissionItem):
     """제품 이미지 등록 요청의 메타데이터를 포함한 상세입니다."""
 
@@ -51,6 +77,12 @@ class ProductImageSubmissionDetail(ProductImageSubmissionItem):
     target_sub_category: str | None = None
     proposed_attributes: dict[str, typing.Any] = pydantic.Field(
         default_factory=dict
+    )
+    target_attributes: dict[str, typing.Any] = pydantic.Field(
+        default_factory=dict
+    )
+    candidates: list[ProductImageSubmissionCandidateSku] = pydantic.Field(
+        default_factory=list
     )
 
 

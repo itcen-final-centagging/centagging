@@ -8,8 +8,22 @@ import os
 import socket
 
 from app.core import config, database
-from app.repositories import ai_job_repository
-from app.services import ai_job_worker_service
+from app.models.ai_job import AiJob
+from app.models.product_image_submission_job import (
+    ProductImageSubmissionJob,
+)
+from app.repositories import (
+    ai_job_repository,
+)
+from app.repositories import (
+    product_image_submission_job_repository as submission_job_repository,
+)
+from app.services import (
+    ai_job_worker_service,
+)
+from app.services import (
+    product_image_submission_job_worker_service as product_job_worker_service,
+)
 
 _LOGGER = logging.getLogger(__name__)
 DEFAULT_POLL_INTERVAL_SECONDS = 1.0
@@ -57,11 +71,22 @@ async def process_once(
     )
     async with database.database_session_factory() as session:
         await ai_job_repository.recover_stale_jobs(session, stale_before)
-        job = await ai_job_worker_service.process_next_job(
-            session,
-            settings,
-            worker_id,
+        await submission_job_repository.recover_stale_jobs(
+            session, stale_before
         )
+        job: AiJob | ProductImageSubmissionJob | None = (
+            await ai_job_worker_service.process_next_job(
+                session,
+                settings,
+                worker_id,
+            )
+        )
+        if job is None:
+            job = await product_job_worker_service.process_next_job(
+                session,
+                settings,
+                worker_id,
+            )
     return job is not None
 
 

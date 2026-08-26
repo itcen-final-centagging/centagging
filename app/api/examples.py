@@ -493,6 +493,47 @@ AI_JOB_NOT_FOUND_RESPONSE = _error_response(
     "AI 분석 작업을 찾을 수 없습니다.",
 )
 
+PRODUCT_IMAGE_SUBMISSION_JOB_STATUS_RESPONSE = {
+    "description": (
+        "제품 이미지 등록 추천 작업의 현재 상태와 완료된 경우 결과"
+        " payload를 반환합니다."
+    ),
+    "content": {
+        "application/json": {
+            "example": _success_example(
+                {
+                    "job_id": "f3d4a95c-0e40-4cbb-a8ed-f0b1b2098f12",
+                    "submission_id": 123,
+                    "status": "SUCCEEDED",
+                    "attempt_count": 1,
+                    "max_attempts": 3,
+                    "result_payload": {
+                        "proposed_category": "소파",
+                        "proposed_sub_category": "3인용",
+                        "proposed_attributes": {
+                            "color": "베이지",
+                            "material": "패브릭",
+                        },
+                        "sku_candidates": [],
+                    },
+                    "error_code": None,
+                    "error_message": None,
+                    "created_at": "2026-08-25T00:00:00+09:00",
+                    "started_at": "2026-08-25T00:00:01+09:00",
+                    "finished_at": "2026-08-25T00:00:05+09:00",
+                    "updated_at": "2026-08-25T00:00:05+09:00",
+                }
+            )
+        }
+    },
+}
+
+PRODUCT_IMAGE_SUBMISSION_JOB_NOT_FOUND_RESPONSE = _error_response(
+    "존재하지 않는 제품 이미지 등록 추천 작업 ID로 조회한 경우입니다.",
+    error_codes.ErrorCode.RESOURCE_NOT_FOUND.value,
+    "제품 이미지 등록 추천 작업을 찾을 수 없습니다.",
+)
+
 SKU_MATCHING_REQUEST_EXAMPLE = {
     "tagging_results": [
         {

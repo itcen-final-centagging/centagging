@@ -336,6 +336,9 @@ CREATE TABLE product_image_submission (
     reject_reason       VARCHAR(255),
     final_sku_id        BIGINT       REFERENCES sku_catalog(sku_id),
     final_sku_image_id  BIGINT       REFERENCES sku_image(sku_image_id),
+    draft_embedding                  HALFVEC(3072),
+    draft_embedding_pipeline_version VARCHAR(50),
+    draft_embedding_image_sha256     TEXT,
     CONSTRAINT ck_product_image_submission_attributes CHECK (
         jsonb_typeof(proposed_attributes) = 'object'
     ),
@@ -368,6 +371,62 @@ COMMENT ON TABLE product_image_submission IS '관리자의 제품 이미지 신�
 COMMENT ON COLUMN product_image_submission.target_type IS 'EXISTING: 기존 SKU 이미지 추가, NEW: 신규 SKU 생성';
 COMMENT ON COLUMN product_image_submission.status IS 'DRAFT | PENDING | APPROVED | REJECTED';
 COMMENT ON COLUMN product_image_submission.final_sku_id IS '최종 승인으로 연결 또는 생성된 SKU';
+COMMENT ON COLUMN product_image_submission.draft_embedding IS '업로드 시점(워커)에 계산한 임베딩 캐시' ;
+COMMENT ON COLUMN product_image_submission.draft_embedding_pipeline_version IS 'draft_embedding 생성 파이프라인 버전';
+COMMENT ON COLUMN product_image_submission.draft_embedding_image_sha256 IS 'draft_embedding 생성에 쓴 보정 이미지 SHA-256';
+
+-- ------------------------------------------------------------
+-- 8-1. product_image_submission_job : 제품 이미지 등록 추천 작업 큐
+--    ai_job과 동일한 폴링 패턴(FOR UPDATE SKIP LOCKED)을 쓰되,
+--    product_image_submission 전용이라 job_type/input_payload가 없다.
+-- ------------------------------------------------------------
+CREATE TABLE product_image_submission_job (
+    job_id          UUID        PRIMARY KEY,
+    submission_id   BIGINT      NOT NULL
+                                REFERENCES product_image_submission(submission_id)
+                                ON DELETE CASCADE,
+    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    result_payload  JSONB,
+    error_code      VARCHAR(50),
+    error_message   TEXT,
+    attempt_count   SMALLINT    NOT NULL DEFAULT 0,
+    max_attempts    SMALLINT    NOT NULL DEFAULT 3,
+    worker_id       VARCHAR(100),
+    locked_at       TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at      TIMESTAMPTZ,
+    finished_at     TIMESTAMPTZ,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT ck_product_image_submission_job_status CHECK (
+        status IN ('PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED')
+    ),
+    CONSTRAINT ck_product_image_submission_job_attempts CHECK (
+        attempt_count >= 0
+        AND max_attempts > 0
+        AND attempt_count <= max_attempts
+    )
+);
+
+CREATE INDEX idx_product_image_submission_job_pending_created
+    ON product_image_submission_job(status, created_at)
+    WHERE status = 'PENDING';
+
+CREATE INDEX idx_product_image_submission_job_submission_created
+    ON product_image_submission_job(submission_id, created_at DESC);
+
+CREATE UNIQUE INDEX uq_product_image_submission_job_active
+    ON product_image_submission_job(submission_id)
+    WHERE status IN ('PENDING', 'RUNNING');
+
+COMMENT ON TABLE  product_image_submission_job IS '제품 이미지 등록 추천 작업 큐 (ai_job과 별도)';
+COMMENT ON COLUMN product_image_submission_job.job_id IS '클라이언트가 조회할 작업 UUID';
+COMMENT ON COLUMN product_image_submission_job.submission_id IS '분석 대상 제품 이미지 등록 요청';
+COMMENT ON COLUMN product_image_submission_job.status IS 'PENDING | RUNNING | SUCCEEDED | FAILED';
+COMMENT ON COLUMN product_image_submission_job.result_payload IS '완료된 작업의 결과값: {proposed_category, proposed_sub_category, proposed_attributes, sku_candidates}';
+COMMENT ON COLUMN product_image_submission_job.attempt_count IS '현재까지 실행을 시도한 횟수';
+COMMENT ON COLUMN product_image_submission_job.max_attempts IS '재시도를 포함한 최대 실행 횟수 (기본 3)';
+COMMENT ON COLUMN product_image_submission_job.worker_id IS '작업을 선점한 Worker 식별자';
+COMMENT ON COLUMN product_image_submission_job.locked_at IS 'Worker가 작업을 선점한 시각';
 
 -- sku_image 멱등성 인덱스: confirm이 두 번 호출돼도 같은 크롭이 중복 등록되지 않는다.
 CREATE UNIQUE INDEX uq_sku_image_sku_url ON sku_image(sku_id, image_url);

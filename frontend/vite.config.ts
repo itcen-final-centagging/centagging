@@ -40,6 +40,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/product-image-submission-jobs': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       '/tagging': {
         target: 'http://localhost:8000',
         changeOrigin: true,

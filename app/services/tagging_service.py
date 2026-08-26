@@ -13,6 +13,7 @@ from app.models.scene_image import SceneImage
 from app.repositories.scene_image_repository import get_scene_image
 from app.schemas.furniture_attribute import FurnitureAttributeResult
 from app.schemas.tagging import (
+    BoundingBox,
     DetectedObject,
     DetectionResult,
     EditedSceneObject,
@@ -20,14 +21,16 @@ from app.schemas.tagging import (
     VlmMood,
 )
 from app.services import sku_search_service
+from app.services.fused_metadata import build_metadata_text
 from app.services.gemini_service import GeminiService
 from app.services.image_processing_service import (
     CroppedObject,
     crop_scene_objects,
     parse_image_to_bytes,
 )
-from app.services.object_attribute_extraction_service import ObjectAttributeExtractionService
-from app.services.fused_metadata import build_metadata_text
+from app.services.object_attribute_extraction_service import (
+    ObjectAttributeExtractionService,
+)
 from app.services.similar_sku_service import (
     FusedEmbeddingInput,
     SimilarSkuService,
@@ -138,7 +141,11 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 crop for crop in crops if crop.crop_index in requested_idxs
             ]
 
-        preprocessed_images = await self.object_attribute_extraction_service.preprocess_crops(crops)
+        preprocessed_images = (
+            await self.object_attribute_extraction_service.preprocess_crops(
+                crops
+            )
+        )
         attributes_by_idx = await self._resolve_attributes(
             crops=crops,
             category_by_idx=category_by_idx,
@@ -153,9 +160,11 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         )
 
         # 2) 임베딩 및 유사 SKU 탐색
-        result.objects = await self.similar_sku_service.build_detected_objects(
-            crops,
-            fused_inputs,
+        result.objects, _ = (
+            await self.similar_sku_service.build_detected_objects(
+                crops,
+                fused_inputs,
+            )
         )
 
         # 3) XAI 근거 산출
@@ -165,7 +174,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         xai_results = await self.xai_scoring_service.score_detected_objects(
             xai_crops, result.objects, category_by_idx
         )
-        self._apply_xai_results(result.objects, xai_results)
+        self.apply_xai_results(result.objects, xai_results)
 
         # 4) 추출 속성 매핑
         for detected in result.objects:
@@ -246,11 +255,9 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             return VlmMood()
 
         try:
-            attributes_by_idx = (
-                await self.object_attribute_extraction_service.extract_for_crops(
-                    [crop],
-                    {crop.crop_index: object_edit.category},
-                )
+            attributes_by_idx = await self.object_attribute_extraction_service.extract_for_crops(
+                [crop],
+                {crop.crop_index: object_edit.category},
             )
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception(
@@ -280,9 +287,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
 
         for crop in crops:
             item = object_by_idx.get(crop.crop_index, {})
-            should_extract = bool(
-                item.get("needs_attribute_extraction", True)
-            )
+            should_extract = bool(item.get("needs_attribute_extraction", True))
 
             if not should_extract:
                 reusable_result = self._to_attribute_result(item)
@@ -397,7 +402,7 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         return xai_crops
 
     @staticmethod
-    def _apply_xai_results(
+    def apply_xai_results(
         detected_objects: list[DetectedObject],
         xai_results: dict[int, XaiObjectResult],
     ) -> None:
@@ -464,3 +469,55 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             width_px=scene.width_px,
             height_px=scene.height_px,
         )
+
+
+async def recommend_for_single_image(
+    similar_sku_service: SimilarSkuService,
+    xai_scoring_service: XaiScoringService,
+    image: Image.Image,
+    metadata_text: str,
+    category: str,
+) -> tuple[DetectedObject, list[float] | None]:
+    """이미지 1장을 crop 1개로 취급해 SKU 후보와 XAI 판정을 만듭니다.
+
+    제품 이미지 등록처럼 이미지 전체가 곧 객체 1개인 흐름에서 쓰는
+    진입점입니다. ``TaggingService.get_sku_candidates``가 crop마다
+    반복하는 것과 같은 순서(임베딩+유사도 검색 → XAI 채점 → 반영)를
+    crop 1개에 대해 그대로 수행합니다. ``TaggingService`` 인스턴스 없이
+    두 하위 서비스만으로 동작하므로, 세션이 필요 없는 호출부(Worker 등)가
+    가볍게 재사용할 수 있습니다.
+
+    Args:
+        similar_sku_service: 임베딩과 유사 SKU 탐색을 담당하는 서비스입니다.
+        xai_scoring_service: XAI 근거 산출을 담당하는 서비스입니다.
+        image: 임베딩·XAI에 쓸 보정 완료 이미지입니다.
+        metadata_text: 융합 임베딩에 넣을 메타데이터 텍스트입니다.
+        category: 유사 SKU 검색과 XAI 비교 항목을 정하는 대분류입니다.
+
+    Returns:
+        SKU 후보와 XAI 판정까지 채워진 탐지 객체, 그리고 후보 검색에 쓴
+        융합 임베딩 벡터입니다(임베딩에 실패하면 두 번째 값은 None).
+    """
+    crop = CroppedObject(
+        crop_index=0,
+        bbox=BoundingBox(xmin=0, ymin=0, xmax=1000, ymax=1000),
+        image=image,
+        image_bytes=parse_image_to_bytes(image),
+    )
+    fused_input = FusedEmbeddingInput(
+        image=image,
+        metadata_text=metadata_text,
+        category=category,
+    )
+
+    detected_objects, embeddings = (
+        await similar_sku_service.build_detected_objects(
+            [crop], {0: fused_input}
+        )
+    )
+    xai_results = await xai_scoring_service.score_detected_objects(
+        [crop], detected_objects, {0: category}
+    )
+    TaggingService.apply_xai_results(detected_objects, xai_results)
+
+    return detected_objects[0], embeddings.get(0)

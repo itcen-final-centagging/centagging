@@ -11,6 +11,7 @@ from app.api import (
     approval,
     auth,
     history,
+    product_image_submission_jobs,
     product_image_submissions,
     scene_images,
     sku,
@@ -56,6 +57,7 @@ app.include_router(sku_search.router)
 app.include_router(history.router)
 app.include_router(approval.router)
 app.include_router(product_image_submissions.router)
+app.include_router(product_image_submission_jobs.router)
 
 app.mount(
     "/sku-images",

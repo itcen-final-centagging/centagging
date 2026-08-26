@@ -6,10 +6,10 @@ import dataclasses
 import logging
 import typing
 
-from PIL import Image
 import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import pydantic
 import sqlalchemy
+from PIL import Image
 from sqlalchemy import orm
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
@@ -94,7 +94,7 @@ class SimilarSkuService:
         self,
         crops: list[CroppedObject],
         fused_inputs: collections.abc.Mapping[int, FusedEmbeddingInput],
-    ) -> list[DetectedObject]:
+    ) -> tuple[list[DetectedObject], dict[int, list[float]]]:
         """크롭 목록으로 SKU 후보까지 채운 탐지 객체를 만듭니다.
 
         임베딩은 외부 API 왕복이라 ``asyncio.gather``로 동시에 호출합니다.
@@ -106,11 +106,14 @@ class SimilarSkuService:
             fused_inputs: 객체별 보정 이미지와 추출 속성 메타데이터입니다.
 
         Returns:
-            sku_candidates까지 채워진 탐지 객체 목록입니다. label과
-            confidence 등 XAI 관련 필드는 아직 기본값입니다.
+            sku_candidates까지 채워진 탐지 객체 목록과, crop_index별로 계산에
+            성공한 융합 임베딩 벡터입니다(임베딩에 실패한 crop은 두 번째
+            값에서 빠집니다). 호출하는 쪽이 이 벡터를 캐싱하면 같은 crop을
+            다시 임베딩하지 않고 재사용할 수 있습니다. label과 confidence
+            등 XAI 관련 필드는 아직 기본값입니다.
         """
         if not crops:
-            return []
+            return [], {}
 
         embeddings = await asyncio.gather(
             *(
@@ -119,6 +122,12 @@ class SimilarSkuService:
             ),
             return_exceptions=True,
         )
+
+        embedding_by_idx = {
+            crop.crop_index: embedding
+            for crop, embedding in zip(crops, embeddings)
+            if not isinstance(embedding, BaseException)
+        }
 
         detected_objects = []
         for crop, embedding in zip(crops, embeddings):
@@ -138,7 +147,7 @@ class SimilarSkuService:
                 )
             )
 
-        return detected_objects
+        return detected_objects, embedding_by_idx
 
     async def _find_skus_for_crop(
         self,
