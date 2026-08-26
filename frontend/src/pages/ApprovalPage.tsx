@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ClipboardCheck, Eye, ImageOff, X } from 'lucide-react';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  Eye,
+  ImageOff,
+  X,
+} from 'lucide-react';
 
 import { Button } from '@/commons/components/Button';
 import {
@@ -12,7 +20,57 @@ import {
   type ApprovalStatus,
 } from '@/features/approvals/api/approvals';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import {
+  ATTRIBUTE_LABELS,
+  CATEGORY_ATTRIBUTE_FIELDS,
+  COMMON_ATTRIBUTE_KEYS,
+} from '@/features/tagging/constants/skuAttributes';
 import { cn } from '@/lib/utils';
+
+type MetadataVerdict = 'MATCH' | 'MISMATCH' | 'UNKNOWN';
+
+type MetadataComparisonRow = {
+  cropValue: string | null;
+  key: string;
+  skuValue: string | null;
+  verdict: MetadataVerdict;
+};
+
+const asComparableText = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+/**
+ * 업로드 이미지에서 추출한 속성(object.attrs)과 SKU 카탈로그 속성을
+ * 코드로 직접 비교해 판정을 만듭니다. 두 값 다 있고 같으면 일치, 둘 다
+ * 있는데 다르면 불일치, 어느 한쪽이라도 없으면 판단 불가입니다. AI가
+ * 저장 시점에 내린 판정을 다시 불러오는 대신 항상 그 자리에서 계산하므로
+ * 이미 저장된 기존 승인 요청에도 그대로 적용됩니다.
+ */
+const buildMetadataComparisonRows = (
+  category: string | null,
+  cropAttrs: Record<string, unknown>,
+  skuAttrs: Record<string, unknown>,
+): MetadataComparisonRow[] => {
+  const categoryKeys = category
+    ? (CATEGORY_ATTRIBUTE_FIELDS[category] ?? [])
+    : [];
+  const keys = [...new Set([...COMMON_ATTRIBUTE_KEYS, ...categoryKeys])];
+
+  return keys.map((key) => {
+    const cropValue = asComparableText(cropAttrs[key]);
+    const skuValue = asComparableText(skuAttrs[key]);
+    const verdict: MetadataVerdict =
+      cropValue === null || skuValue === null
+        ? 'UNKNOWN'
+        : cropValue === skuValue
+          ? 'MATCH'
+          : 'MISMATCH';
+    return { cropValue, key, skuValue, verdict };
+  });
+};
 
 const statuses: Array<{ label: string; value: ApprovalStatus | 'ALL' }> = [
   { label: '승인 대기', value: 'PENDING' },
@@ -20,6 +78,18 @@ const statuses: Array<{ label: string; value: ApprovalStatus | 'ALL' }> = [
   { label: '반려', value: 'REJECTED' },
   { label: '전체', value: 'ALL' },
 ];
+
+const XAI_VERDICT_LABELS = {
+  MATCH: '일치',
+  MISMATCH: '불일치',
+  UNKNOWN: '판단 불가',
+} as const;
+
+const XAI_VERDICT_STYLES = {
+  MATCH: 'bg-emerald-50 text-emerald-700',
+  MISMATCH: 'bg-rose-50 text-rose-700',
+  UNKNOWN: 'bg-amber-50 text-amber-700',
+} as const;
 
 const statusStyles: Record<ApprovalStatus, string> = {
   ACTIVE: 'bg-success-50 text-success-600',
@@ -33,11 +103,43 @@ const statusLabels: Record<ApprovalStatus, string> = {
   REJECTED: '반려',
 };
 
+/** 접힌 목록 레일의 썸네일에 얹는 작은 상태 점 색상입니다. */
+const statusDotStyles: Record<ApprovalStatus, string> = {
+  ACTIVE: 'bg-success-600',
+  PENDING: 'bg-yellow-400',
+  REJECTED: 'bg-danger-600',
+};
+
 const formatDate = (value: string): string =>
   new Intl.DateTimeFormat('ko-KR', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+
+/** SKU 속성(color, material 등)을 key-value 카드 목록으로 보여줍니다. */
+const AttributeList = ({ attrs }: { attrs: Record<string, unknown> }) => {
+  const entries = Object.entries(attrs).filter(
+    ([, value]) => value != null && value !== '',
+  );
+  if (entries.length === 0) {
+    return (
+      <p className="text-sm text-text-secondary">저장된 속성이 없습니다.</p>
+    );
+  }
+
+  return (
+    <dl className="grid gap-2 sm:grid-cols-2">
+      {entries.map(([key, value]) => (
+        <div className="rounded-lg bg-bg-tertiary px-3 py-2" key={key}>
+          <dt className="text-xs font-semibold text-text-secondary">{key}</dt>
+          <dd className="mt-1 text-sm font-medium text-text-primary">
+            {typeof value === 'string' ? value : JSON.stringify(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+};
 
 export const ApprovalPage = () => {
   const { user } = useAuth();
@@ -49,6 +151,10 @@ export const ApprovalPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [isListExpanded, setIsListExpanded] = useState(false);
+  const [previewCandidateSkuId, setPreviewCandidateSkuId] = useState<
+    number | null
+  >(null);
 
   const session = user?.session;
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -56,6 +162,37 @@ export const ApprovalPage = () => {
     () => items.find((item) => item.requestId === selectedId),
     [items, selectedId],
   );
+  const previewCandidate = useMemo(
+    () =>
+      detail?.candidates.find(
+        (candidate) => candidate.skuId === previewCandidateSkuId,
+      ) ?? null,
+    [detail, previewCandidateSkuId],
+  );
+  // 승인/반려는 처음 승인 요청으로 들어온 확정 SKU를 보고 있을 때만
+  // 가능합니다. 후보를 미리 보는 동안(previewCandidate가 확정 SKU와
+  // 다를 때)에는 실수로 다른 SKU를 승인하지 않도록 막습니다.
+  const isViewingConfirmedSku =
+    !previewCandidate || previewCandidate.skuId === detail?.sku.skuId;
+
+  const activeSku = previewCandidate ?? detail?.sku;
+  const activeSimilarityScore = previewCandidate
+    ? previewCandidate.similarityScore
+    : (detail?.similarityScore ?? null);
+  const activeSimilarityPercent =
+    activeSimilarityScore === null
+      ? null
+      : Math.round(activeSimilarityScore * 100);
+  const metadataComparisonRows = useMemo(() => {
+    if (!detail) return [];
+    const source = previewCandidate ?? detail.sku;
+    return buildMetadataComparisonRows(
+      source.category ?? detail.object.category,
+      detail.object.attrs,
+      source.attributes,
+    );
+  }, [detail, previewCandidate]);
+
 
   const refresh = async () => {
     if (!session) return;
@@ -111,7 +248,9 @@ export const ApprovalPage = () => {
     let isMounted = true;
     void getApprovalDetail(session, selectedId)
       .then((nextDetail) => {
-        if (isMounted) setDetail(nextDetail);
+        if (!isMounted) return;
+        setDetail(nextDetail);
+        setPreviewCandidateSkuId(null);
       })
       .catch((requestError: unknown) => {
         if (!isMounted) return;
@@ -226,65 +365,157 @@ export const ApprovalPage = () => {
         </p>
       ) : null}
 
-      <div className="mt-5 grid min-h-[580px] gap-5 xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.5fr)]">
-        <section className="studio-surface min-h-0 p-3">
-          <div className="flex items-center justify-between px-2 pb-3 pt-1">
-            <h2 className="text-sm font-extrabold text-text-primary">
-              승인 요청
-            </h2>
-            <span className="text-xs font-semibold text-text-tertiary">
-              {isLoading ? '불러오는 중' : `${items.length}건`}
-            </span>
-          </div>
-          <div className="max-h-[650px] space-y-2 overflow-y-auto pr-1">
-            {items.map((item) => (
+      <div
+        className={cn(
+          'mt-5 grid min-h-[580px] gap-5',
+          isListExpanded
+            ? 'xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.5fr)]'
+            : 'xl:grid-cols-[88px_minmax(0,1fr)]',
+        )}
+      >
+        <section
+          className={cn(
+            'studio-surface min-h-0',
+            isListExpanded ? 'p-3' : 'p-2',
+          )}
+        >
+          {isListExpanded ? (
+            <>
+              <div className="flex items-center justify-between px-2 pb-3 pt-1">
+                <button
+                  aria-expanded={isListExpanded}
+                  className="flex items-center gap-1.5 text-sm font-extrabold text-text-primary"
+                  onClick={() => setIsListExpanded(false)}
+                  title="목록 옆으로 접기"
+                  type="button"
+                >
+                  <ChevronLeft size={16} />
+                  승인 요청
+                </button>
+                <span className="text-xs font-semibold text-text-tertiary">
+                  {isLoading ? '불러오는 중' : `${items.length}건`}
+                </span>
+              </div>
+              <div className="max-h-[650px] space-y-2 overflow-y-auto pr-1">
+                {items.map((item) => (
+                  <button
+                    aria-pressed={selectedId === item.requestId}
+                    className={cn(
+                      'flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors',
+                      selectedId === item.requestId
+                        ? 'border-blue-600 bg-blue-50 shadow-[0_0_0_1px_#2563eb]'
+                        : 'border-border bg-bg-primary hover:border-blue-300 hover:bg-bg-hover',
+                    )}
+                    key={item.requestId}
+                    onClick={() => setSelectedId(item.requestId)}
+                    type="button"
+                  >
+                    <span className="size-12 shrink-0 overflow-hidden rounded-lg bg-bg-tertiary">
+                      {item.sceneImageUrl ? (
+                        <img
+                          alt={item.productName}
+                          className="size-full object-cover"
+                          src={item.sceneImageUrl}
+                        />
+                      ) : (
+                        <span className="flex size-full items-center justify-center">
+                          <ImageOff className="size-4 text-text-quaternary" />
+                        </span>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-start justify-between gap-2">
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-text-primary">
+                            {item.productName}
+                          </span>
+                          <span className="mt-1 block font-mono text-[11px] text-text-tertiary">
+                            {item.skuCode} · 객체 {item.objectIdx + 1}
+                          </span>
+                        </span>
+                        <span
+                          className={cn(
+                            'shrink-0 rounded-full px-2 py-1 text-[11px] font-bold',
+                            statusStyles[item.status],
+                          )}
+                        >
+                          {statusLabels[item.status]}
+                        </span>
+                      </span>
+                      <span className="mt-2 block text-xs text-text-secondary">
+                        {item.category ?? '카테고리 미지정'} · {item.originName}
+                      </span>
+                      <span className="mt-1 block text-[11px] text-text-tertiary">
+                        {formatDate(item.requestedAt)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+                {!isLoading && items.length === 0 ? (
+                  <div className="flex min-h-60 flex-col items-center justify-center px-5 text-center text-text-tertiary">
+                    <ClipboardCheck className="size-7" />
+                    <p className="mt-3 text-sm font-semibold">
+                      해당 요청이 없습니다
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
               <button
-                aria-pressed={selectedId === item.requestId}
-                className={cn(
-                  'w-full rounded-xl border p-4 text-left transition-colors',
-                  selectedId === item.requestId
-                    ? 'border-blue-600 bg-blue-50 shadow-[0_0_0_1px_#2563eb]'
-                    : 'border-border bg-bg-primary hover:border-blue-300 hover:bg-bg-hover',
-                )}
-                key={item.requestId}
-                onClick={() => setSelectedId(item.requestId)}
+                aria-expanded={isListExpanded}
+                className="flex flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-text-secondary transition-colors hover:bg-bg-hover"
+                onClick={() => setIsListExpanded(true)}
+                title="승인 요청 목록 펼치기"
                 type="button"
               >
-                <span className="flex items-start justify-between gap-2">
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold text-text-primary">
-                      {item.productName}
-                    </span>
-                    <span className="mt-1 block font-mono text-[11px] text-text-tertiary">
-                      {item.skuCode} · 객체 {item.objectIdx + 1}
-                    </span>
-                  </span>
-                  <span
-                    className={cn(
-                      'shrink-0 rounded-full px-2 py-1 text-[11px] font-bold',
-                      statusStyles[item.status],
-                    )}
-                  >
-                    {statusLabels[item.status]}
-                  </span>
+                <ChevronRight size={16} />
+                <span className="text-[11px] font-extrabold leading-tight text-text-primary">
+                  승인 요청
                 </span>
-                <span className="mt-3 block text-xs text-text-secondary">
-                  {item.category ?? '카테고리 미지정'} · {item.originName}
-                </span>
-                <span className="mt-2 block text-[11px] text-text-tertiary">
-                  {formatDate(item.requestedAt)}
+                <span className="text-[10px] font-semibold leading-tight text-text-tertiary">
+                  {isLoading ? '...' : `${items.length}건`}
                 </span>
               </button>
-            ))}
-            {!isLoading && items.length === 0 ? (
-              <div className="flex min-h-60 flex-col items-center justify-center px-5 text-center text-text-tertiary">
-                <ClipboardCheck className="size-7" />
-                <p className="mt-3 text-sm font-semibold">
-                  해당 요청이 없습니다
-                </p>
+              <div className="max-h-[600px] w-full space-y-2 overflow-y-auto">
+                {items.map((item) => (
+                  <button
+                    aria-label={`${item.productName} 선택`}
+                    aria-pressed={selectedId === item.requestId}
+                    className={cn(
+                      'relative mx-auto block size-14 overflow-hidden rounded-lg border-2 transition-colors',
+                      selectedId === item.requestId
+                        ? 'border-blue-600'
+                        : 'border-border hover:border-blue-300',
+                    )}
+                    key={item.requestId}
+                    onClick={() => setSelectedId(item.requestId)}
+                    title={`${item.productName} · ${statusLabels[item.status]}`}
+                    type="button"
+                  >
+                    {item.sceneImageUrl ? (
+                      <img
+                        alt={item.productName}
+                        className="size-full object-cover"
+                        src={item.sceneImageUrl}
+                      />
+                    ) : (
+                      <span className="flex size-full items-center justify-center bg-bg-tertiary">
+                        <ImageOff className="size-4 text-text-quaternary" />
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        'absolute right-0.5 top-0.5 size-2 rounded-full ring-1 ring-white',
+                        statusDotStyles[item.status],
+                      )}
+                    />
+                  </button>
+                ))}
               </div>
-            ) : null}
-          </div>
+            </div>
+          )}
         </section>
 
         <section className="studio-surface p-5 sm:p-6">
@@ -314,7 +545,7 @@ export const ApprovalPage = () => {
                 </span>
               </div>
 
-              <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px]">
                 <div className="rounded-xl bg-bg-tertiary p-4">
                   <p className="text-xs font-bold text-text-secondary">
                     원본의 선택 객체
@@ -327,30 +558,32 @@ export const ApprovalPage = () => {
                           className="block max-h-72 max-w-full rounded-lg"
                           src={detail.sceneImage.imageUrl}
                         />
-                        <div
-                          className="detection-box pointer-events-none"
-                          style={{
-                            height: `${Math.max(
-                              1,
-                              (detail.object.bbox.ymax -
-                                detail.object.bbox.ymin) /
-                                10,
-                            )}%`,
-                            left: `${detail.object.bbox.xmin / 10}%`,
-                            top: `${detail.object.bbox.ymin / 10}%`,
-                            width: `${Math.max(
-                              1,
-                              (detail.object.bbox.xmax -
-                                detail.object.bbox.xmin) /
-                                10,
-                            )}%`,
-                          }}
-                        >
-                          <span>
-                            {detail.object.category ??
-                              `객체 ${detail.object.objectIdx + 1}`}
-                          </span>
-                        </div>
+                        {detail.object.bbox ? (
+                          <div
+                            className="detection-box pointer-events-none"
+                            style={{
+                              height: `${Math.max(
+                                1,
+                                (detail.object.bbox.ymax -
+                                  detail.object.bbox.ymin) /
+                                  10,
+                              )}%`,
+                              left: `${detail.object.bbox.xmin / 10}%`,
+                              top: `${detail.object.bbox.ymin / 10}%`,
+                              width: `${Math.max(
+                                1,
+                                (detail.object.bbox.xmax -
+                                  detail.object.bbox.xmin) /
+                                  10,
+                              )}%`,
+                            }}
+                          >
+                            <span>
+                              {detail.object.category ??
+                                `객체 ${detail.object.objectIdx + 1}`}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <ImageOff className="size-8 text-text-quaternary" />
@@ -361,29 +594,189 @@ export const ApprovalPage = () => {
                     {detail.object.objectIdx + 1}
                   </p>
                 </div>
-                <div className="rounded-xl bg-bg-tertiary p-4">
+
+                <div className="rounded-xl border border-border bg-bg-secondary p-4">
                   <p className="text-xs font-bold text-text-secondary">
-                    연결할 SKU 이미지
+                    {isViewingConfirmedSku
+                      ? '선택한 SKU'
+                      : '미리보기 중인 후보 SKU'}
                   </p>
-                  <div className="mt-3 flex min-h-52 items-center justify-center rounded-lg bg-bg-primary">
-                    {detail.sku.imageUrl ? (
-                      <img
-                        alt={detail.sku.productName}
-                        className="max-h-72 w-full object-contain p-2"
-                        src={detail.sku.imageUrl}
-                      />
-                    ) : (
-                      <ImageOff className="size-8 text-text-quaternary" />
-                    )}
+                  <div className="mt-3 flex items-center gap-4">
+                    <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-tertiary">
+                      {activeSku?.imageUrl ? (
+                        <img
+                          alt={activeSku.productName}
+                          className="size-full object-cover"
+                          src={activeSku.imageUrl}
+                        />
+                      ) : (
+                        <ImageOff className="size-6 text-text-quaternary" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-mono text-xs font-bold text-text-tertiary">
+                        {activeSku?.skuCode}
+                      </p>
+                      <h3 className="mt-1 text-base font-extrabold text-text-primary">
+                        {activeSku?.productName}
+                      </h3>
+                      <p className="mt-1 text-sm text-text-secondary">
+                        {[
+                          activeSku?.brand,
+                          [activeSku?.category, activeSku?.subCategory]
+                            .filter(Boolean)
+                            .join(' > '),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || '-'}
+                      </p>
+                      {activeSku?.price != null ? (
+                        <p className="mt-1 text-sm font-semibold text-text-primary">
+                          {activeSku.price.toLocaleString('ko-KR')}원
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="mt-3 text-xs font-semibold text-text-secondary">
-                    유사도{' '}
-                    {detail.similarityScore === null
+                </div>
+
+                <div className="flex flex-col items-center justify-center rounded-xl bg-bg-primary px-4 py-3 text-center lg:border lg:border-border">
+                  <p className="text-[11px] font-bold text-text-tertiary">
+                    유사도
+                  </p>
+                  <p className="mt-1 text-2xl font-extrabold text-blue-700">
+                    {activeSimilarityPercent === null
                       ? '-'
-                      : `${Math.round(detail.similarityScore * 100)}%`}
+                      : `${activeSimilarityPercent}%`}
                   </p>
                 </div>
               </div>
+
+              {detail.candidates.length > 0 ? (
+                <div className="mt-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-text-secondary">
+                      추천 후보 SKU · 클릭하면 아래 비교표가 바뀝니다
+                    </p>
+                    {!isViewingConfirmedSku ? (
+                      <button
+                        className="text-xs font-bold text-blue-700 hover:underline"
+                        onClick={() => setPreviewCandidateSkuId(null)}
+                        type="button"
+                      >
+                        확정 SKU로 돌아가기
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                    {detail.candidates.map((candidate) => {
+                      const isConfirmed = candidate.skuId === detail.sku.skuId;
+                      const isActive = previewCandidate
+                        ? previewCandidate.skuId === candidate.skuId
+                        : isConfirmed;
+                      return (
+                        <button
+                          aria-pressed={isActive}
+                          className={cn(
+                            'relative flex w-32 shrink-0 flex-col items-center gap-1 rounded-lg border p-2 text-center transition-colors',
+                            isConfirmed
+                              ? 'border-success-200 bg-success-50'
+                              : 'border-border bg-bg-primary hover:border-blue-300',
+                            isActive &&
+                              'border-blue-600 shadow-[0_0_0_1px_#2563eb]',
+                          )}
+                          key={candidate.skuId}
+                          onClick={() =>
+                            setPreviewCandidateSkuId(candidate.skuId)
+                          }
+                          type="button"
+                        >
+                          {isConfirmed ? (
+                            <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-success-600 text-white">
+                              <Check size={12} />
+                            </span>
+                          ) : null}
+                          <span className="flex size-16 items-center justify-center overflow-hidden rounded-md bg-bg-tertiary">
+                            {candidate.imageUrl ? (
+                              <img
+                                alt={candidate.productName}
+                                className="size-full object-cover"
+                                src={candidate.imageUrl}
+                              />
+                            ) : (
+                              <ImageOff className="size-4 text-text-quaternary" />
+                            )}
+                          </span>
+                          <span className="text-[10px] font-bold text-text-quaternary">
+                            {candidate.viaSearch
+                              ? '검색 선택'
+                              : `${candidate.matchRank}위`}
+                          </span>
+                          <span className="w-full truncate font-mono text-[10px] text-text-tertiary">
+                            {candidate.skuCode}
+                          </span>
+                          <span className="w-full truncate text-xs font-semibold text-text-primary">
+                            {candidate.productName}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {metadataComparisonRows.length > 0 ? (
+                <div className="mt-5">
+                  <p className="text-xs font-bold text-text-secondary">
+                    메타데이터 비교
+                  </p>
+                  <div className="mt-2 overflow-x-auto rounded-xl border border-neutral-100">
+                    <table className="w-full min-w-[640px] text-left text-xs">
+                      <thead className="bg-bg-tertiary text-text-tertiary">
+                        <tr>
+                          <th className="px-3 py-2 font-bold">메타데이터</th>
+                          <th className="px-3 py-2 font-bold">업로드 이미지</th>
+                          <th className="px-3 py-2 font-bold">판정</th>
+                          <th className="px-3 py-2 font-bold">선택한 SKU</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {metadataComparisonRows.map((row) => (
+                          <tr key={row.key}>
+                            <td className="px-3 py-3 font-bold text-text-primary">
+                              {ATTRIBUTE_LABELS[row.key] ?? row.key}
+                            </td>
+                            <td className="px-3 py-3 text-text-secondary">
+                              {row.cropValue ?? '판단 불가'}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span
+                                className={cn(
+                                  'rounded-full px-2 py-1 text-[11px] font-bold',
+                                  XAI_VERDICT_STYLES[row.verdict],
+                                )}
+                              >
+                                {XAI_VERDICT_LABELS[row.verdict]}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-text-secondary">
+                              {row.skuValue ?? '정보 없음'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-border p-4">
+                  <p className="text-xs font-bold text-text-secondary">
+                    SKU 속성
+                  </p>
+                  <div className="mt-3">
+                    <AttributeList attrs={detail.sku.attributes} />
+                  </div>
+                </div>
+              )}
 
               <dl className="mt-5 divide-y divide-border rounded-xl border border-border">
                 <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 px-4 py-3 text-sm">
@@ -398,14 +791,6 @@ export const ApprovalPage = () => {
                     {formatDate(detail.requestedAt)}
                   </dd>
                 </div>
-                {detail.xaiResult?.summary ? (
-                  <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 px-4 py-3 text-sm">
-                    <dt className="text-text-tertiary">매칭 근거</dt>
-                    <dd className="leading-6 text-text-primary">
-                      {detail.xaiResult.summary}
-                    </dd>
-                  </div>
-                ) : null}
                 {detail.rejectReason ? (
                   <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 px-4 py-3 text-sm">
                     <dt className="text-text-tertiary">반려 사유</dt>
@@ -442,7 +827,11 @@ export const ApprovalPage = () => {
                           취소
                         </Button>
                         <Button
-                          disabled={!rejectReason.trim() || isLoading}
+                          disabled={
+                            !rejectReason.trim() ||
+                            isLoading ||
+                            !isViewingConfirmedSku
+                          }
                           onClick={() => void handleReject()}
                           size="sm"
                         >
@@ -453,7 +842,7 @@ export const ApprovalPage = () => {
                   ) : (
                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                       <Button
-                        disabled={isLoading}
+                        disabled={isLoading || !isViewingConfirmedSku}
                         onClick={() => setIsRejecting(true)}
                         startDecorator={<X size={16} />}
                         variant="neutral-outlined"
@@ -461,7 +850,7 @@ export const ApprovalPage = () => {
                         반려
                       </Button>
                       <Button
-                        disabled={isLoading}
+                        disabled={isLoading || !isViewingConfirmedSku}
                         onClick={() => void handleConfirm()}
                         startDecorator={<Check size={16} />}
                       >

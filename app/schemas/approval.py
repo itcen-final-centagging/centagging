@@ -6,6 +6,8 @@ import typing
 import pydantic
 from pydantic import alias_generators
 
+from app.schemas import tagging as tagging_schema
+
 
 class _CamelModel(pydantic.BaseModel):
     """JSON 응답을 camelCase로 직렬화하는 공통 모델입니다."""
@@ -39,6 +41,7 @@ class ApprovalListItem(_CamelModel):
     reviewed_by_name: str | None = None
     scene_image_id: int
     origin_name: str
+    scene_image_url: str
     object_idx: int
     category: str | None = None
     sku_code: str
@@ -61,11 +64,13 @@ class ApprovalSceneImage(_CamelModel):
 
 
 class ApprovalObject(_CamelModel):
-    """승인 대상 객체의 현재 위치·카테고리입니다."""
+    """승인 대상 객체의 현재 위치·카테고리·추출된 속성입니다."""
 
     object_idx: int
     category: str | None = None
-    bbox: BoundingBox
+    sub_category: str | None = None
+    attrs: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
+    bbox: BoundingBox | None = None
 
 
 class ApprovalSku(_CamelModel):
@@ -74,7 +79,23 @@ class ApprovalSku(_CamelModel):
     sku_id: int
     sku_code: str
     product_name: str
+    brand: str | None = None
+    price: int | None = None
+    category: str | None = None
+    sub_category: str | None = None
+    attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
     image_url: str | None = None
+
+
+class ApprovalXaiResult(_CamelModel):
+    """승인 화면에 표시할 XAI 판단 근거입니다."""
+
+    summary: str
+    common: str = ""
+    difference: str = ""
+    criteria: list[tagging_schema.XaiCriterion] = pydantic.Field(
+        default_factory=list
+    )
 
 
 class ApprovalActions(_CamelModel):
@@ -82,6 +103,29 @@ class ApprovalActions(_CamelModel):
 
     can_confirm: bool
     can_reject: bool
+
+
+class ApprovalCandidateSku(_CamelModel):
+    """추천 당시 함께 제시됐던 후보 SKU 1건입니다.
+
+    match_rank는 추천 후보 배열에서의 순번(1부터)이다. 검색으로 직접
+    선택해 확정한 SKU가 추천 후보 목록에 없으면 이 항목을 맨 앞에
+    끼워 넣고 via_search=True, match_rank=0으로 표시한다(검색 확정은
+    유사도·순위 개념이 없어 similarity_score도 항상 비어 있다).
+    """
+
+    sku_id: int
+    sku_code: str
+    product_name: str
+    match_rank: int
+    brand: str | None = None
+    price: int | None = None
+    category: str | None = None
+    sub_category: str | None = None
+    attributes: dict[str, typing.Any] = pydantic.Field(default_factory=dict)
+    image_url: str | None = None
+    similarity_score: float | None = None
+    via_search: bool = False
 
 
 class ApprovalDetailResponse(_CamelModel):
@@ -98,7 +142,10 @@ class ApprovalDetailResponse(_CamelModel):
     object: ApprovalObject
     sku: ApprovalSku
     similarity_score: float | None = None
-    xai_result: dict[str, typing.Any] | None = None
+    xai_result: ApprovalXaiResult | None = None
+    candidates: list[ApprovalCandidateSku] = pydantic.Field(
+        default_factory=list
+    )
     actions: ApprovalActions
 
 

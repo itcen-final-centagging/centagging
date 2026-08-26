@@ -1,4 +1,5 @@
 import { createAuthorizationHeaders } from '@/features/auth/api/auth';
+import type { XaiCriterion } from '@/features/tagging/types';
 import { requestJson, type ApiSuccessResponse } from '@/lib/api-request';
 
 export type ApprovalStatus = 'PENDING' | 'ACTIVE' | 'REJECTED';
@@ -14,9 +15,25 @@ export type ApprovalListItem = {
   reviewedAt: string | null;
   reviewedByName: string | null;
   sceneImageId: number;
+  sceneImageUrl: string;
   similarityScore: number | null;
   skuCode: string;
   status: ApprovalStatus;
+};
+
+export type ApprovalCandidateSku = {
+  attributes: Record<string, unknown>;
+  brand: string | null;
+  category: string | null;
+  imageUrl: string | null;
+  matchRank: number;
+  price: number | null;
+  productName: string;
+  similarityScore: number | null;
+  skuCode: string;
+  skuId: number;
+  subCategory: string | null;
+  viaSearch: boolean;
 };
 
 export type ApprovalDetail = {
@@ -24,10 +41,13 @@ export type ApprovalDetail = {
     canConfirm: boolean;
     canReject: boolean;
   };
+  candidates: ApprovalCandidateSku[];
   object: {
-    bbox: { xmax: number; xmin: number; ymax: number; ymin: number };
+    attrs: Record<string, unknown>;
+    bbox: { xmax: number; xmin: number; ymax: number; ymin: number } | null;
     category: string | null;
     objectIdx: number;
+    subCategory: string | null;
   };
   rejectReason: string | null;
   requestId: number;
@@ -40,12 +60,23 @@ export type ApprovalDetail = {
   };
   similarityScore: number | null;
   sku: {
+    attributes: Record<string, unknown>;
+    brand: string | null;
+    category: string | null;
     imageUrl: string | null;
+    price: number | null;
     productName: string;
     skuCode: string;
+    skuId: number;
+    subCategory: string | null;
   };
   status: ApprovalStatus;
-  xaiResult: { summary?: string } | null;
+  xaiResult: {
+    common: string;
+    criteria: XaiCriterion[];
+    difference: string;
+    summary: string;
+  } | null;
 };
 
 type ApprovalListResponse = ApiSuccessResponse<{

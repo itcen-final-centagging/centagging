@@ -9,8 +9,9 @@ import logging
 import pathlib
 import typing
 
-from PIL import Image
+import pydantic
 import sqlalchemy
+from PIL import Image
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core import config
@@ -53,6 +54,7 @@ _SELECT_LIST = sqlalchemy.text("""
            a.scene_image_id,
            a.object_index,
            si.origin_name,
+           si.image_url AS scene_image_url,
            ru.user_name AS requested_by_name,
            vu.user_name AS reviewed_by_name,
            object_data.metadata ->> 'category' AS category,
@@ -72,6 +74,7 @@ _SELECT_LIST = sqlalchemy.text("""
            LIMIT 1
       ) object_data ON TRUE
      WHERE (:status = 'ALL' OR a.status = :status)
+       AND si.image_url NOT LIKE '/uploads/seed/%'
      ORDER BY a.requested_at DESC
     """)
 
@@ -93,6 +96,11 @@ _SELECT_DETAIL = sqlalchemy.text("""
            sc.sku_id,
            sc.sku_code,
            sc.product_name,
+           sc.brand,
+           sc.price,
+           sc.category,
+           sc.sub_category,
+           sc.attributes,
            simg.image_url AS sku_image_url
       FROM approval a
       JOIN tagging_result tr ON tr.result_id = a.tagging_result_id
@@ -108,6 +116,7 @@ _SELECT_DETAIL = sqlalchemy.text("""
            LIMIT 1
       ) object_data ON TRUE
      WHERE a.request_id = :request_id
+       AND si.image_url NOT LIKE '/uploads/seed/%'
     """)
 
 _SELECT_FOR_UPDATE = sqlalchemy.text("""
@@ -159,6 +168,16 @@ _SELECT_ACTIVE_VLM_MOODS = sqlalchemy.text("""
        AND tr.vlm_mood IS NOT NULL
     """)
 
+_SELECT_LATEST_RECOMMEND_JOB = sqlalchemy.text("""
+    SELECT result_payload
+      FROM ai_job
+     WHERE scene_image_id = :scene_image_id
+       AND job_type = 'RECOMMEND_SKU'
+       AND status = 'SUCCEEDED'
+     ORDER BY created_at DESC
+     LIMIT 1
+    """)
+
 
 class ApprovalService:
     """태깅 확정 결과를 SKU 스타일링 이미지로 승인·반려합니다."""
@@ -198,6 +217,7 @@ class ApprovalService:
                     reviewed_by_name=row["reviewed_by_name"],
                     scene_image_id=int(row["scene_image_id"]),
                     origin_name=str(row["origin_name"]),
+                    scene_image_url=str(row["scene_image_url"]),
                     object_idx=int(row["object_index"]),
                     category=row["category"],
                     sku_code=str(row["sku_code"]),
@@ -228,11 +248,35 @@ class ApprovalService:
         if row is None:
             raise ApprovalNotFoundError(request_id)
         object_metadata = _as_object_metadata(row["object_metadata"])
-        bbox = object_metadata.get("bbox_coord", {})
+        bbox = _as_bounding_box(object_metadata.get("bbox_coord"))
         category = object_metadata.get("category")
         sku_image_url = row["sku_image_url"]
         if sku_image_url is not None:
             sku_image_url = self.sku_image_storage.public_url(sku_image_url)
+        candidates = await self._fetch_recommend_candidates(
+            scene_image_id=int(row["scene_image_id"]),
+            object_idx=int(row["object_index"]),
+        )
+        final_sku_id = int(row["sku_id"])
+        if not any(
+            candidate.sku_id == final_sku_id for candidate in candidates
+        ):
+            candidates.insert(
+                0,
+                approval_schema.ApprovalCandidateSku(
+                    sku_id=final_sku_id,
+                    sku_code=str(row["sku_code"]),
+                    product_name=str(row["product_name"]),
+                    match_rank=0,
+                    brand=row["brand"],
+                    price=row["price"],
+                    category=row["category"],
+                    sub_category=row["sub_category"],
+                    attributes=row["attributes"] or {},
+                    image_url=sku_image_url,
+                    via_search=True,
+                ),
+            )
         return approval_schema.ApprovalDetailResponse(
             request_id=int(row["request_id"]),
             status=typing.cast(approval_schema.ApprovalStatus, row["status"]),
@@ -249,12 +293,19 @@ class ApprovalService:
             object=approval_schema.ApprovalObject(
                 object_idx=int(row["object_index"]),
                 category=category,
-                bbox=approval_schema.BoundingBox(**bbox),
+                sub_category=object_metadata.get("sub_category"),
+                attrs=object_metadata.get("attrs") or {},
+                bbox=bbox,
             ),
             sku=approval_schema.ApprovalSku(
                 sku_id=int(row["sku_id"]),
                 sku_code=str(row["sku_code"]),
                 product_name=str(row["product_name"]),
+                brand=row["brand"],
+                price=row["price"],
+                category=row["category"],
+                sub_category=row["sub_category"],
+                attributes=row["attributes"] or {},
                 image_url=sku_image_url,
             ),
             similarity_score=(
@@ -262,12 +313,95 @@ class ApprovalService:
                 if row["similarity_score"] is not None
                 else None
             ),
-            xai_result=row["xai_result"],
+            xai_result=(
+                approval_schema.ApprovalXaiResult.model_validate(
+                    row["xai_result"]
+                )
+                if row["xai_result"] is not None
+                else None
+            ),
+            candidates=candidates,
             actions=approval_schema.ApprovalActions(
                 can_confirm=row["status"] == "PENDING",
                 can_reject=row["status"] == "PENDING",
             ),
         )
+
+    async def _fetch_recommend_candidates(
+        self, *, scene_image_id: int, object_idx: int
+    ) -> list[approval_schema.ApprovalCandidateSku]:
+        """추천 당시 이 객체에 제시됐던 후보 SKU 목록을 다시 만듭니다.
+
+        가장 최근 RECOMMEND_SKU 작업의 result_payload에서 이 object_idx에
+        해당하는 sku_candidates를 찾아 반환한다. 최종 확정이 검색(SEARCH)
+        경유였어도 추천 자체는 그 전에 한 번 실행됐으므로 후보는 그대로
+        남아 있다 — match_source와 무관하게 scene_image_id·object_idx로만
+        찾는다. 해당 장면에 추천 이력 자체가 없을 때만 빈 목록을 반환하며,
+        조회·파싱에 실패해도 승인 화면 표시가 막히지 않도록 예외를
+        삼킨다.
+        """
+        try:
+            payload = await self.session.scalar(
+                _SELECT_LATEST_RECOMMEND_JOB,
+                {"scene_image_id": scene_image_id},
+            )
+            if not isinstance(payload, dict):
+                return []
+            objects = payload.get("objects")
+            if not isinstance(objects, list):
+                return []
+            matched_object = next(
+                (
+                    item
+                    for item in objects
+                    if isinstance(item, dict)
+                    and item.get("object_idx") == object_idx
+                ),
+                None,
+            )
+            if matched_object is None:
+                return []
+            raw_candidates = matched_object.get("sku_candidates")
+            if not isinstance(raw_candidates, list):
+                return []
+
+            candidates: list[approval_schema.ApprovalCandidateSku] = []
+            for rank, candidate in enumerate(raw_candidates, start=1):
+                if not isinstance(candidate, dict):
+                    continue
+                matched_image = candidate.get("matched_sku_image") or {}
+                image_url = matched_image.get("image_url")
+                similarity_score = candidate.get("similarity_score")
+                candidates.append(
+                    approval_schema.ApprovalCandidateSku(
+                        sku_id=int(candidate["sku_id"]),
+                        sku_code=str(candidate["sku_code"]),
+                        product_name=str(candidate["product_name"]),
+                        match_rank=rank,
+                        category=candidate.get("category"),
+                        sub_category=candidate.get("sub_category"),
+                        attributes=candidate.get("attrs") or {},
+                        image_url=(
+                            self.sku_image_storage.public_url(image_url)
+                            if image_url
+                            else None
+                        ),
+                        similarity_score=(
+                            float(similarity_score) / 100
+                            if similarity_score is not None
+                            else None
+                        ),
+                    )
+                )
+            return candidates
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception(
+                "추천 후보 목록을 다시 만들지 못했습니다: "
+                "scene_image_id=%s object_idx=%s",
+                scene_image_id,
+                object_idx,
+            )
+            return []
 
     async def confirm(
         self,
@@ -534,6 +668,24 @@ class ApprovalService:
 def _as_object_metadata(value: object) -> dict[str, typing.Any]:
     """Psycopg JSONB 결과를 안전한 객체 메타데이터로 변환합니다."""
     return value if isinstance(value, dict) else {}
+
+
+def _as_bounding_box(
+    value: object,
+) -> approval_schema.BoundingBox | None:
+    """bbox_coord를 안전하게 파싱합니다.
+
+    시드 스크립트(scripts/seed/seed_demo_vlm_moods.py)가 만든 가짜 승인
+    이력처럼 scene_image.object_metadata가 비어 있는 경우 bbox_coord가
+    없거나 형식이 맞지 않을 수 있다. 이런 경우 500 대신 화면에서 "이미지
+    없음"으로 표시할 수 있도록 None을 반환한다.
+    """
+    if not isinstance(value, dict):
+        return None
+    try:
+        return approval_schema.BoundingBox(**value)
+    except pydantic.ValidationError:
+        return None
 
 
 def _image_sha256(image: Image.Image) -> str:
