@@ -21,9 +21,9 @@ const roleLabels = {
 };
 
 const roleDisplayNames = {
-  ADMIN: '이태깅(마케팅)',
+  ADMIN: '김태깅(마케팅)',
   SUPER_ADMIN: '허태깅(시스템 관리자)',
-  USER: '김태깅(MD)',
+  USER: '이태깅(MD)',
 };
 
 export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
