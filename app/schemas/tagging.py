@@ -20,9 +20,9 @@ class XaiCriterion(BaseModel):
     메타데이터 1건의 일치 여부를 담습니다. 화면과 저장 구조를 그대로 쓰기
     위해 배열과 필드 이름을 유지합니다.
 
-    crop 판독값은 ``DetectedObject.xai_readings``에 crop당 한 번만 있고
-    SKU 값은 ``SkuCandidate.attrs``에 이미 있으므로, 여기서는 ``key``로
-    참조만 합니다. 후보 5건에 같은 사실을 반복해 담지 않습니다.
+    crop 판독값은 ``DetectedObject.xai_readings``에 crop당 한 번만 있고,
+    ``value``에는 현재 SKU 후보 이미지에서 XAI가 직접 판독한 값을 담습니다.
+    DB의 ``SkuCandidate.attrs``와 분리해 시각 판독 결과만 표시합니다.
     """
 
     # v2는 구조/색상/디테일/맥락을 넣었습니다. v3는 비워 둡니다.
@@ -31,6 +31,7 @@ class XaiCriterion(BaseModel):
 
     # v3에서 추가한 필드입니다.
     key: str = ""
+    value: str = ""
     verdict: typing.Literal["MATCH", "MISMATCH", "UNKNOWN"] | None = None
 
     # v1·v2 이력 호환용입니다. v3 응답에서는 항상 None입니다.
