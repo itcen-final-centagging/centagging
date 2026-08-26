@@ -23,7 +23,7 @@ class _SeededUser(typing.TypedDict):
 _SEEDED_USERS: tuple[_SeededUser, ...] = (
     {
         "login_id": "user",
-        "user_name": "일반 사용자",
+        "user_name": "이재혁",
         "password_hash": (
             "03ac674216f3e15c761ee1a5e255f067"
             "953623c8b388b4459e13f978d7c846f4"
@@ -33,7 +33,7 @@ _SEEDED_USERS: tuple[_SeededUser, ...] = (
     },
     {
         "login_id": "admin",
-        "user_name": "관리자",
+        "user_name": "이충헌",
         "password_hash": (
             "03ac674216f3e15c761ee1a5e255f067"
             "953623c8b388b4459e13f978d7c846f4"
@@ -43,7 +43,7 @@ _SEEDED_USERS: tuple[_SeededUser, ...] = (
     },
     {
         "login_id": "super-admin",
-        "user_name": "최종 관리자",
+        "user_name": "허민영",
         "password_hash": (
             "03ac674216f3e15c761ee1a5e255f067"
             "953623c8b388b4459e13f978d7c846f4"
