@@ -15,15 +15,15 @@ type SideBarProps = {
 };
 
 const roleLabels = {
-  ADMIN: '관리자',
+  ADMIN: 'MD',
   SUPER_ADMIN: '시스템 관리자',
-  USER: '일반 사용자',
+  USER: '마케팅',
 };
 
 const roleDisplayNames = {
-  ADMIN: '김태깅(마케팅)',
-  SUPER_ADMIN: '허태깅(시스템 관리자)',
-  USER: '이태깅(MD)',
+  ADMIN: '이충헌',
+  SUPER_ADMIN: '허민영',
+  USER: '이재혁',
 };
 
 export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
