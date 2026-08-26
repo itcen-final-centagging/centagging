@@ -66,6 +66,8 @@ export interface XaiCriterion {
   comment: string;
   /** v3 메타데이터 비교의 속성 키입니다. */
   key?: string;
+  /** 현재 SKU 후보 이미지에서 XAI가 직접 판독한 값입니다. */
+  value?: string;
   /** 구 루브릭 응답과의 호환을 위해 남겨 둔 표시명입니다. */
   label?: string;
   score?: number | null;

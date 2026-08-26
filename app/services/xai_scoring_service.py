@@ -12,7 +12,6 @@ crop의 카테고리에 정의된 메타데이터를 항목별로 비교해 일�
 
 import asyncio
 import collections.abc
-import json
 import logging
 import typing
 
@@ -60,8 +59,6 @@ class ScoringCandidate(BaseModel):
 
     sku_code: str
     image_bytes: bytes
-    # v3 프롬프트에 참고용으로 제시하는 SKU 카탈로그 메타데이터입니다.
-    attrs: dict[str, str] = Field(default_factory=dict)
 
 
 class ScoringCrop(BaseModel):
@@ -92,6 +89,7 @@ class GeminiCandidateVerdict(BaseModel):
     """후보 1건에 대한 메타데이터 1건의 판정입니다."""
 
     key: str
+    value: str = ""
     verdict: typing.Literal["MATCH", "MISMATCH", "UNKNOWN"]
     comment: str = ""
 
@@ -331,7 +329,11 @@ class XaiScoringService:
         }
         return all(
             readable_keys
-            <= {verdict.key for verdict in evaluation.xai_result.verdicts}
+            <= {
+                verdict.key
+                for verdict in evaluation.xai_result.verdicts
+                if verdict.verdict == "UNKNOWN" or verdict.value
+            }
             for evaluation in evaluations.values()
         )
 
@@ -414,7 +416,6 @@ class XaiScoringService:
                 ScoringCandidate(
                     sku_code=candidate.sku_code,
                     image_bytes=image_bytes,
-                    attrs=candidate.attrs,
                 )
                 for candidate, image_bytes in zip(
                     detected.sku_candidates, image_bytes_list
@@ -489,7 +490,7 @@ class XaiScoringService:
                 value = ""
                 note = MISSING_READING_NOTE
             else:
-                value = reading.value
+                value = _normalize_xai_value(key, reading.value)
                 note = "" if value else reading.note
             readings.append(
                 XaiCropReading(key=key, value=value, note=note)
@@ -539,6 +540,13 @@ class XaiScoringService:
             criteria.append(
                 XaiCriterion(
                     key=reading.key,
+                    value=(
+                        ""
+                        if verdict.verdict == "UNKNOWN"
+                        else _normalize_xai_value(
+                            reading.key, verdict.value
+                        )
+                    ),
                     verdict=verdict.verdict,
                     comment=verdict.comment,
                 )
@@ -654,24 +662,20 @@ class XaiScoringService:
 
     @staticmethod
     def _build_crop_block(crop: ScoringCrop) -> str:
-        """crop 1건의 카테고리·비교 항목·후보 카탈로그 값을 정리합니다.
+        """crop 1건의 카테고리·비교 key·SKU 식별자를 정리합니다.
 
         crop마다 카테고리가 다를 수 있으므로 비교 항목을 crop 블록 안에
-        넣습니다. 후보의 카탈로그 값은 비교 항목에 해당하는 키만 추립니다.
+        넣습니다. 시각 판정을 오염시키지 않도록 후보 카탈로그 값은 모델에
+        전달하지 않습니다.
         """
-        keys = _comparison_keys(crop.category)
         lines = [
             f"    - crop {crop.crop_index} · 카테고리: {crop.category}",
             "      비교 항목:",
             build_comparison_block(crop.category),
-            "      SKU 후보와 카탈로그 값:",
+            "      SKU 후보:",
         ]
         for candidate in crop.candidates:
-            values = {key: candidate.attrs.get(key, "") for key in keys}
-            lines.append(
-                f"        - {candidate.sku_code}: "
-                f"{json.dumps(values, ensure_ascii=False)}"
-            )
+            lines.append(f"        - {candidate.sku_code}")
         return "\n".join(line for line in lines if line)
 
 def _comparison_keys(category: str) -> list[str]:
@@ -683,3 +687,17 @@ def _comparison_keys(category: str) -> list[str]:
         return catalog_spec.visual_attribute_names(category)
     except KeyError:
         return []
+
+
+def _normalize_xai_value(key: str, value: str) -> str:
+    """XAI의 존재 여부 판독값을 API 표준인 있음/없음으로 맞춥니다."""
+    text = value.strip()
+    if not key.startswith("has_") or not text:
+        return text
+
+    normalized = text.casefold().replace(" ", "").replace("_", "")
+    if normalized in {"true", "yes", "present", "있음", "유"}:
+        return "있음"
+    if normalized in {"false", "no", "absent", "없음", "무"}:
+        return "없음"
+    return text
