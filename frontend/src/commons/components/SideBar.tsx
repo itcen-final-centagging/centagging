@@ -20,6 +20,12 @@ const roleLabels = {
   USER: '일반 사용자',
 };
 
+const roleDisplayNames = {
+  ADMIN: '이태깅(마케팅)',
+  SUPER_ADMIN: '허태깅(시스템 관리자)',
+  USER: '김태깅(MD)',
+};
+
 export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
@@ -27,8 +33,7 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const menuItems = isAdminMode ? adminSidebarMenus : sidebarMenus;
-  const displayName =
-    user?.role === 'SUPER_ADMIN' ? '시스템 관리자' : (user?.userName ?? '사용자');
+  const displayName = user ? roleDisplayNames[user.role] : '사용자';
 
   useEffect(() => {
     const closeUserMenu = (event: MouseEvent) => {
@@ -135,11 +140,12 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
             </div>
           ) : null}
           <div className="flex items-center gap-2 rounded-[4px] bg-bg-muted/50 px-2 py-2">
-            <span
-              className="flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
-              style={{ background: 'var(--gradient-primary)' }}
-            >
-              {displayName.slice(0, 1)}
+            <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-white">
+              <img
+                alt=""
+                className="size-full object-contain p-1"
+                src="/itcen-favicon.png"
+              />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[14px] font-bold leading-[1.42] text-text-secondary">
