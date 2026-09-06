@@ -42,3 +42,4 @@ resource
 .DS_Store
 Thumbs.db
 /zz-sku-catalog-embeddings.sql
+docker-compose.override.yml

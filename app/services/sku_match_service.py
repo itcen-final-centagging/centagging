@@ -105,7 +105,6 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
                         sku_image_id=tagging_result.sku_image_id,
                         match_source=tagging_result.match_source,
                         match_rank=tagging_result.match_rank,
-                        status="PENDING",
                         similarity_score=(
                             tagging_result.similarity_score / 100
                             if tagging_result.similarity_score is not None
@@ -130,7 +129,6 @@ class SkuMatchService:  # pylint: disable=too-few-public-methods
                     scene_image_id=scene_id,
                     object_index=result.object_idx,
                     requested_by=user_id,
-                    status="PENDING",
                 )
                 for result in results
             )

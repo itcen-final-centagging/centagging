@@ -5,9 +5,14 @@ import typing
 import fastapi
 
 from app import dependencies
+from app.core.error_codes import ErrorCode
 from app.schemas import approval as approval_schema
 from app.schemas import common as common_schema
 from app.services import approval_service
+from app.services.gemini_service import (
+    GeminiConfigurationError,
+    GeminiEmbeddingError,
+)
 
 router = fastapi.APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -84,6 +89,22 @@ async def confirm_approval(
     except approval_service.AlreadyReviewedError as error:
         raise fastapi.HTTPException(
             status_code=409, detail="이미 처리된 요청입니다."
+        ) from error
+    except GeminiConfigurationError as error:
+        raise fastapi.HTTPException(
+            status_code=503,
+            detail={
+                "code": ErrorCode.SERVICE_UNAVAILABLE.value,
+                "message": "임베딩 기능이 아직 설정되지 않았습니다.",
+            },
+        ) from error
+    except GeminiEmbeddingError as error:
+        raise fastapi.HTTPException(
+            status_code=502,
+            detail={
+                "code": ErrorCode.UPSTREAM_ERROR.value,
+                "message": "스타일링 이미지 임베딩 중 오류가 발생했습니다.",
+            },
         ) from error
 
 

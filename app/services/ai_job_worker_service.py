@@ -2,6 +2,7 @@
 
 import logging
 import pathlib
+import typing
 
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,8 +17,12 @@ from app.schemas.furniture_detection import (
 )
 from app.schemas.gemini_detection import GeminiDetectionResult
 from app.schemas.tagging import EditedSceneObject
-from app.services import furniture_detection_service
+from app.services import furniture_attribute_rules, furniture_detection_service
 from app.services.gemini_service import GeminiService
+from app.services.image_processing_service import crop_scene_objects
+from app.services.object_attribute_extraction_service import (
+    ObjectAttributeExtractionService,
+)
 from app.services.similar_sku_service import SimilarSkuService
 from app.services.tagging_service import TaggingService
 from app.services.xai_scoring_service import XaiScoringService
@@ -63,11 +68,33 @@ def _build_detected_objects(
                 xmax=round(detection.bbox_coord.xmax),
                 ymax=round(detection.bbox_coord.ymax),
             ),
-            evidence=detection.evidence,
             confidence=detection.confidence,
+            evidence=detection.evidence,
         )
         for object_index, detection in enumerate(detection_result.detections)
     ]
+
+
+def _build_enriched_evidence(
+    category: str,
+    attrs: dict[str, str],
+    original_evidence: str,
+) -> str:
+    """추출된 객체 속성을 기반으로 화면용 탐지 근거를 생성합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        category, attrs
+    )
+
+    if not descriptors:
+        normalized_evidence = original_evidence.strip()
+        if normalized_evidence.endswith("판단했습니다."):
+            return normalized_evidence
+        return (
+            f"{normalized_evidence.rstrip('.')}. 해당 형태와 구조를 근거로 "
+            f"{category}로 판단했습니다."
+        )
+
+    return f"{', '.join(descriptors[:3])} 등이 확인되어 {category}로 판단했습니다."
 
 
 def _mark_detection_succeeded(scene: SceneImage) -> None:
@@ -93,6 +120,42 @@ async def _detect_scene(
         settings,
     )
     detections = _build_detected_objects(detection_result)
+
+    object_metadata = [
+        detection.model_dump(mode="json") for detection in detections
+    ]
+    crops = await run_in_threadpool(
+        crop_scene_objects,
+        image_path,
+        object_metadata,
+    )
+    category_by_idx = {
+        detection.object_idx: detection.category for detection in detections
+    }
+    attribute_extraction_service = ObjectAttributeExtractionService(
+        settings=settings,
+        gemini_service=GeminiService(settings=settings),
+    )
+    attributes_by_idx = await attribute_extraction_service.extract_for_crops(
+        crops,
+        category_by_idx,
+    )
+
+    for detection in detections:
+        attribute_result = attributes_by_idx.get(detection.object_idx)
+
+        if attribute_result is None:
+            continue
+
+        detection.sub_category = attribute_result.sub_category
+        detection.attrs = attribute_result.attributes
+        detection.vlm_mood = attribute_result.vlm_mood
+        detection.evidence = _build_enriched_evidence(
+            category=detection.category,
+            attrs=detection.attrs,
+            original_evidence=detection.evidence,
+        )
+
     _mark_detection_succeeded(scene)
     await session.flush()
 
@@ -142,7 +205,7 @@ async def _recommend_sku(
         session,
         settings,
     ).get_sku_candidates(job.scene_image_id, objects=objects)
-    return result.model_dump(mode="json")
+    return typing.cast(dict[str, object], result.model_dump(mode="json"))
 
 
 async def _record_detection_failure(

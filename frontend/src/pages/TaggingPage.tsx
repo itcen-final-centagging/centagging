@@ -7,7 +7,6 @@ import { RecommendationPanel } from '@/features/tagging/components/Recommendatio
 import { ReviewPanel } from '@/features/tagging/components/ReviewPanel';
 import { UploadPanel } from '@/features/tagging/components/UploadPanel';
 import {
-  NoDetectionPanel,
   FailedPanel,
   LoadingPanel,
   SavedPanel,
@@ -26,12 +25,6 @@ const PAGE_COPY = {
     title: 'AI가 찾은 가구를 확인해 주세요',
     description:
       '이미지 또는 오른쪽 목록에서 태깅할 가구 하나를 선택할 수 있습니다.',
-  },
-  'not-found': {
-    eyebrow: '미탐지 보완',
-    title: '가구를 자동으로 찾지 못했어요',
-    description:
-      '찾으려는 가구를 구체적으로 설명하면 이미지와 함께 한 번 더 분석합니다.',
   },
   recommend: {
     eyebrow: 'SKU 추천',
@@ -56,24 +49,22 @@ const PAGE_COPY = {
     description: '저장한 결과는 검수 이력에서 다시 확인할 수 있습니다.',
   },
   failed: {
-    eyebrow: '미탐지 종료',
-    title: '가구를 찾지 못했어요',
+    eyebrow: '분석 오류',
+    title: '가구 분석을 완료하지 못했어요',
     description:
-      '입력한 설명으로도 가구 객체를 확인하지 못했습니다. 다른 이미지를 업로드해 주세요.',
+      'API 설정과 이미지를 확인한 뒤 잠시 후 다시 시도해 주세요.',
   },
 } as const;
 
 const getCopyKey = (stage: string): keyof typeof PAGE_COPY => {
   if (stage === 'analyzing') return 'upload';
-  if (stage === 'redetecting') return 'not-found';
   if (stage === 'recommending') return 'recommend';
   if (stage === 'saving') return 'review';
   return stage as keyof typeof PAGE_COPY;
 };
 
 export const TaggingPage: React.FC = () => {
-  const { analysisMode, analysisScenario, setAnalysisScenario, stage } =
-    useTaggingWorkflow();
+  const { stage } = useTaggingWorkflow();
   const copy = PAGE_COPY[getCopyKey(stage)];
 
   return (
@@ -92,33 +83,7 @@ export const TaggingPage: React.FC = () => {
           <p className="max-w-3xl pl-0 text-sm leading-6 text-text-secondary sm:pl-1">
             {copy.description}
           </p>
-          {analysisMode ? (
-            <span className="mt-2 inline-flex w-fit rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
-              {analysisMode === 'live'
-                ? 'Gemini 실시간 분석 결과'
-                : '객체 · SKU 선택 데모'}
-            </span>
-          ) : null}
         </div>
-        {import.meta.env.DEV ? (
-          <label className="hidden shrink-0 text-xs font-bold text-text-tertiary 2xl:block">
-            UAT 시나리오
-            <select
-              className="ml-2 h-8 rounded-md border border-border bg-bg-primary px-2 text-xs font-medium text-text-secondary outline-none focus:border-blue-400"
-              onChange={(event) =>
-                setAnalysisScenario(
-                  event.target.value === 'not-detected'
-                    ? 'not-detected'
-                    : 'detected',
-                )
-              }
-              value={analysisScenario}
-            >
-              <option value="detected">정상 탐지</option>
-              <option value="not-detected">미탐지</option>
-            </select>
-          </label>
-        ) : null}
       </div>
       {stage === 'upload' ? <UploadPanel /> : null}
       {stage === 'analyzing' ? (
@@ -128,13 +93,6 @@ export const TaggingPage: React.FC = () => {
         />
       ) : null}
       {stage === 'detect' ? <DetectionPanel /> : null}
-      {stage === 'not-found' ? <NoDetectionPanel /> : null}
-      {stage === 'redetecting' ? (
-        <LoadingPanel
-          description="입력한 설명과 이미지를 함께 분석하고 있습니다."
-          label="가구를 다시 찾고 있습니다"
-        />
-      ) : null}
       {stage === 'recommending' ? (
         <LoadingPanel
           description="수정한 객체를 저장하고 각 객체의 SKU 후보를 조회하고 있습니다."

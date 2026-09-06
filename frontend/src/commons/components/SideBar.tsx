@@ -15,9 +15,15 @@ type SideBarProps = {
 };
 
 const roleLabels = {
-  ADMIN: '관리자',
-  SUPER_ADMIN: '최종 관리자',
-  USER: '일반 사용자',
+  ADMIN: 'MD',
+  SUPER_ADMIN: '시스템 관리자',
+  USER: '마케팅',
+};
+
+const roleDisplayNames = {
+  ADMIN: '이충헌',
+  SUPER_ADMIN: '허민영',
+  USER: '이재혁',
 };
 
 export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
@@ -27,6 +33,7 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const menuItems = isAdminMode ? adminSidebarMenus : sidebarMenus;
+  const displayName = user ? roleDisplayNames[user.role] : '사용자';
 
   useEffect(() => {
     const closeUserMenu = (event: MouseEvent) => {
@@ -56,12 +63,11 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
           className="flex items-center gap-2.5"
           to={isAdminMode ? '/admin' : '/'}
         >
-          <span
-            className="flex size-7 items-center justify-center rounded-md text-sm font-extrabold text-white shadow-sm"
-            style={{ background: 'var(--gradient-primary)' }}
-          >
-            C
-          </span>
+          <img
+            alt="ITCEN"
+            className="size-7 rounded-md shadow-sm"
+            src="/itcen-favicon.png"
+          />
           <span>
             <span className="block text-sm font-extrabold leading-none tracking-[-0.03em] text-text-primary">
               CenTagging
@@ -134,15 +140,16 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
             </div>
           ) : null}
           <div className="flex items-center gap-2 rounded-[4px] bg-bg-muted/50 px-2 py-2">
-            <span
-              className="flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
-              style={{ background: 'var(--gradient-primary)' }}
-            >
-              {user?.userName.slice(0, 1) ?? 'C'}
+            <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-white">
+              <img
+                alt=""
+                className="size-full object-contain p-1"
+                src="/itcen-favicon.png"
+              />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[14px] font-bold leading-[1.42] text-text-secondary">
-                {user?.userName ?? '사용자'}
+                {displayName}
               </span>
               <span className="mt-0.5 block truncate text-[12px] leading-[18px] text-text-tertiary">
                 {user ? roleLabels[user.role] : ''}
@@ -161,7 +168,7 @@ export const SideBar: React.FC<SideBarProps> = ({ isAdminMode = false }) => {
           </div>
         </div>
         <p className="py-3 text-center text-[11px] font-semibold text-text-quaternary">
-          Powered by CenTagging
+          Powered by ITCEN
         </p>
       </div>
     </aside>

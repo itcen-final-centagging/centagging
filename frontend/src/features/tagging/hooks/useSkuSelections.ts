@@ -4,6 +4,7 @@ import type {
   ConfirmedSkuSelection,
   FurnitureObject,
   SkuCandidate,
+  VlmMood,
 } from '../types';
 
 interface UseSkuSelectionsOptions {
@@ -73,7 +74,25 @@ export const useSkuSelections = ({
     });
   }, []);
 
+
+  const applySkuMood = useCallback(
+    (objectId: string, skuCode: string, vlmMood: VlmMood) => {
+      setSelectedSkusByObject((selections) => {
+        const current = selections[objectId];
+        if (!current || current.sku !== skuCode) return selections;
+        return { ...selections, [objectId]: { ...current, vlmMood } };
+      });
+      // 지금 화면에 보여주는 selectedSku도 같은 객체·같은 SKU일 때만 갱신합니다.
+      if (selectedObject?.id !== objectId) return;
+      setSelectedSku((current) =>
+        current && current.sku === skuCode ? { ...current, vlmMood } : current,
+      );
+    },
+    [selectedObject],
+  );
+
   return {
+    applySkuMood,
     clearSelectedSku,
     confirmedSelections,
     removeSkuSelection,

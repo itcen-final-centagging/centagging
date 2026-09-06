@@ -1,11 +1,39 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ImageOff, Images, PackageSearch, Tags } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  ImageOff,
+  Images,
+  PackageSearch,
+  RotateCcw,
+  Search,
+  SearchX,
+  Tags,
+} from 'lucide-react';
 
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import {
   fetchCatalogSkus,
+  type CatalogFilters,
   type CatalogSku,
 } from '@/features/catalog/api/catalog';
+import {
+  CATEGORIES,
+  COMMON_ATTRIBUTE,
+  getSubCategories,
+} from '@/features/tagging/constants/catalogSpec';
+
+const MIN_SEARCH_QUERY_LENGTH = 2;
+
+const emptyFilters: CatalogFilters = {
+  category: '',
+  color: '',
+  pattern: '',
+  q: '',
+  style: '',
+  subCategory: '',
+};
+
+const selectClassName =
+  'h-10 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary outline-none transition-colors focus:border-blue-500 disabled:bg-bg-muted disabled:text-text-quaternary';
 
 const metadataLabels: Record<string, string> = {
   color: '색상',
@@ -45,11 +73,20 @@ export const AdminCatalogPage = () => {
   const [items, setItems] = useState<CatalogSku[]>([]);
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState<CatalogFilters>(emptyFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<CatalogFilters>(emptyFilters);
+  const [queryError, setQueryError] = useState<string>();
+
+  const hasActiveFilters = Object.values(appliedFilters).some(
+    (value) => !!value,
+  );
 
   useEffect(() => {
     if (!user?.session) return undefined;
     let isMounted = true;
-    void fetchCatalogSkus(user.session)
+    setIsLoading(true);
+    void fetchCatalogSkus(user.session, appliedFilters)
       .then((catalog) => {
         if (isMounted) setItems(catalog);
       })
@@ -67,7 +104,30 @@ export const AdminCatalogPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [user?.session]);
+  }, [user?.session, appliedFilters]);
+
+  const handleCategoryChange = (category: string): void => {
+    setFilters((current) => ({ ...current, category, subCategory: '' }));
+  };
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const keyword = (filters.q ?? '').trim();
+    if (keyword && keyword.length < MIN_SEARCH_QUERY_LENGTH) {
+      setQueryError(`검색어는 ${MIN_SEARCH_QUERY_LENGTH}자 이상 입력해주세요.`);
+      return;
+    }
+    setQueryError(undefined);
+    setError(undefined);
+    setAppliedFilters(filters);
+  };
+
+  const handleReset = (): void => {
+    setFilters(emptyFilters);
+    setQueryError(undefined);
+    setError(undefined);
+    setAppliedFilters(emptyFilters);
+  };
 
   return (
     <div className="px-6 py-6 pb-10">
@@ -88,6 +148,133 @@ export const AdminCatalogPage = () => {
         </span>
       </div>
 
+      <form className="studio-surface mt-5 p-4" onSubmit={handleSearch}>
+        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <select
+            aria-label="대분류"
+            className={selectClassName}
+            onChange={(event) => handleCategoryChange(event.target.value)}
+            value={filters.category ?? ''}
+          >
+            <option value="">대분류 전체</option>
+            {CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="소분류"
+            className={selectClassName}
+            disabled={!filters.category}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                subCategory: event.target.value,
+              }))
+            }
+            value={filters.subCategory ?? ''}
+          >
+            <option value="">소분류 전체</option>
+            {getSubCategories(filters.category || null).map((subCategory) => (
+              <option key={subCategory} value={subCategory}>
+                {subCategory}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="색상"
+            className={selectClassName}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                color: event.target.value,
+              }))
+            }
+            value={filters.color ?? ''}
+          >
+            <option value="">색상 전체</option>
+            {COMMON_ATTRIBUTE.color.map((color) => (
+              <option key={color} value={color}>
+                {color}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="스타일"
+            className={selectClassName}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                style: event.target.value,
+              }))
+            }
+            value={filters.style ?? ''}
+          >
+            <option value="">스타일 전체</option>
+            {COMMON_ATTRIBUTE.style.map((style) => (
+              <option key={style} value={style}>
+                {style}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="패턴"
+            className={selectClassName}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                pattern: event.target.value,
+              }))
+            }
+            value={filters.pattern ?? ''}
+          >
+            <option value="">패턴 전체</option>
+            {COMMON_ATTRIBUTE.pattern.map((pattern) => (
+              <option key={pattern} value={pattern}>
+                {pattern}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            aria-label="SKU 코드 또는 상품명 검색"
+            className="h-10 flex-1 rounded-lg border border-border bg-bg-primary px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-quaternary focus:border-blue-500"
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                q: event.target.value,
+              }))
+            }
+            placeholder="SKU 코드 또는 상품명 검색"
+            value={filters.q ?? ''}
+          />
+          <button
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-blue-700 bg-blue-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-900"
+            type="submit"
+          >
+            <Search className="size-4" />
+            검색
+          </button>
+          <button
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-primary px-4 text-sm font-semibold text-text-secondary transition-colors hover:border-blue-300 hover:bg-bg-hover"
+            onClick={handleReset}
+            type="button"
+          >
+            <RotateCcw className="size-4" />
+            초기화
+          </button>
+        </div>
+
+        {queryError ? (
+          <p className="mt-2 text-xs font-semibold text-danger-600">
+            {queryError}
+          </p>
+        ) : null}
+      </form>
+
       {error ? (
         <p
           className="mt-5 rounded-xl border border-danger-200 bg-danger-20 px-4 py-3 text-sm font-semibold text-danger-600"
@@ -99,13 +286,27 @@ export const AdminCatalogPage = () => {
 
       {!isLoading && !error && items.length === 0 ? (
         <section className="studio-surface mt-6 flex min-h-80 flex-col items-center justify-center px-6 text-center">
-          <PackageSearch className="size-8 text-text-quaternary" />
-          <h2 className="mt-4 text-xl font-bold text-text-primary">
-            등록된 상품이 없습니다
-          </h2>
-          <p className="mt-2 text-sm text-text-secondary">
-            상품이 등록되면 대표 이미지와 메타데이터가 이곳에 표시됩니다.
-          </p>
+          {hasActiveFilters ? (
+            <>
+              <SearchX className="size-8 text-text-quaternary" />
+              <h2 className="mt-4 text-xl font-bold text-text-primary">
+                검색 결과가 없습니다
+              </h2>
+              <p className="mt-2 text-sm text-text-secondary">
+                다른 검색 조건으로 시도해보세요.
+              </p>
+            </>
+          ) : (
+            <>
+              <PackageSearch className="size-8 text-text-quaternary" />
+              <h2 className="mt-4 text-xl font-bold text-text-primary">
+                등록된 상품이 없습니다
+              </h2>
+              <p className="mt-2 text-sm text-text-secondary">
+                상품이 등록되면 대표 이미지와 메타데이터가 이곳에 표시됩니다.
+              </p>
+            </>
+          )}
         </section>
       ) : null}
 

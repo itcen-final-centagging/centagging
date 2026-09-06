@@ -1,4 +1,4 @@
-import { MAX_FILE_SIZE, MIN_IMAGE_DIMENSION } from '../constants/data';
+import { MAX_FILE_SIZE } from '../constants/data';
 
 import type { UploadedImage } from '../types';
 
@@ -33,9 +33,6 @@ export const validateImage = async (file: File): Promise<UploadedImage> => {
   }
 
   const { height, width } = await readImageDimensions(file);
-  if (width < MIN_IMAGE_DIMENSION || height < MIN_IMAGE_DIMENSION) {
-    throw new Error('가로와 세로가 512px 이상인 이미지를 업로드해 주세요.');
-  }
 
   return {
     file,

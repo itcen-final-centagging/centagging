@@ -1,8 +1,11 @@
 """장면 이미지 태깅 흐름을 단계별로 조립하는 오케스트레이션 서비스입니다."""
 
 import asyncio
+import dataclasses
+import logging
 import pathlib
 
+from PIL import Image
 from sqlalchemy.ext import asyncio as sqlalchemy_async
 
 from app.core.config import Settings
@@ -14,17 +17,33 @@ from app.schemas.tagging import (
     DetectionResult,
     EditedSceneObject,
     SceneImageInfo,
+    VlmMood,
 )
+from app.services import sku_search_service
 from app.services.gemini_service import GeminiService
 from app.services.image_processing_service import (
     CroppedObject,
     crop_scene_objects,
+    parse_image_to_bytes,
 )
-from app.services.similar_sku_service import SimilarSkuService
-from app.services.xai_scoring_service import XaiObjectResult, XaiScoringService
+from app.services.object_attribute_extraction_service import ObjectAttributeExtractionService
+from app.services.fused_metadata import build_metadata_text
+from app.services.similar_sku_service import (
+    FusedEmbeddingInput,
+    SimilarSkuService,
+)
+from app.services.xai_scoring_service import (
+    XaiObjectResult,
+    XaiScoringService,
+)
 
 DETECTED_STATUS = "DETECTED"
-ATTRIBUTE_EXTRACTION_CONCURRENCY = 1
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class SkuNotFoundError(RuntimeError):
+    """검색으로 선택한 SKU 코드가 카탈로그에 없는 경우입니다."""
 
 
 # 단일 태깅 유스케이스를 제공하는 오케스트레이터입니다.
@@ -53,8 +72,11 @@ class TaggingService:  # pylint: disable=too-few-public-methods
         self.gemini_service = gemini_service
         self.similar_sku_service = similar_sku_service
         self.xai_scoring_service = xai_scoring_service
-        self._attribute_semaphore = asyncio.Semaphore(
-            ATTRIBUTE_EXTRACTION_CONCURRENCY
+        self.object_attribute_extraction_service = (
+            ObjectAttributeExtractionService(
+                settings=settings,
+                gemini_service=gemini_service,
+            )
         )
 
     async def get_sku_candidates(
@@ -94,6 +116,11 @@ class TaggingService:  # pylint: disable=too-few-public-methods
             else list(scene.object_metadata)
         )
 
+        object_by_idx = {
+            int(item.get("object_idx", index)): item
+            for index, item in enumerate(object_metadata)
+        }
+
         category_by_idx = {
             int(item.get("object_idx", index)): item.get("category", "")
             for index, item in enumerate(object_metadata)
@@ -111,19 +138,32 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 crop for crop in crops if crop.crop_index in requested_idxs
             ]
 
-        attributes_by_idx = await self._extract_attributes(
+        preprocessed_images = await self.object_attribute_extraction_service.preprocess_crops(crops)
+        attributes_by_idx = await self._resolve_attributes(
+            crops=crops,
+            category_by_idx=category_by_idx,
+            object_by_idx=object_by_idx,
+            preprocessed_images=preprocessed_images,
+        )
+        fused_inputs = self._build_fused_embedding_inputs(
             crops,
             category_by_idx,
+            attributes_by_idx,
+            preprocessed_images,
         )
 
         # 2) 임베딩 및 유사 SKU 탐색
         result.objects = await self.similar_sku_service.build_detected_objects(
-            crops
+            crops,
+            fused_inputs,
         )
 
         # 3) XAI 근거 산출
+        # 카테고리는 4단계에서 채우지만 XAI가 비교 항목을 정하는 데 먼저
+        # 필요하므로, 확정된 category_by_idx를 그대로 넘깁니다.
+        xai_crops = self._build_xai_crops(crops, preprocessed_images)
         xai_results = await self.xai_scoring_service.score_detected_objects(
-            crops, result.objects
+            xai_crops, result.objects, category_by_idx
         )
         self._apply_xai_results(result.objects, xai_results)
 
@@ -144,63 +184,241 @@ class TaggingService:  # pylint: disable=too-few-public-methods
 
             if attribute_result is not None:
                 detected.attrs = attribute_result.attributes
+                detected.vlm_mood = attribute_result.vlm_mood
 
         return result
 
-    async def _extract_attributes(
+    async def score_search_selected_sku(
+        self,
+        scene_image_id: int,
+        object_edit: EditedSceneObject,
+        sku_code: str,
+    ) -> VlmMood:
+        """전체 카탈로그 검색으로 선택한 SKU의 공간 분위기·스타일 태그를 계산합니다.
+
+        ``vlm_mood``는 연출 이미지 crop에서만 결정되는 값이라 SKU 후보와
+        무관합니다. 그래서 XAI를 거치지 않고 AI 추천 흐름과 같은 속성 추출
+        서비스(``ObjectAttributeExtractionService``)를 크롭 1건으로 실행해
+        같은 값을 얻습니다. 검색으로 확정한 결과는 순위 근거(xai_result)를
+        저장할 수 없으므로(``SkuMatching.validate_source_consistency``)
+        판정 결과는 애초에 만들지 않습니다.
+
+        속성 추출이 실패해도 SKU 선택 흐름을 막지 않도록, 크롭을 만들지
+        못했거나 추출이 실패하면 빈 VlmMood를 반환합니다.
+
+        Args:
+            scene_image_id: 크롭을 잘라낼 연출 이미지 ID입니다.
+            object_edit: 크롭 대상 객체의 바운딩 박스·카테고리입니다.
+            sku_code: 검색으로 선택한 SKU 코드입니다. 카탈로그에 있는
+                코드인지 확인하는 데만 씁니다.
+
+        Returns:
+            VLM이 크롭에서 읽어낸 공간 분위기 요약과 스타일 태그입니다.
+            추출에 실패하면 빈 VlmMood입니다.
+
+        Raises:
+            SceneImageNotFoundError: 장면 이미지가 없는 경우입니다.
+            InvalidImageError: 장면 원본 이미지를 열 수 없는 경우입니다.
+            SkuNotFoundError: sku_code가 카탈로그에 없는 경우입니다.
+        """
+        scene = await get_scene_image(self.session, scene_image_id)
+
+        sku_image = await sku_search_service.get_sku_image_for_scoring(
+            self.session, sku_code
+        )
+        if sku_image is None:
+            raise SkuNotFoundError(sku_code)
+
+        crops = await asyncio.to_thread(
+            crop_scene_objects,
+            self._resolve_image_path(scene),
+            [object_edit.model_dump()],
+        )
+        crop = next(
+            (
+                item
+                for item in crops
+                if item.crop_index == object_edit.object_idx
+            ),
+            None,
+        )
+        if crop is None:
+            return VlmMood()
+
+        try:
+            attributes_by_idx = (
+                await self.object_attribute_extraction_service.extract_for_crops(
+                    [crop],
+                    {crop.crop_index: object_edit.category},
+                )
+            )
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception(
+                "검색 SKU VLM 분위기 추출 실패, 빈 값으로 대체합니다: "
+                "sku_code=%s",
+                sku_code,
+            )
+            return VlmMood()
+
+        attribute_result = attributes_by_idx.get(crop.crop_index)
+        return (
+            attribute_result.vlm_mood
+            if attribute_result is not None
+            else VlmMood()
+        )
+
+    async def _resolve_attributes(
         self,
         crops: list[CroppedObject],
         category_by_idx: dict[int, str],
+        object_by_idx: dict[int, dict[str, object]],
+        preprocessed_images: dict[int, Image.Image],
     ) -> dict[int, FurnitureAttributeResult | None]:
-        """크롭별 카테고리 규격에 맞춰 속성을 추출합니다."""
-        extraction_targets = []
+        """기존 속성을 재사용하고 필요한 객체만 다시 추출합니다."""
         attributes_by_idx: dict[int, FurnitureAttributeResult | None] = {}
-        for crop in crops:
-            category = category_by_idx.get(crop.crop_index, "")
-            if not category:
-                attributes_by_idx[crop.crop_index] = None
-                continue
-            extraction_targets.append((crop, category))
+        extraction_targets: list[CroppedObject] = []
 
-        extraction_results = await asyncio.gather(
-            *(
-                self._extract_attributes_for_crop(crop, category)
-                for crop, category in extraction_targets
+        for crop in crops:
+            item = object_by_idx.get(crop.crop_index, {})
+            should_extract = bool(
+                item.get("needs_attribute_extraction", True)
+            )
+
+            if not should_extract:
+                reusable_result = self._to_attribute_result(item)
+
+                if reusable_result is not None:
+                    attributes_by_idx[crop.crop_index] = reusable_result
+                    continue
+
+            extraction_targets.append(crop)
+
+        extracted_attributes = (
+            await self.object_attribute_extraction_service.extract_for_crops(
+                extraction_targets,
+                category_by_idx,
+                preprocessed_images,
             )
         )
-        attributes_by_idx.update(
-            (crop.crop_index, result)
-            for (crop, _), result in zip(
-                extraction_targets, extraction_results
-            )
-        )
+        attributes_by_idx.update(extracted_attributes)
+
         return attributes_by_idx
 
-    async def _extract_attributes_for_crop(
-        self,
-        crop: CroppedObject,
-        category: str,
-    ) -> FurnitureAttributeResult:
-        """속성 추출 Vertex AI 요청 수를 제한합니다."""
-        async with self._attribute_semaphore:
-            return await asyncio.to_thread(
-                self.gemini_service.extract_furniture_attributes,
-                crop.image,
-                category,
+    @staticmethod
+    def _to_attribute_result(
+        item: dict[str, object],
+    ) -> FurnitureAttributeResult | None:
+        """요청에 포함된 검증 완료 속성을 재사용 가능한 DTO로 변환합니다."""
+        category = item.get("category")
+        attrs = item.get("attrs")
+        sub_category = item.get("sub_category")
+        vlm_mood = item.get("vlm_mood")
+
+        if not isinstance(category, str) or not category:
+            return None
+
+        if not isinstance(attrs, dict):
+            return None
+
+        if not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in attrs.items()
+        ):
+            return None
+
+        if sub_category is not None and not isinstance(sub_category, str):
+            return None
+
+        if vlm_mood is not None and not isinstance(vlm_mood, dict):
+            return None
+
+        return FurnitureAttributeResult(
+            category=category,
+            sub_category=sub_category,
+            attributes=attrs,
+            vlm_mood=VlmMood.model_validate(vlm_mood or {}),
+        )
+
+    @staticmethod
+    def _build_fused_embedding_inputs(
+        crops: list[CroppedObject],
+        category_by_idx: dict[int, str],
+        attributes_by_idx: dict[int, FurnitureAttributeResult | None],
+        preprocessed_images: dict[int, Image.Image],
+    ) -> dict[int, FusedEmbeddingInput]:
+        """보정 크롭과 추출 속성을 SKU와 동일한 입력 규칙으로 조립합니다."""
+        fused_inputs = {}
+        for crop in crops:
+            image = preprocessed_images.get(crop.crop_index)
+            if image is None:
+                continue
+            attributes = attributes_by_idx.get(crop.crop_index)
+            fused_inputs[crop.crop_index] = FusedEmbeddingInput(
+                image=image,
+                metadata_text=build_metadata_text(
+                    category=category_by_idx.get(crop.crop_index),
+                    sub_category=(
+                        attributes.sub_category
+                        if attributes is not None
+                        else None
+                    ),
+                    attributes=(
+                        attributes.attributes
+                        if attributes is not None
+                        else None
+                    ),
+                ),
+                category=category_by_idx.get(crop.crop_index, ""),
             )
+        return fused_inputs
+
+    @staticmethod
+    def _build_xai_crops(
+        crops: list[CroppedObject],
+        preprocessed_images: dict[int, Image.Image],
+    ) -> list[CroppedObject]:
+        """보정 Crop을 XAI 요청용 이미지·JPEG 바이트로 재구성합니다.
+
+        전처리 결과는 파일로 저장하지 않고, Gemini 요청 직전에만 JPEG 바이트로
+        직렬화합니다. 보정 결과가 없는 객체는 XAI 채점 대상에서 제외합니다.
+        """
+        xai_crops = []
+        for crop in crops:
+            image = preprocessed_images.get(crop.crop_index)
+            if image is None:
+                continue
+            xai_crops.append(
+                dataclasses.replace(
+                    crop,
+                    image=image,
+                    image_bytes=parse_image_to_bytes(image),
+                )
+            )
+        return xai_crops
 
     @staticmethod
     def _apply_xai_results(
         detected_objects: list[DetectedObject],
         xai_results: dict[int, XaiObjectResult],
     ) -> None:
-        """XAI 결과 중 XAI 속성과 후보 평가만 탐지 객체에 반영합니다."""
+        """XAI 결과를 탐지 객체와 각 SKU 후보에 반영합니다.
+
+        crop 판독값은 후보와 무관한 crop의 속성이라 ``xai_readings``에
+        객체 단위로 한 번만 담고, 후보별 판정과 근거만 각 후보의
+        ``xai_result``에 담습니다.
+
+        후보 순위는 임베딩 유사도로 결정하므로 여기서 재정렬하지 않고,
+        ``similarity_score``도 임베딩 유사도 그대로 둡니다. 화면의 XAI
+        메타데이터 일치도도 같은 값을 사용하므로 후보별 ``match_rate``에
+        복사합니다.
+        """
         for detected in detected_objects:
             xai_result = xai_results.get(detected.object_idx)
             if xai_result is None:
                 continue
 
             detected.xai_attrs = xai_result.xai_attrs
+            detected.xai_readings = xai_result.readings
             evaluations = {
                 evaluation.sku_id: evaluation
                 for evaluation in xai_result.evaluations
@@ -210,13 +428,9 @@ class TaggingService:  # pylint: disable=too-few-public-methods
                 evaluation = evaluations.get(candidate.sku_code)
                 if evaluation is None:
                     continue
-                candidate.similarity_score = evaluation.total_score
-                candidate.xai_result = evaluation.xai_result
-
-            detected.sku_candidates.sort(
-                key=lambda candidate: candidate.similarity_score,
-                reverse=True,
-            )
+                candidate.xai_result = evaluation.xai_result.model_copy(
+                    update={"match_rate": candidate.similarity_score}
+                )
 
     def _resolve_image_path(self, scene: SceneImage) -> pathlib.Path:
         """``scene_image.image_url``을 실제 저장소 경로로 변환합니다.

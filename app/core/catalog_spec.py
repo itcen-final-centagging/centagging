@@ -599,6 +599,124 @@ CATEGORY_CODE: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
+# ATTRIBUTE VISUAL VERIFIABILITY
+# ---------------------------------------------------------------------------
+# VLM이 crop 이미지만으로 시각적으로 비교할 수 있는 속성인지 여부.
+#
+# XAI는 crop 이미지와 SKU 이미지를 눈으로 비교하는 기능이므로, 이미지에
+# 드러나지 않는 속성(내부 구조, 촉감, 정확한 치수, 가격 등)을 비교 항목으로
+# 주면 매번 판단 불가만 나와 일치도 분모만 깎는다. 그런 속성은 애초에
+# 프롬프트에 넣지 않는다.
+#
+# COMMON_ATTRIBUTE / PRODUCT_ATTRIBUTE와 같은 구조(공통 vs 카테고리별)를
+# 그대로 따른다. 새 속성을 추가하면 반드시 이곳에도 등록해야 하며,
+# 누락은 tests/test_catalog_spec.py에서 잡는다.
+
+COMMON_ATTRIBUTE_VISUALLY_VERIFIABLE: dict[str, bool] = {
+    "color": True,
+    "style": True,
+    "pattern": True,
+    "brand": False,  # 로고가 보이지 않으면 판별 불가
+    "selling_price": False,  # 이미지와 무관한 정보
+}
+
+PRODUCT_ATTRIBUTE_VISUALLY_VERIFIABLE: dict[str, dict[str, bool]] = {
+    "침대": {
+        "bed_type": True,
+        "size": False,  # 정확한 치수 구간은 이미지로 특정 불가
+        "has_headboard": True,
+        "frame_type": True,
+        "material": True,
+        "wood_tone": True,
+        "head_type": True,
+        "base_type": False,  # 프레임 하부라 통상 이미지에 비노출
+        "product_type": True,
+    },
+    "매트리스": {
+        "mattress_type": False,  # 스프링·폼 등 내부 구조
+        "size": False,
+        "firmness": False,  # 촉감 속성
+        "thickness": True,
+        "features": False,  # 방수·항균·통풍은 시각 단서 없음
+    },
+    "테이블·식탁·책상": {
+        "shape": True,
+        "top_material": True,
+        "frame_material": True,
+        "leg_type": True,
+        "has_storage": True,
+        "wood_tone": True,
+        "seating_capacity": False,  # 크기 추정이 부정확
+    },
+    "소파": {
+        "sofa_type": True,
+        "material": True,
+        "has_legs": True,
+        "has_armrest": True,
+        "has_headrest": True,
+        "has_stool": True,
+    },
+    "서랍·수납장": {
+        "storage_type": True,
+        "drawer_count": True,
+        "material": True,
+        "wood_tone": True,
+        "door_type": True,
+        "has_legs": True,
+        "has_wheels": True,
+        "has_drawer": True,
+    },
+    "거실장·TV장": {
+        "tv_stand_type": True,
+        "length": False,  # 정확한 cm 구간 특정 불가
+        "material": True,
+        "frame_material": True,
+        "level_count": True,
+        "has_legs": True,
+    },
+    "선반": {
+        "shelf_type": True,
+        "material": True,
+        "frame_material": True,
+        "shelf_count": True,
+    },
+    "진열장·책장": {
+        "storage_type": True,
+        "material": True,
+        "frame_material": True,
+        "door_type": True,
+    },
+    "의자": {
+        "chair_type": True,
+        "material": True,
+        "has_wheels": True,
+        "has_backrest": True,
+        "has_armrest": True,
+    },
+    "행거·옷장": {
+        "wardrobe_type": True,
+        "layout_type": True,
+        "mobility_type": False,  # 바퀴 유무로 추정하는 정도라 애매
+        "door_type": True,
+        "storage_features": True,
+        "material": True,
+    },
+    "거울": {
+        "installation_type": True,
+        "shape": True,
+        "has_frame": True,
+        "frame_material": True,
+    },
+    "화장대·콘솔": {
+        "vanity_type": True,
+        "has_mirror": True,
+        "storage_type": True,
+        "material": True,
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # 메타데이터 조회 함수
 # ---------------------------------------------------------------------------
 
@@ -615,6 +733,35 @@ def attribute_names(category: str) -> list[str]:
     return list(COMMON_ATTRIBUTE.keys()) + list(
         PRODUCT_ATTRIBUTE[category].keys()
     )
+
+
+# 해당 대분류에서 VLM이 이미지로 비교할 수 있는 속성명만 반환한다.
+def visual_attribute_names(category: str) -> list[str]:
+    """해당 대분류의 XAI 비교 대상 속성명을 반환한다.
+
+    attribute_names() 중 시각적으로 판별 가능하다고 등록된 속성만 남긴다.
+    XAI 메타데이터 비교 프롬프트는 반드시 이 함수의 결과만 사용하고,
+    attribute_names()를 직접 프롬프트에 넣지 않는다.
+
+    분류표에 등록되지 않은 속성은 판별 가능 여부를 아무도 결정하지 않은
+    상태이므로 안전한 쪽인 제외로 처리한다.
+    """
+    if category not in PRODUCT_ATTRIBUTE:
+        raise KeyError(f"정의되지 않은 대분류입니다: {category}")
+
+    category_visibility = PRODUCT_ATTRIBUTE_VISUALLY_VERIFIABLE.get(
+        category, {}
+    )
+
+    return [
+        key
+        for key in COMMON_ATTRIBUTE
+        if COMMON_ATTRIBUTE_VISUALLY_VERIFIABLE.get(key, False)
+    ] + [
+        key
+        for key in PRODUCT_ATTRIBUTE[category]
+        if category_visibility.get(key, False)
+    ]
 
 
 # 해당 카테고리의 특정 속성(attribute)에서 사용할 수 있는 허용값을 반환한다.

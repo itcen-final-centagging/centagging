@@ -1,11 +1,9 @@
-export type AnalysisScenario = 'detected' | 'not-detected';
+import type { ApprovalStatus } from '@/features/approvals/api/approvals';
 
 export type WorkflowStage =
   | 'upload'
   | 'analyzing'
   | 'detect'
-  | 'not-found'
-  | 'redetecting'
   | 'recommending'
   | 'recommend'
   | 'catalog'
@@ -35,10 +33,12 @@ export interface FurnitureObject {
    * 서버가 객체 목록을 다시 색인하므로, 이 값은 화면 상태에만 사용합니다.
    */
   isNew?: boolean;
+  attrsDirty?: boolean;
   metadata: ExtractedMetadata;
   name: string;
   objectIdx: number;
   xaiAttrs?: Record<string, string>;
+  xaiReadings?: XaiCropReading[];
 }
 
 export interface ExtractedMetadata {
@@ -47,6 +47,7 @@ export interface ExtractedMetadata {
   description: string | null;
   keyFeatures: string[];
   subCategory: string | null;
+  vlmMood?: VlmMood;
 }
 
 export interface RubricEvaluation {
@@ -63,14 +64,29 @@ export interface RubricEvaluation {
 
 export interface XaiCriterion {
   comment: string;
-  label: string;
-  score: number;
+  /** v3 메타데이터 비교의 속성 키입니다. */
+  key?: string;
+  /** 현재 SKU 후보 이미지에서 XAI가 직접 판독한 값입니다. */
+  value?: string;
+  /** 구 루브릭 응답과의 호환을 위해 남겨 둔 표시명입니다. */
+  label?: string;
+  score?: number | null;
+  verdict?: 'MATCH' | 'MISMATCH' | 'UNKNOWN' | null;
 }
 
 export interface XaiResult {
+  common?: string;
   criteria: XaiCriterion[];
+  difference?: string;
+  matchRate?: number | null;
   summary: string;
   xaiAttrs?: Record<string, string>;
+}
+
+export interface XaiCropReading {
+  key: string;
+  note: string;
+  value: string;
 }
 
 export interface VlmMood {
@@ -85,6 +101,14 @@ export interface SkuCandidate {
   subCategory?: string | null;
   brand?: string | null;
   price?: number | null;
+  /**
+   * 승인(ACTIVE)된 태깅 결과의 공간 분위기 요약을 다시 모아 채운
+   * 값입니다. 별도 컬럼이 아니라 조회할 때마다 새로 계산되며, 아직
+   * 승인된 태깅 결과가 없으면 빈 배열입니다.
+   */
+  spaceMoods?: string[];
+  /** 같은 방식으로 모은 스타일 태그입니다. */
+  styleTags?: string[];
   attrs: Record<string, unknown>;
   category: string | null;
   color: string | null;
@@ -112,18 +136,69 @@ export interface ConfirmedSkuSelection {
 export interface TaggingValues {
   category: string;
   color: string;
-  material: string;
+  /**
+   * 카테고리별 소재 속성입니다. 키는 카탈로그 스펙의 속성명
+   * (material / top_material / frame_material 등), 값은 선택한 허용값입니다.
+   */
+  materials: Record<string, string>;
   mood: string;
   styleTags: string[];
   subCategory: string;
 }
 
 export interface TaggingHistory {
+  /** approval 테이블의 최신 검수 상태입니다. 승인 요청이 없으면 null입니다. */
+  approvalStatus: ApprovalStatus | null;
   id: string;
   imageName: string;
+  objectIdx: number;
   objectName: string;
   productName: string;
   savedAt: string;
+  sceneImage: {
+    bbox: HistoryBoundingBox | null;
+    id: string;
+    imageUrl: string | null;
+  };
   sku: string;
+  skuImageUrl: string | null;
   tags: TaggingValues;
+}
+
+export interface HistoryBoundingBox {
+  xmax: number;
+  xmin: number;
+  ymax: number;
+  ymin: number;
+}
+
+/** 태깅 이력 한 건의 검수 상세 화면 데이터입니다. */
+export interface TaggingHistoryDetail {
+  approvalStatus: ApprovalStatus | null;
+  createdAt: string;
+  createdBy: string;
+  detectedObject: {
+    attrs: Record<string, unknown>;
+    bbox: HistoryBoundingBox | null;
+    category: string | null;
+    subCategory: string | null;
+    vlmMood: VlmMood | null;
+  };
+  id: string;
+  matchedSku: {
+    attrs: Record<string, unknown>;
+    brand: string | null;
+    category: string | null;
+    imageUrl: string | null;
+    price: number | null;
+    productName: string;
+    sku: string;
+    subCategory: string | null;
+  };
+  sceneImage: {
+    imageName: string;
+    imageUrl: string | null;
+  };
+  similarityScore: number | null;
+  xaiResult: XaiResult | null;
 }
