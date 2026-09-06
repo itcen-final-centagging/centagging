@@ -11,9 +11,12 @@ import {
 import { Button } from '@/commons/components/Button';
 import { FurnitureArtwork } from '@/features/tagging/components/FurnitureArtwork';
 import { ObjectCropPreview } from '@/features/tagging/components/ImagePreview';
-import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
 import { ATTRIBUTE_LABELS } from '@/features/tagging/constants/skuAttributes';
-import { buildSkuAttributeRows } from '@/features/tagging/utils/skuAttributes';
+import { useTaggingWorkflow } from '@/features/tagging/hooks/useTaggingWorkflow';
+import {
+  buildSkuAttributeRows,
+  formatAttributeValue,
+} from '@/features/tagging/utils/skuAttributes';
 import { cn } from '@/lib/utils';
 
 const VERDICT_LABELS = {
@@ -363,7 +366,7 @@ export const RecommendationPanel = () => {
                     <tr>
                       <th className="px-3 py-2 font-bold">메타데이터</th>
                       <th className="px-3 py-2 font-bold">Crop 이미지 판독</th>
-                      <th className="px-3 py-2 font-bold">SKU 카탈로그 값</th>
+                      <th className="px-3 py-2 font-bold">SKU 이미지 판독</th>
                       <th className="px-3 py-2 font-bold">판정</th>
                       <th className="px-3 py-2 font-bold">판단 근거</th>
                     </tr>
@@ -379,15 +382,19 @@ export const RecommendationPanel = () => {
                             {ATTRIBUTE_LABELS[key] ?? key}
                           </td>
                           <td className="px-3 py-3 text-text-secondary">
-                            {reading?.value || reading?.note || '판단 불가'}
+                            {reading?.value
+                              ? formatAttributeValue(reading.value)
+                              : reading?.note || '판단 불가'}
                           </td>
                           <td className="px-3 py-3 text-text-secondary">
-                            {String(focusedCandidate.attrs[key] ?? '정보 없음')}
+                            {criterion.value
+                              ? formatAttributeValue(criterion.value)
+                              : '판단 불가'}
                           </td>
                           <td className="px-3 py-3">
                             <span
                               className={cn(
-                                'rounded-full px-2 py-1 text-[11px] font-bold',
+                                'inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-bold',
                                 VERDICT_STYLES[verdict],
                               )}
                             >

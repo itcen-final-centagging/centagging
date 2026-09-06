@@ -51,10 +51,12 @@ class _RateLimitedScoringService(xai_scoring_service.XaiScoringService):
 def _verdict(
     key: str,
     verdict: str,
+    value: str = "판독값",
 ) -> xai_scoring_service.GeminiCandidateVerdict:
     """테스트용 판정 1건을 만듭니다."""
     return xai_scoring_service.GeminiCandidateVerdict(
         key=key,
+        value=value,
         verdict=typing.cast(typing.Any, verdict),
         comment=f"{key} 근거",
     )
@@ -193,7 +195,6 @@ def _scoring_crop(
             xai_scoring_service.ScoringCandidate(
                 sku_code="CHR-2041",
                 image_bytes=b"sku",
-                attrs={"color": "블랙"},
             )
         ],
     )
@@ -233,6 +234,9 @@ class XaiScoringServiceTest(unittest.TestCase):
         self.assertNotIn("total_score", prompt)
         self.assertNotIn("vlm_mood", prompt)
         self.assertNotIn("object_attrs", prompt)
+        self.assertNotIn('"color": "블랙"', prompt)
+        self.assertNotIn("color: [", prompt)
+        self.assertNotIn("SKU 후보와 카탈로그 값", prompt)
         self.assertIn("MISMATCH", prompt)
         self.assertIn("UNKNOWN", prompt)
 
@@ -448,9 +452,10 @@ class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(detected.xai_attrs.get("color"), "블랙")
         self.assertNotIn("material", detected.xai_attrs)
 
-        # 후보 판정에는 crop 값을 중복해 담지 않습니다.
+        # 후보 판정에는 SKU 이미지에서 XAI가 직접 판독한 값을 담습니다.
         # 화면 표시명은 프론트엔드가 key로 해석하므로 응답에 담지 않습니다.
         self.assertEqual(criteria["color"].verdict, "MATCH")
+        self.assertEqual(criteria["color"].value, "판독값")
         self.assertEqual(criteria["pattern"].verdict, "MISMATCH")
         self.assertIsNone(criteria["color"].score)
         self.assertEqual(criteria["color"].label, "")
@@ -475,6 +480,37 @@ class XaiFallbackContractTest(unittest.IsolatedAsyncioTestCase):
 
         # 순위 근거인 임베딩 유사도는 XAI가 덮어쓰지 않습니다.
         self.assertEqual(candidate.similarity_score, 91)
+
+    def test_presence_values_are_normalized_to_korean(self) -> None:
+        """Crop과 SKU 이미지의 유무 판독값을 있음/없음으로 통일합니다."""
+        readings = (
+            # pylint: disable-next=protected-access
+            xai_scoring_service.XaiScoringService._build_readings(
+                _CATEGORY,
+                [
+                    xai_scoring_service.GeminiCropReading(
+                        key="has_wheels", value="false"
+                    )
+                ],
+            )
+        )
+        has_wheels = next(
+            reading for reading in readings if reading.key == "has_wheels"
+        )
+        self.assertEqual(has_wheels.value, "없음")
+
+        result = (
+            # pylint: disable-next=protected-access
+            xai_scoring_service.XaiScoringService._build_metadata_xai_result(
+                xai_scoring_service.MetadataXaiResult(
+                    verdicts=[
+                        _verdict("has_wheels", "MISMATCH", value="true")
+                    ]
+                ),
+                [has_wheels],
+            )
+        )
+        self.assertEqual(result.criteria[0].value, "있음")
 
     async def test_keeps_embedding_order(self) -> None:
         """XAI 결과가 후보 순서를 바꾸지 않습니다."""
