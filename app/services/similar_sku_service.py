@@ -2,9 +2,11 @@
 
 import asyncio
 import collections.abc
+import dataclasses
 import logging
 import typing
 
+from PIL import Image
 import pgvector.sqlalchemy as pgvector_sa  # type: ignore[import-untyped]
 import pydantic
 import sqlalchemy
@@ -26,7 +28,7 @@ from app.services.sku_image_storage import SkuImageStorage
 EMBEDDING_DIMENSIONS = 3072
 CANDIDATE_LIMIT = 30
 DEFAULT_RESULT_LIMIT = 5
-EMBED_CONCURRENCY = 2
+EMBED_CONCURRENCY = 3
 NO_XAI_SUMMARY = "XAI 판정 결과가 없습니다."
 _HALFVEC = pgvector_sa.HALFVEC(EMBEDDING_DIMENSIONS)
 
@@ -37,6 +39,15 @@ class SceneImageNotFoundError(RuntimeError):
 
 class SimilarSkuQueryError(RuntimeError):
     """유사 SKU 검색 중 발생한 오류입니다."""
+
+
+@dataclasses.dataclass(frozen=True)
+class FusedEmbeddingInput:
+    """연출 객체를 SKU 색인과 같은 규칙으로 벡터화할 입력입니다."""
+
+    image: Image.Image
+    metadata_text: str
+    category: str
 
 
 class SimilarSku(pydantic.BaseModel):
@@ -82,6 +93,7 @@ class SimilarSkuService:
     async def build_detected_objects(
         self,
         crops: list[CroppedObject],
+        fused_inputs: collections.abc.Mapping[int, FusedEmbeddingInput],
     ) -> list[DetectedObject]:
         """크롭 목록으로 SKU 후보까지 채운 탐지 객체를 만듭니다.
 
@@ -91,6 +103,7 @@ class SimilarSkuService:
 
         Args:
             crops: 장면 이미지에서 잘라낸 탐지 객체 목록입니다.
+            fused_inputs: 객체별 보정 이미지와 추출 속성 메타데이터입니다.
 
         Returns:
             sku_candidates까지 채워진 탐지 객체 목록입니다. label과
@@ -100,13 +113,21 @@ class SimilarSkuService:
             return []
 
         embeddings = await asyncio.gather(
-            *(self._embed_crop(crop) for crop in crops),
+            *(
+                self._embed_crop(crop, fused_inputs.get(crop.crop_index))
+                for crop in crops
+            ),
             return_exceptions=True,
         )
 
         detected_objects = []
         for crop, embedding in zip(crops, embeddings):
-            similar_skus = await self._find_skus_for_crop(crop, embedding)
+            fused_input = fused_inputs.get(crop.crop_index)
+            similar_skus = await self._find_skus_for_crop(
+                crop,
+                embedding,
+                category=fused_input.category if fused_input else "",
+            )
             detected_objects.append(
                 DetectedObject(
                     object_idx=crop.crop_index,
@@ -123,6 +144,7 @@ class SimilarSkuService:
         self,
         crop: CroppedObject,
         embedding: list[float] | BaseException,
+        category: str,
     ) -> list["SimilarSku"]:
         """임베딩 1건으로 유사 SKU를 조회합니다.
 
@@ -143,7 +165,7 @@ class SimilarSkuService:
             return []
 
         try:
-            return await self.find_similar_skus(embedding)
+            return await self.find_similar_skus(embedding, category=category)
         except SimilarSkuQueryError:
             _LOGGER.exception(
                 "유사 SKU 조회 실패로 후보를 비웁니다: crop_index=%s",
@@ -151,18 +173,29 @@ class SimilarSkuService:
             )
             return []
 
-    async def _embed_crop(self, crop: CroppedObject) -> list[float]:
+    async def _embed_crop(
+        self,
+        crop: CroppedObject,
+        fused_input: FusedEmbeddingInput | None,
+    ) -> list[float]:
         """크롭 1건을 임베딩합니다. 동시 호출 수를 세마포어로 제한합니다.
 
         Args:
             crop: 임베딩할 크롭입니다.
+            fused_input: 보정 이미지와 메타데이터 입력입니다.
 
         Returns:
             크롭 이미지의 임베딩 벡터입니다.
         """
+        if fused_input is None:
+            raise SimilarSkuQueryError(
+                f"융합 임베딩 입력이 없습니다: crop_index={crop.crop_index}"
+            )
         async with self._embed_semaphore:
             return await asyncio.to_thread(
-                self.gemini_service.embed_image, crop.image_bytes
+                self.gemini_service.embed_fused,
+                fused_input.image,
+                fused_input.metadata_text,
             )
 
     def _to_sku_candidate(self, sku: "SimilarSku") -> SkuCandidate:
@@ -198,9 +231,10 @@ class SimilarSkuService:
     async def find_similar_skus(
         self,
         embedding: collections.abc.Sequence[float],
+        category: str,
         limit: int = DEFAULT_RESULT_LIMIT,
     ) -> list[SimilarSku]:
-        """임베딩 벡터와 코사인 거리가 가까운 SKU를 조회합니다.
+        """호환되는 파이프라인 벡터 중 코사인 거리가 가까운 SKU를 조회합니다.
 
         Args:
             embedding: 크롭 이미지의 임베딩 벡터입니다.
@@ -218,6 +252,9 @@ class SimilarSkuService:
                 f"합니다. 현재 {len(embedding)} 차원입니다."
             )
 
+        if not category:
+            return []
+
         query_vector = sqlalchemy.cast(list(embedding), _HALFVEC)
         distance = (
             sqlalchemy.cast(SkuImage.embedding, _HALFVEC)
@@ -227,7 +264,15 @@ class SimilarSkuService:
 
         candidate = (
             sqlalchemy.select(SkuImage.sku_id, distance)
-            .where(SkuImage.embedding.is_not(None))
+            .join(SkuCatalog, SkuCatalog.sku_id == SkuImage.sku_id)
+            .where(
+                SkuImage.embedding.is_not(None),
+                SkuImage.embedding_pipeline_version
+                == self.settings.embedding_pipeline_version,
+                SkuImage.embedding_image_sha256.is_not(None),
+                SkuCatalog.category == category,
+                distance <= self.settings.similar_sku_max_cosine_distance,
+            )
             .order_by(distance)
             .limit(CANDIDATE_LIMIT)
             .cte("candidate")

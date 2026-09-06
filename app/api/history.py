@@ -39,6 +39,9 @@ async def list_tagging_history(
     session: sqlalchemy_async.AsyncSession = fastapi.Depends(
         database.get_database_session
     ),
+    image_storage: sku_image_storage.SkuImageStorage = fastapi.Depends(
+        dependencies.get_sku_image_storage
+    ),
 ) -> common_schema.SuccessResponse[history_schema.TaggingHistoryListData]:
     """저장된 태깅 결과를 최신순으로 조회합니다.
 
@@ -48,7 +51,10 @@ async def list_tagging_history(
     Returns:
         검수 이력 화면에 표시할 태깅 결과 목록입니다.
     """
-    items = await tagging_history_repository.list_tagging_history(session)
+    items = await tagging_history_repository.list_tagging_history(
+        session,
+        image_storage,
+    )
     return common_schema.success_response(
         history_schema.TaggingHistoryListData(items=items)
     )

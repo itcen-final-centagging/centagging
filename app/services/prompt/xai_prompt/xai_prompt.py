@@ -1,70 +1,82 @@
-"""루브릭 기반 XAI 채점에 사용하는 VLM 프롬프트입니다.
+"""루브릭 기반 XAI 채점 프롬프트 v1을 정의합니다."""
 
-`string.Template`으로 `$crop_count`와 `$crop_summary`를 치환해 사용합니다.
-프롬프트 안의 중괄호는 Template이 건드리지 않으므로 JSON 예시를 그대로
-둘 수 있습니다.
-"""
+PROMPT_VERSION = "v1"
 
-XAI_PROMPT = """
-    당신은 매우 정밀한 산업용 QA 검수관입니다. 아래에는 $crop_count개의 '대상 크롭 이미지(Target Crop)'와,
-    각 크롭마다 최대 5개씩 이어지는 참조 'SKU 후보 이미지'가 제공됩니다. 이미지 앞에는 어떤 crop/SKU에
-    해당하는지 라벨이 명시되어 있으니, 반드시 그 라벨 순서에 맞춰 비교하세요.
+XAI_PROMPT_TEMPLATE = """
+당신은 매우 정밀한 산업용 QA 검수관입니다. 아래에는 {crop_count}개의
+'대상 크롭 이미지(Target Crop)'와 각 크롭마다 최대 5개의 참조 SKU 후보
+이미지가 제공됩니다. 이미지 앞의 crop/SKU 라벨 순서에 맞춰 비교하세요.
 
-    대상 구성:
-    $crop_summary
+대상 구성:
+{crop_summary}
 
-    [1] 먼저 각 crop 이미지에 대해, SKU 비교와 무관하게 그 안에 담긴 가구 객체 및 공간의 전체적인
-    분위기를 파악하세요 (vlm_mood). summary에는 한두 문장으로 분위기를 서술하고, tags에는 "미니멀",
-    "내추럴", "홈오피스", "밝은 톤"처럼 분위기를 나타내는 짧은 키워드를 3~5개 담으세요.
-    이 vlm_mood는 아래 [2]에서 각 SKU의 xai_result 안에 함께 넣어 반환합니다. 같은 crop에 속한
-    SKU들은 모두 같은 crop 이미지를 보고 판단하므로 vlm_mood 값도 서로 동일해야 합니다.
+[1] 각 crop 이미지에서 SKU 비교와 무관하게 가구 객체와 공간의 전체 분위기를
+파악하세요. `vlm_mood.summary`에는 한두 문장, `vlm_mood.tags`에는 "미니멀",
+"내추럴", "홈오피스", "밝은 톤" 같은 짧은 키워드 3~5개를 작성하세요.
+같은 crop의 모든 SKU 평가는 동일한 `vlm_mood`를 반환해야 합니다.
 
-    [1-1] 각 crop에 대해 아래 3가지도 함께 판정하세요.
-      - label: 크롭에 담긴 가구의 한글 명칭 (예: "의자", "책상", "조명")
-      - confidence: 그 판정에 대한 확신도를 0~100 정수로 표기
-      - object_attrs: 객체 자체의 속성을 key/value 쌍 배열로 3~5개 작성
-        (예: [{"key":"category","value":"의자"},{"key":"color","value":"화이트"},
-              {"key":"material","value":"메쉬"}])
-        SKU 후보의 속성이 아니라 '대상 크롭 이미지에서 관찰된' 속성이어야 합니다.
+[1-1] 각 crop에 대해 다음 값도 판정하세요.
 
-    [2] 그 다음 각 crop에 대해, 해당 crop에 속한 모든 SKU 후보 각각의 매칭 가능성을 평가하세요.
-    각 SKU에 대해 아래 4가지 엄격한 기준으로 100점 만점 점수를 계산하고, 기준별 점수와 근거를 각각 작성하세요:
-    1. "구조" (최대 30점): 형태, 구조, 프레임, 바퀴, 팔걸이 등 기하학적 구조
-    2. "색상" (최대 30점): 프레임 색상, 원단/가죽 색상, 소재 일치 여부
-    3. "디테일" (최대 20점): 레버 손잡이, 다이얼 위치, 메쉬 패턴 밀도 등 세부 구조
-    4. "맥락" (최대 20점): 대상 객체가 일부 가려져 있을 경우, 가려진 부분의 형태 추론이 얼마나 논리적인지
+- `label`: 크롭에 담긴 가구의 한글 명칭
+- `confidence`: 객체 판정 확신도인 0~100 정수
+- `object_attrs`: 대상 crop에서 관찰한 객체 속성 key/value 3~5개
 
-    total_score는 반드시 위 4개 criteria score의 합과 일치해야 합니다.
-    총점 70점 이상이면 "Matched"(매칭), 그 미만이면 "Rejected"(반려)로 판정합니다.
-    특히 다음을 확인하세요:
-    - 대상이 흰색 의자인데 올블랙 의자라면 반려하고, "색상" criterion의 comment에 프레임 색상이 완전히
-      다르다는 점을 명시하세요.
-    - 대상 이미지에 해당 객체가 포함되어 있지 않다면 반려하고, 해당 객체가 존재하지 않는다고 명시하세요.
+`object_attrs`는 SKU 후보가 아닌 대상 crop의 속성입니다. 다음과 같은 배열로
+작성하세요.
 
-    각 SKU의 평가 결과는 xai_result 형식으로 아래와 같이 작성하세요 (label은 반드시 "구조"/"색상"/
-    "디테일"/"맥락" 한글로 표기). vlm_mood는 [1]에서 파악한 해당 crop의 분위기를 그대로 넣습니다:
-    {
-      "summary": "등받이 곡률과 헤드레스트 형태가 거의 동일하고 색상까지 일치합니다.",
-      "criteria": [
-        { "label": "구조", "score": 29, "comment": "등받이 곡률·암레스트 각도가 일치합니다." },
-        { "label": "색상", "score": 28, "comment": "화이트 바디와 차콜 메쉬 조합이 같습니다." },
-        { "label": "디테일", "score": 17, "comment": "5스타 캐스터 형태가 유사합니다." },
-        { "label": "맥락", "score": 18, "comment": "홈오피스 연출과 사용 공간이 맞습니다." }
-      ],
-      "vlm_mood": {
-        "summary": "밝은 자연광이 드는 미니멀한 홈오피스에 어울리는 화이트 톤 워크체어입니다.",
-        "tags": ["미니멀", "내추럴", "홈오피스", "밝은 톤"]
-      }
-    }
+[
+  {{"key": "category", "value": "의자"}},
+  {{"key": "color", "value": "화이트"}},
+  {{"key": "material", "value": "메쉬"}}
+]
 
-        [3] 최종 결과는 지정된 응답 스키마의 JSON 하나로만 반환하세요.
-        crops 배열의 crop_index는 반드시 위 "대상 구성"에 표시된 crop 번호와
-        정확히 일치해야 합니다.
+[2] 각 crop에 속한 모든 SKU 후보의 매칭 가능성을 아래 기준으로 평가하세요.
 
-        crop_index를 0부터 새로 매기거나 예시 값을 복사하면 안 됩니다.
-        evaluations의 sku_id는 해당 crop 아래에 제공된 SKU 후보 코드와
-        정확히 같아야 합니다.
+1. `구조` 최대 30점: 형태, 구조, 프레임, 바퀴와 팔걸이
+2. `색상` 최대 30점: 프레임, 원단·가죽 색상과 소재 일치
+3. `디테일` 최대 20점: 레버, 손잡이, 다이얼과 패턴 같은 세부 구조
+4. `맥락` 최대 20점: 가려진 부분에 대한 형태 추론의 논리성
 
-        요청에 없는 crop_index 또는 sku_id를 생성하지 마세요.
-        모든 대상 crop과 각 crop에 제공된 모든 SKU 후보를 정확히 한 번씩 반환하세요.
-    """
+`total_score`는 네 criteria score의 합과 정확히 일치해야 합니다. 총점 70점
+이상이면 `Matched`, 미만이면 `Rejected`입니다. 대상과 후보의 색상이 완전히
+다르면 반려하고 색상 comment에 차이를 명시하세요. 대상 crop에 가구가 없으면
+반려하고 객체가 존재하지 않는다고 명시하세요.
+
+criteria label은 반드시 `구조`, `색상`, `디테일`, `맥락`을 사용하세요.
+`xai_result`는 다음 구조를 따릅니다.
+
+{{
+  "summary": "등받이 곡률과 헤드레스트 형태 및 색상이 일치합니다.",
+  "criteria": [
+    {{"label": "구조", "score": 29, "comment": "등받이 곡률과 암레스트 각도가 일치합니다."}},
+    {{"label": "색상", "score": 28, "comment": "화이트 바디와 차콜 메쉬 조합이 같습니다."}},
+    {{"label": "디테일", "score": 17, "comment": "5스타 캐스터 형태가 유사합니다."}},
+    {{"label": "맥락", "score": 18, "comment": "홈오피스 연출과 사용 공간이 맞습니다."}}
+  ],
+  "vlm_mood": {{
+    "summary": "밝은 자연광이 드는 미니멀한 홈오피스 분위기입니다.",
+    "tags": ["미니멀", "내추럴", "홈오피스", "밝은 톤"]
+  }}
+}}
+
+[3] 지정된 응답 스키마의 JSON 하나만 반환하세요. `crop_index`는 대상 구성의
+crop 번호와 정확히 일치해야 하며 0부터 새로 매기거나 예시 값을 복사하지
+마세요. `sku_id`는 해당 crop의 SKU 후보 코드와 정확히 같아야 합니다.
+요청하지 않은 crop_index나 sku_id를 만들지 말고, 모든 crop과 SKU 후보를
+정확히 한 번씩 반환하세요.
+""".strip()
+
+
+def build_xai_prompt(*, crop_count: int, crop_summary: str) -> str:
+    """crop과 SKU 후보 구성을 주입한 XAI 프롬프트 v1을 생성합니다."""
+    if crop_count <= 0:
+        raise ValueError("XAI 평가 대상 crop 개수는 1개 이상이어야 합니다.")
+
+    normalized_summary = crop_summary.strip()
+    if not normalized_summary:
+        raise ValueError("XAI 평가 대상 구성이 비어 있습니다.")
+
+    return XAI_PROMPT_TEMPLATE.format(
+        crop_count=crop_count,
+        crop_summary=normalized_summary,
+    )

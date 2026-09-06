@@ -64,6 +64,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
         rows = [
             {
                 "result_id": 8801,
+                "scene_image_id": 71,
+                "object_idx": 2,
                 "sku_code": "CHR-2041",
                 "product_name": "에르고 메쉬 오피스체어 화이트",
                 "object_name": "의자",
@@ -78,6 +80,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                     tzinfo=datetime.timezone(datetime.timedelta(hours=9)),
                 ),
                 "image_url": "/uploads/scene-images/9f2c.jpg",
+                "sku_image_url": r"data\images\2041\main.jpg",
                 "origin_name": "scene_office_01.jpg",
                 "bbox": {
                     "xmin": 262,
@@ -89,6 +92,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                     "summary": "차분한 홈오피스 분위기입니다.",
                     "tags": ["미니멀", "홈오피스"],
                 },
+                "approval_status": "REJECTED",
             }
         ]
         detail_row = {
@@ -112,6 +116,8 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "ymax": 800,
             },
             "object_category": "의자",
+            "object_sub_category": "학생·사무용의자",
+            "object_attrs": {"color": "블랙", "material": "패브릭"},
             "vlm_mood": {
                 "summary": "차분한 홈오피스 분위기입니다.",
                 "tags": ["미니멀", "홈오피스"],
@@ -128,6 +134,7 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "summary": "형태와 색상이 유사합니다.",
                 "criteria": [],
             },
+            "approval_status": "ACTIVE",
         }
         self.session = _FakeSession(rows, detail_row)
         self.app = fastapi.FastAPI()
@@ -157,13 +164,17 @@ class TaggingHistoryApiTest(unittest.TestCase):
                 "items": [
                     {
                         "result_id": 8801,
+                        "scene_image_id": 71,
+                        "object_idx": 2,
                         "sku_code": "CHR-2041",
                         "product_name": ("에르고 메쉬 오피스체어 화이트"),
                         "object_name": "의자",
                         "similarity_score": 92,
                         "created_by": "김태깅",
                         "created_at": "2026-08-10T17:56:00+09:00",
+                        "approval_status": "REJECTED",
                         "style_tags": ["미니멀", "홈오피스"],
+                        "sku_image_url": "/sku-images/2041/main.jpg",
                         "scene_image": {
                             "image_url": ("/uploads/scene-images/9f2c.jpg"),
                             "origin_name": "scene_office_01.jpg",
@@ -205,12 +216,14 @@ class TaggingHistoryApiTest(unittest.TestCase):
         query = " ".join(self.session.executed_statement.split())
 
         self.assertIn(
-            "si.object_metadata -> tr.object_idx "
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
             "->> 'category' AS object_name",
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_idx "
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
             "-> 'bbox_coord' AS bbox",
             query,
         )
@@ -218,7 +231,23 @@ class TaggingHistoryApiTest(unittest.TestCase):
             "ORDER BY tr.created_at DESC, tr.result_id DESC",
             query,
         )
+        self.assertIn(
+            "WHERE si.image_url NOT LIKE '/uploads/seed/%'",
+            query,
+        )
         self.assertIn("tr.vlm_mood", query)
+
+    def test_queries_latest_approval_status_for_each_result(self) -> None:
+        """결과별 최신 승인 요청의 상태를 함께 조회합니다."""
+        self.client.get("/history/results")
+        query = " ".join(self.session.executed_statement.split())
+
+        self.assertIn("approval_data.status AS approval_status", query)
+        self.assertIn("WHERE a.tagging_result_id = tr.result_id", query)
+        self.assertIn(
+            "ORDER BY a.requested_at DESC, a.request_id DESC LIMIT 1",
+            query,
+        )
 
     def test_queries_detail_object_fields_by_object_idx(self) -> None:
         """상세 조회도 동일 객체의 카테고리와 좌표를 선택합니다."""
@@ -226,15 +255,34 @@ class TaggingHistoryApiTest(unittest.TestCase):
         query = " ".join(self.session.executed_statement.split())
 
         self.assertIn(
-            "si.object_metadata -> tr.object_idx "
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
             "->> 'category' AS object_category",
             query,
         )
         self.assertIn(
-            "si.object_metadata -> tr.object_idx " "-> 'bbox_coord' AS bbox",
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
+            "-> 'bbox_coord' AS bbox",
             query,
         )
-        self.assertNotIn("'attribute'", query)
+        self.assertIn(
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
+            "->> 'sub_category' AS object_sub_category",
+            query,
+        )
+        self.assertIn(
+            "COALESCE(object_data.metadata, "
+            "si.object_metadata -> tr.object_idx) "
+            "-> 'attrs' AS object_attrs",
+            query,
+        )
+        self.assertIn("approval_data.status AS approval_status", query)
+        self.assertIn(
+            "AND si.image_url NOT LIKE '/uploads/seed/%'",
+            query,
+        )
         self.assertIn("tr.vlm_mood", query)
 
     def test_returns_saved_tagging_history_detail(self) -> None:
@@ -251,7 +299,14 @@ class TaggingHistoryApiTest(unittest.TestCase):
             {"xmin": 100, "ymin": 200, "xmax": 500, "ymax": 800},
         )
         self.assertEqual(data["detected_object"]["category"], "의자")
-        self.assertEqual(data["detected_object"]["attrs"], {})
+        self.assertEqual(
+            data["detected_object"]["sub_category"], "학생·사무용의자"
+        )
+        self.assertEqual(
+            data["detected_object"]["attrs"],
+            {"color": "블랙", "material": "패브릭"},
+        )
+        self.assertEqual(data["approval_status"], "ACTIVE")
         self.assertEqual(
             data["detected_object"]["vlm_mood"],
             {

@@ -26,8 +26,13 @@ export type ProductImageSubmission = {
   status: ProductImageSubmissionStatus;
   submissionId: number;
   submittedAt: string | null;
+  targetBrand: string | null;
+  targetCategory: string | null;
+  targetMainImageUrl: string | null;
+  targetPrice: number | null;
   targetProductName: string | null;
   targetSkuCode: string | null;
+  targetSubCategory: string | null;
   targetType: ProductImageTargetType | null;
 };
 
@@ -64,8 +69,13 @@ type ApiSubmission = {
   status: ProductImageSubmissionStatus;
   submission_id: number;
   submitted_at: string | null;
+  target_brand?: string | null;
+  target_category?: string | null;
+  target_main_image_url: string | null;
+  target_price?: number | null;
   target_product_name: string | null;
   target_sku_code: string | null;
+  target_sub_category?: string | null;
   target_type: ProductImageTargetType | null;
 };
 
@@ -85,6 +95,9 @@ const toAssetUrl = (imageUrl: string): string => {
   if (/^https?:\/\//.test(imageUrl)) return imageUrl;
   return `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
 };
+
+const toOptionalAssetUrl = (imageUrl: string | null): string | null =>
+  imageUrl ? toAssetUrl(imageUrl) : null;
 
 const toSubmission = (item: ApiSubmission): ProductImageSubmission => ({
   finalSkuId: item.final_sku_id,
@@ -106,8 +119,13 @@ const toSubmission = (item: ApiSubmission): ProductImageSubmission => ({
   status: item.status,
   submissionId: item.submission_id,
   submittedAt: item.submitted_at,
+  targetBrand: item.target_brand ?? null,
+  targetCategory: item.target_category ?? null,
+  targetMainImageUrl: toOptionalAssetUrl(item.target_main_image_url),
+  targetPrice: item.target_price ?? null,
   targetProductName: item.target_product_name,
   targetSkuCode: item.target_sku_code,
+  targetSubCategory: item.target_sub_category ?? null,
   targetType: item.target_type,
 });
 

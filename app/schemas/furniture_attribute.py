@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, Field
 
+from app.schemas.tagging import VlmMood
+
 
 class FurnitureAttributeResult(BaseModel):
     """crop 이미지에서 추출한 가구 속성입니다."""
@@ -9,3 +11,4 @@ class FurnitureAttributeResult(BaseModel):
     category: str
     sub_category: str | None = None
     attributes: dict[str, str] = Field(default_factory=dict)
+    vlm_mood: VlmMood = Field(default_factory=VlmMood)

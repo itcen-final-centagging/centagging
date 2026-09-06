@@ -1,12 +1,15 @@
 import { requestJson, type ApiSuccessResponse } from '../../../lib/api-request';
 
+import type { ApprovalStatus } from '../../approvals/api/approvals';
 import type {
   FurnitureObject,
   SkuCandidate,
   TaggingHistory,
+  TaggingHistoryDetail,
   TaggingValues,
   VlmMood,
   XaiCriterion,
+  XaiCropReading,
 } from '../types';
 
 type ApiBoundingBox = {
@@ -19,11 +22,12 @@ type ApiBoundingBox = {
 type DevDetection = {
   object_idx: number;
   category: string;
-  sub_category: string;
+  sub_category: string | null;
   bbox_coord: ApiBoundingBox;
-  confidence: number | null;
+  confidence: number;
+  attrs: Record<string, string>;
   evidence: string;
-  label: string;
+  vlm_mood: VlmMood;
 };
 
 type AiJobAcceptedData = {
@@ -58,7 +62,10 @@ type DevCandidate = {
   sku_code: string;
   sub_category: string | null;
   xai_result: {
+    common?: string;
     criteria: XaiCriterion[];
+    difference?: string;
+    match_rate?: number | null;
     summary: string;
     vlm_mood: VlmMood;
     xai_attrs?: Record<string, string>;
@@ -73,20 +80,32 @@ type DevRecommendationObject = {
   confidence: number;
   attrs: Record<string, string>;
   xai_attrs?: Record<string, string>;
+  xai_readings?: XaiCropReading[];
+  vlm_mood: VlmMood;
   sku_candidates: DevCandidate[];
 };
 
-type RecommendationObject = Omit<DevRecommendationObject, 'sku_candidates'> & {
+type RecommendationObject = Omit<
+  DevRecommendationObject,
+  'sku_candidates' | 'xai_readings'
+> & {
   sku_candidates: SkuCandidate[];
+  xaiReadings: XaiCropReading[];
 };
 
 type DevRecommendationData = {
   objects: DevRecommendationObject[];
 };
 
-type EditedSceneObject = Pick<FurnitureObject, 'bbox' | 'category' | 'name'> & {
-  objectIdx: number;
-};
+type EditedSceneObject = Pick<
+  FurnitureObject,
+  'attrsDirty' | 'bbox' | 'category' | 'metadata' | 'name'
+> & { objectIdx: number };
+
+type SearchMoodObject = Pick<
+  FurnitureObject,
+  'bbox' | 'category' | 'name' | 'objectIdx'
+>;
 
 type ApiSkuSearchItem = {
   brand: string | null;
@@ -96,6 +115,8 @@ type ApiSkuSearchItem = {
   product_name: string;
   similarity_score: number;
   sku_code: string;
+  space_moods: string[];
+  style_tags: string[];
   sub_category: string | null;
 };
 
@@ -103,12 +124,16 @@ type SkuSearchResponseData = { skus: ApiSkuSearchItem[] };
 
 type ApiHistoryListItem = {
   result_id: number;
+  scene_image_id: number;
+  object_idx: number;
   sku_code: string;
   product_name: string;
   object_name: string | null;
   similarity_score: number | null;
   created_by: string;
   created_at: string;
+  approval_status: ApprovalStatus | null;
+  sku_image_url: string | null;
   style_tags: string[];
   scene_image: {
     image_url: string;
@@ -126,9 +151,41 @@ type ApiHistoryListData = {
   items: ApiHistoryListItem[];
 };
 
+type ApiHistoryDetail = {
+  approval_status: ApprovalStatus | null;
+  created_at: string;
+  created_by: string;
+  detected_object: {
+    attrs: Record<string, unknown>;
+    bbox: ApiBoundingBox | null;
+    category: string | null;
+    sub_category: string | null;
+    vlm_mood: VlmMood | null;
+  };
+  matched_sku: {
+    attrs: Record<string, unknown>;
+    brand: string | null;
+    category: string | null;
+    image_url: string | null;
+    price: number | null;
+    product_name: string;
+    sku_code: string;
+    sub_category: string | null;
+  };
+  result_id: number;
+  scene_image: {
+    image_url: string | null;
+    origin_name: string;
+  };
+  similarity_score: number | null;
+  xai_result: {
+    criteria: XaiCriterion[];
+    summary: string;
+  } | null;
+};
+
 export type TaggingAnalysis = {
   analysisId: string;
-  mode: 'live' | 'mock' | null;
   objects: FurnitureObject[];
 };
 
@@ -182,6 +239,17 @@ const toBbox = (bbox: ApiBoundingBox): [number, number, number, number] => [
 const nullableText = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
 
+const toStringAttributes = (
+  attributes: Record<string, unknown>,
+): Record<string, string> =>
+  Object.entries(attributes).reduce<Record<string, string>>(
+    (result, [key, value]) => {
+      if (typeof value === 'string') result[key] = value;
+      return result;
+    },
+    {},
+  );
+
 const NULL_TAG_VALUE = 'null';
 
 const reviewedText = (
@@ -191,6 +259,21 @@ const reviewedText = (
 
 const reviewedTags = (tags: string[] | undefined): string[] | undefined =>
   tags?.filter((tag) => tag !== NULL_TAG_VALUE);
+
+/**
+ * 카테고리별 소재 속성(material / top_material / frame_material 등)을
+ * attrs에 그대로 실어 보냅니다. 검수 값이 없으면 SKU 소재를 기본값으로 씁니다.
+ */
+const reviewedMaterials = (
+  materials: Record<string, string> | undefined,
+  fallback: string | null | undefined,
+): Record<string, string> => {
+  const entries = Object.entries(materials ?? {}).filter(
+    ([, value]) => value && value !== NULL_TAG_VALUE,
+  );
+  if (entries.length > 0) return Object.fromEntries(entries);
+  return { material: fallback ?? '' };
+};
 
 const resolveAssetUrl = (value: unknown): string | null => {
   const path = nullableText(value);
@@ -226,7 +309,8 @@ const toDevCandidate = (
   kind: toKind(candidate.category, candidate.sub_category),
   material: nullableText(candidate.attrs.material),
   matchRank: candidateIndex + 1,
-  metadataScore: null,
+  metadataScore:
+    candidate.xai_result.match_rate ?? candidate.similarity_score,
   name: candidate.product_name,
   rubric: null,
   score: candidate.similarity_score,
@@ -237,7 +321,10 @@ const toDevCandidate = (
   vlmMood: candidate.xai_result.vlm_mood,
   xaiReason: nullableText(candidate.xai_result.summary),
   xaiResult: {
+    common: candidate.xai_result.common,
     criteria: candidate.xai_result.criteria,
+    difference: candidate.xai_result.difference,
+    matchRate: candidate.xai_result.match_rate ?? candidate.similarity_score,
     summary: candidate.xai_result.summary,
     xaiAttrs: candidate.xai_result.xai_attrs ?? {},
   },
@@ -261,6 +348,8 @@ const toSearchCandidate = (item: ApiSkuSearchItem): SkuCandidate => ({
   score: null,
   size: null,
   sku: item.sku_code,
+  spaceMoods: item.space_moods,
+  styleTags: item.style_tags,
   subCategory: item.sub_category,
   vectorScore: null,
   vlmMood: null,
@@ -278,6 +367,8 @@ type ApiSkuDetail = {
   sku_code: string;
   sku_id: number;
   sku_image_id: number | null;
+  space_moods: string[];
+  style_tags: string[];
   sub_category: string | null;
 };
 
@@ -291,6 +382,8 @@ export type SkuDetail = {
   skuCode: string;
   skuId: number;
   skuImageId: number | null;
+  spaceMoods: string[];
+  styleTags: string[];
   subCategory: string | null;
 };
 
@@ -304,6 +397,8 @@ const toSkuDetail = (detail: ApiSkuDetail): SkuDetail => ({
   skuCode: detail.sku_code,
   skuId: detail.sku_id,
   skuImageId: detail.sku_image_id,
+  spaceMoods: detail.space_moods,
+  styleTags: detail.style_tags,
   subCategory: detail.sub_category,
 });
 
@@ -338,7 +433,9 @@ export const toCandidateFromDetail = (detail: SkuDetail): SkuCandidate => ({
   sku: detail.skuCode,
   skuId: detail.skuId,
   skuImageId: detail.skuImageId,
+  spaceMoods: detail.spaceMoods,
   style: nullableText(detail.attrs.style),
+  styleTags: detail.styleTags,
   subCategory: detail.subCategory,
   vectorScore: null,
   vlmMood: null,
@@ -347,38 +444,62 @@ export const toCandidateFromDetail = (detail: SkuDetail): SkuCandidate => ({
 });
 
 const toHistory = (item: ApiHistoryListItem): TaggingHistory => ({
+  approvalStatus: item.approval_status ?? null,
   id: String(item.result_id),
   imageName: item.scene_image.origin_name,
+  objectIdx: item.object_idx,
   objectName: item.object_name ?? '',
   productName: item.product_name,
   savedAt: item.created_at,
+  sceneImage: {
+    bbox: item.scene_image.bbox,
+    id: String(item.scene_image_id),
+    imageUrl: resolveAssetUrl(item.scene_image.image_url),
+  },
   sku: item.sku_code,
+  skuImageUrl: resolveAssetUrl(item.sku_image_url),
   tags: {
     category: '',
     color: '',
-    material: '',
+    materials: {},
     mood: '',
     styleTags: item.style_tags,
     subCategory: '',
   },
 });
 
-export const analyzeImage = async (
-  file: File,
-  targetDescription?: string,
-): Promise<TaggingAnalysis> => {
+const toHistoryDetail = (detail: ApiHistoryDetail): TaggingHistoryDetail => ({
+  approvalStatus: detail.approval_status ?? null,
+  createdAt: detail.created_at,
+  createdBy: detail.created_by,
+  detectedObject: {
+    attrs: detail.detected_object.attrs ?? {},
+    bbox: detail.detected_object.bbox,
+    category: detail.detected_object.category,
+    subCategory: detail.detected_object.sub_category,
+    vlmMood: detail.detected_object.vlm_mood,
+  },
+  id: String(detail.result_id),
+  matchedSku: {
+    attrs: detail.matched_sku.attrs ?? {},
+    brand: detail.matched_sku.brand,
+    category: detail.matched_sku.category,
+    imageUrl: resolveAssetUrl(detail.matched_sku.image_url),
+    price: detail.matched_sku.price,
+    productName: detail.matched_sku.product_name,
+    sku: detail.matched_sku.sku_code,
+    subCategory: detail.matched_sku.sub_category,
+  },
+  sceneImage: {
+    imageName: detail.scene_image.origin_name,
+    imageUrl: resolveAssetUrl(detail.scene_image.image_url),
+  },
+  similarityScore: detail.similarity_score,
+  xaiResult: detail.xai_result,
+});
+
+export const analyzeImage = async (file: File): Promise<TaggingAnalysis> => {
   const formData = new FormData();
-
-  if (targetDescription) {
-    formData.append('image', file);
-    formData.append('target_description', targetDescription);
-    await requestJson(`${API_BASE_URL}/api/v1/taggings/analyze`, {
-      body: formData,
-      method: 'POST',
-    });
-    throw new Error('재탐지 인터페이스가 구현되지 않았습니다.');
-  }
-
   formData.append('file', file);
   const accepted = await requestJson<ApiSuccessResponse<AiJobAcceptedData>>(
     `${API_BASE_URL}/tagging`,
@@ -393,7 +514,6 @@ export const analyzeImage = async (
 
   return {
     analysisId: String(accepted.data.scene_image_id),
-    mode: null,
     objects: detectionResult.objects.map((detection) => ({
       bbox: toBbox(detection.bbox_coord),
       candidates: [],
@@ -402,11 +522,12 @@ export const analyzeImage = async (
       description: detection.evidence,
       id: `${accepted.data.scene_image_id}-${detection.object_idx}`,
       metadata: {
-        attributes: {},
+        attributes: detection.attrs,
         category: nullableText(detection.category),
         description: detection.evidence,
         keyFeatures: [],
         subCategory: detection.sub_category,
+        vlmMood: detection.vlm_mood,
       },
       name: detection.category,
       objectIdx: detection.object_idx,
@@ -456,9 +577,13 @@ export const updateSceneObjects = async (
         objects: objects.map((object) => {
           const [ymin, xmin, ymax, xmax] = object.bbox;
           return {
+            attrs: toStringAttributes(object.metadata.attributes),
             bbox_coord: { xmax, xmin, ymax, ymin },
             category: object.category ?? object.name,
+            needs_attribute_extraction: object.attrsDirty ?? false,
             object_idx: object.objectIdx,
+            sub_category: object.metadata.subCategory,
+            vlm_mood: object.metadata.vlmMood ?? { summary: '', tags: [] },
           };
         }),
       }),
@@ -476,9 +601,48 @@ export const updateSceneObjects = async (
       {
         ...object,
         sku_candidates: object.sku_candidates.map(toDevCandidate),
+        xaiReadings: object.xai_readings ?? [],
       },
     ]),
   );
+};
+
+type ApiSearchCandidateMoodData = {
+  vlm_mood: VlmMood;
+};
+
+/**
+ * 전체 카탈로그 검색으로 선택한 SKU에 대해, VLM이 크롭 이미지에서 읽어낸
+ * 공간 분위기·스타일 태그를 계산합니다. AI 추천 후보와 달리 순위 근거는
+ * 만들지 않으므로(match_source가 SEARCH인 결과는 xai_result를 가질 수
+ * 없음), vlm_mood 하나만 돌려받습니다.
+ */
+export const fetchSearchCandidateMood = async (
+  sceneImageId: string,
+  object: SearchMoodObject,
+  skuCode: string,
+): Promise<VlmMood> => {
+  const [ymin, xmin, ymax, xmax] = object.bbox;
+  const response = await requestJson<
+    ApiSuccessResponse<ApiSearchCandidateMoodData>
+  >(
+    `${API_BASE_URL}/tagging/scenes/${encodeURIComponent(
+      sceneImageId,
+    )}/search-candidates/mood`,
+    {
+      body: JSON.stringify({
+        object: {
+          bbox_coord: { xmax, xmin, ymax, ymin },
+          category: object.category ?? object.name,
+          object_idx: object.objectIdx,
+        },
+        sku_code: skuCode,
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    },
+  );
+  return response.data.vlm_mood;
 };
 
 /** 검색어와 의미적으로 유사한 SKU를 전체 카탈로그에서 조회합니다. */
@@ -493,9 +657,19 @@ export const searchCatalogItems = async (
 
 export const fetchTaggingHistory = async (): Promise<TaggingHistory[]> => {
   const response = await requestJson<ApiSuccessResponse<ApiHistoryListData>>(
-    `${API_BASE_URL}/history/results`,
+    `${API_BASE_URL}/api/history/results`,
   );
   return response.data.items.map(toHistory);
+};
+
+/** 결과 ID로 연출 이미지·탐지 객체·SKU·XAI를 포함한 상세 이력을 조회합니다. */
+export const fetchTaggingHistoryDetail = async (
+  resultId: string,
+): Promise<TaggingHistoryDetail> => {
+  const response = await requestJson<ApiSuccessResponse<ApiHistoryDetail>>(
+    `${API_BASE_URL}/api/history/results/${encodeURIComponent(resultId)}`,
+  );
+  return toHistoryDetail(response.data);
 };
 
 type TaggingReviewMatch = {
@@ -537,18 +711,19 @@ export const saveTaggingReview = async (
           ({ object, objectIdx, selectedSku, values }) => {
             const [ymin, xmin, ymax, xmax] = object.bbox;
             const styleTags = reviewedTags(values?.styleTags);
+            const matchSource = toMatchSource(selectedSku);
+            // 검색으로 직접 고른 SKU는 AI 추천 근거가 없으므로 순위·유사도·XAI를
+            // 모두 null로 보냅니다(백엔드 ck_result_source 제약과 같은 규칙).
+            const isRecommended = matchSource === 'RECOMMEND';
             return {
-              match_rank: selectedSku.matchRank,
+              match_rank: isRecommended ? selectedSku.matchRank : null,
               object_idx: objectIdx,
-              match_source: toMatchSource(selectedSku),
+              match_source: matchSource,
               object_metadata: {
                 attrs: {
                   ...object.metadata.attributes,
+                  ...reviewedMaterials(values?.materials, selectedSku.material),
                   color: reviewedText(values?.color, selectedSku.color),
-                  material: reviewedText(
-                    values?.material,
-                    selectedSku.material,
-                  ),
                   style: reviewedText(styleTags?.[0], selectedSku.style),
                 },
                 bbox_coord: { xmax, xmin, ymax, ymin },
@@ -558,11 +733,15 @@ export const saveTaggingReview = async (
                   values?.subCategory,
                   object.metadata.subCategory,
                 ),
+                vlm_mood: object.metadata.vlmMood ?? {
+                  summary: '',
+                  tags: [],
+                },
               },
               similarity_score:
-                selectedSku.score === null
-                  ? null
-                  : Math.round(selectedSku.score),
+                isRecommended && selectedSku.score !== null
+                  ? Math.round(selectedSku.score)
+                  : null,
               sku_id: selectedSku.skuId,
               sku_image_id: selectedSku.skuImageId ?? null,
               vlm_mood: {
@@ -574,12 +753,14 @@ export const saveTaggingReview = async (
                 // 때만 VLM이 추출한 원본 태그를 그대로 사용합니다.
                 tags: styleTags ?? selectedSku.vlmMood?.tags ?? [],
               },
-              xai_result: {
-                criteria: selectedSku.xaiResult?.criteria ?? [],
-                summary: selectedSku.xaiResult?.summary ?? '',
-                xai_attrs:
-                  object.xaiAttrs ?? selectedSku.xaiResult?.xaiAttrs ?? {},
-              },
+              xai_result: isRecommended
+                ? {
+                    criteria: selectedSku.xaiResult?.criteria ?? [],
+                    summary: selectedSku.xaiResult?.summary ?? '',
+                    xai_attrs:
+                      object.xaiAttrs ?? selectedSku.xaiResult?.xaiAttrs ?? {},
+                  }
+                : null,
             };
           },
         ),

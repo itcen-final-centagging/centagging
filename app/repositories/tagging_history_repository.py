@@ -9,6 +9,8 @@ from app.services import sku_image_storage
 
 _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
     SELECT tr.result_id,
+           tr.scene_image_id,
+           tr.object_idx,
            sc.sku_code,
            sc.product_name,
            COALESCE(object_data.metadata,
@@ -20,9 +22,11 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
            tr.created_at,
            si.image_url,
            si.origin_name,
+           sku_img.image_url AS sku_image_url,
            COALESCE(object_data.metadata,
                     si.object_metadata -> tr.object_idx)
-               -> 'bbox_coord' AS bbox
+               -> 'bbox_coord' AS bbox,
+           approval_data.status AS approval_status
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -36,6 +40,16 @@ _SELECT_TAGGING_HISTORY = sqlalchemy.text("""
             WHERE item.metadata ->> 'object_idx' = tr.object_idx::text
             LIMIT 1
        ) object_data ON TRUE
+ LEFT JOIN sku_image sku_img
+        ON sku_img.sku_image_id = tr.sku_image_id
+ LEFT JOIN LATERAL (
+           SELECT a.status
+             FROM approval a
+            WHERE a.tagging_result_id = tr.result_id
+            ORDER BY a.requested_at DESC, a.request_id DESC
+            LIMIT 1
+       ) approval_data ON TRUE
+     WHERE si.image_url NOT LIKE '/uploads/seed/%'
      ORDER BY tr.created_at DESC, tr.result_id DESC
     """)
 
@@ -52,6 +66,12 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            COALESCE(object_data.metadata,
                     si.object_metadata -> tr.object_idx)
                ->> 'category' AS object_category,
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               ->> 'sub_category' AS object_sub_category,
+           COALESCE(object_data.metadata,
+                    si.object_metadata -> tr.object_idx)
+               -> 'attrs' AS object_attrs,
            sc.sku_code,
            sc.product_name,
            sc.brand,
@@ -61,7 +81,8 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
            sc.sub_category,
            sc.attributes,
            tr.xai_result,
-           tr.vlm_mood
+           tr.vlm_mood,
+           approval_data.status AS approval_status
       FROM tagging_result tr
       JOIN scene_image si
         ON si.scene_image_id = tr.scene_image_id
@@ -77,12 +98,21 @@ _SELECT_TAGGING_HISTORY_DETAIL = sqlalchemy.text("""
        ) object_data ON TRUE
  LEFT JOIN sku_image sku_img
         ON sku_img.sku_image_id = tr.sku_image_id
+ LEFT JOIN LATERAL (
+           SELECT a.status
+             FROM approval a
+            WHERE a.tagging_result_id = tr.result_id
+            ORDER BY a.requested_at DESC, a.request_id DESC
+            LIMIT 1
+       ) approval_data ON TRUE
      WHERE tr.result_id = :result_id
+       AND si.image_url NOT LIKE '/uploads/seed/%'
     """)
 
 
 async def list_tagging_history(
     session: sqlalchemy_async.AsyncSession,
+    image_storage: sku_image_storage.SkuImageStorage,
 ) -> list[history_schema.TaggingHistoryListItem]:
     """저장된 태깅 결과를 최신순으로 조회합니다.
 
@@ -102,6 +132,8 @@ async def list_tagging_history(
             history_schema.TaggingHistoryListItem.model_validate(
                 {
                     "result_id": row["result_id"],
+                    "scene_image_id": row["scene_image_id"],
+                    "object_idx": row["object_idx"],
                     "sku_code": row["sku_code"],
                     "product_name": row["product_name"],
                     "object_name": row["object_name"],
@@ -110,7 +142,13 @@ async def list_tagging_history(
                     ),
                     "created_by": row["created_by"],
                     "created_at": row["created_at"],
+                    "approval_status": row["approval_status"],
                     "style_tags": vlm_mood.get("tags", []),
+                    "sku_image_url": (
+                        image_storage.public_url(row["sku_image_url"])
+                        if row["sku_image_url"] is not None
+                        else None
+                    ),
                     "scene_image": {
                         "image_url": row["image_url"],
                         "origin_name": row["origin_name"],
@@ -155,14 +193,15 @@ async def get_tagging_history_detail(
             "similarity_score": (
                 round(float(score) * 100) if score is not None else None
             ),
+            "approval_status": row["approval_status"],
             "scene_image": {
                 "image_url": row["scene_image_url"],
                 "origin_name": row["origin_name"],
             },
             "detected_object": {
                 "category": row["object_category"],
-                "sub_category": None,
-                "attrs": {},
+                "sub_category": row["object_sub_category"],
+                "attrs": row["object_attrs"] or {},
                 "bbox": row["bbox"],
                 "vlm_mood": row["vlm_mood"],
             },

@@ -10,6 +10,12 @@ import PIL.Image
 from app.core import config
 from app.schemas.furniture_attribute import FurnitureAttributeResult
 from app.services import furniture_attribute_rules, gemini_service
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v1,
+)
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt_v2 import (
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v2,
+)
 
 
 def _test_settings(api_key: str = "test-key") -> config.Settings:
@@ -21,6 +27,7 @@ def _test_settings(api_key: str = "test-key") -> config.Settings:
         mvp_login_id="",
         mvp_login_password="",
         image_storage_root="unused",
+        sku_image_root="unused",
         database=config.DatabaseSettings(
             name="",
             username="",
@@ -29,6 +36,44 @@ def _test_settings(api_key: str = "test-key") -> config.Settings:
             port=5432,
         ),
     )
+
+
+def test_build_v1_furniture_attribute_prompt_injects_allowed_schema() -> None:
+    """v1 한글 프롬프트에 카테고리별 허용 규격을 직접 주입합니다."""
+    attribute_schema = furniture_attribute_rules.build_allowed_attribute_schema(
+        "의자"
+    )
+
+    prompt = build_furniture_attribute_prompt_v1(
+        attribute_schema=attribute_schema,
+    )
+
+    assert "- 고정 대분류: 의자" in prompt
+    assert '"인테리어의자"' in prompt
+    assert '"color"' in prompt
+    assert '"material"' in prompt
+    assert '"has_armrest"' in prompt
+    assert '"category": "의자"' in prompt
+    assert "JSON 외의 설명" in prompt
+
+
+def test_build_v2_furniture_attribute_prompt_injects_allowed_schema() -> None:
+    """v2 프롬프트에 카테고리별 허용 규격을 직접 주입합니다."""
+    attribute_schema = furniture_attribute_rules.build_allowed_attribute_schema(
+        "의자"
+    )
+
+    prompt = build_furniture_attribute_prompt_v2(
+        attribute_schema=attribute_schema,
+    )
+
+    assert "- 고정 대분류: 의자" in prompt
+    assert '"인테리어의자"' in prompt
+    assert '"color"' in prompt
+    assert '"material"' in prompt
+    assert '"has_armrest"' in prompt
+    assert '"category": "의자"' in prompt
+    assert "JSON 외의 설명" in prompt
 
 
 def test_build_allowed_schema_contains_only_visual_common_attributes() -> None:
@@ -70,7 +115,7 @@ def test_build_allowed_schema_rejects_unknown_category() -> None:
 
 
 def test_build_response_schema_uses_explicit_attribute_properties() -> None:
-    schema = furniture_attribute_rules.build_attribute_response_schema("?섏옄")
+    schema = furniture_attribute_rules.build_attribute_response_schema("의자")
 
     assert schema["type"] == "OBJECT"
     assert set(schema["required"]) == {"category", "attributes"}
@@ -108,6 +153,129 @@ def test_normalize_attributes_keeps_only_allowed_keys_and_values() -> None:
         "material": "패브릭",
         "has_armrest": "있음",
     }
+
+
+def test_build_evidence_descriptors_uses_only_category_attributes() -> None:
+    """근거에는 객체별 카테고리 속성만 사용합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "의자",
+        {
+            "color": "블랙",
+            "style": "모던",
+            "chair_type": "학생·사무용의자",
+            "material": "메쉬",
+            "has_wheels": "있음",
+            "has_backrest": "모름",
+        },
+    )
+
+    assert descriptors == [
+        "메쉬 소재",
+        "바퀴가 있는 구조",
+    ]
+
+
+def test_build_evidence_descriptors_uses_storage_attributes() -> None:
+    """수납장 전용 구조 속성도 사용자용 근거에 포함합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "서랍·수납장",
+        {
+            "storage_type": "주방 수납장",
+            "door_type": "여닫이형",
+            "has_drawer": "있음",
+            "pattern": "무지",
+        },
+    )
+
+    assert descriptors[:3] == [
+        "여닫이형 구조",
+        "서랍이 있는 구조",
+    ]
+
+
+def test_build_evidence_descriptors_excludes_category_classification() -> None:
+    """세부 유형처럼 카테고리를 재분류하는 값은 근거에서 제외합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "진열장·책장",
+        {
+            "storage_type": "장식장",
+            "material": "원목",
+            "door_type": "유리도어",
+        },
+    )
+
+    assert descriptors == ["원목 소재", "유리 도어 구조"]
+
+
+def test_build_evidence_descriptors_avoids_repeated_attribute_names() -> None:
+    """값에 이미 포함된 단어를 속성 이름으로 반복하지 않습니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "테이블·식탁·책상",
+        {
+            "leg_type": "4다리",
+            "wood_tone": "밝은 우드톤",
+            "seating_capacity": "4인",
+        },
+    )
+
+    assert descriptors == ["4다리 구조", "밝은 우드톤"]
+
+
+def test_build_evidence_descriptors_excludes_uncertain_visual_attributes() -> (
+    None
+):
+    """이미지에서 직접 검증하기 어려운 속성은 근거에서 제외합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "매트리스",
+        {
+            "size": "퀸(Q)",
+            "firmness": "미디엄",
+            "thickness": "21~30cm",
+            "features": "항균",
+        },
+    )
+
+    assert descriptors == ["두께 21~30cm"]
+
+
+def test_build_evidence_descriptors_excludes_unconfirmed_absence() -> None:
+    """가림으로 오판할 수 있는 구조 부재 값은 근거에서 제외합니다."""
+    descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "의자",
+        {
+            "material": "원목",
+            "has_wheels": "없음",
+            "has_backrest": "있음",
+            "has_armrest": "모름",
+        },
+    )
+
+    assert descriptors == ["원목 소재", "등받이가 있는 구조"]
+
+
+def test_build_evidence_descriptors_formats_category_phrases() -> None:
+    """카테고리별 수량과 구조 속성을 자연스러운 표현으로 변환합니다."""
+    bed_descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "침대",
+        {
+            "bed_type": "수납침대",
+            "thickness": "21~30cm",
+            "product_type": "프레임+매트리스",
+        },
+    )
+    vanity_descriptors = furniture_attribute_rules.build_evidence_descriptors(
+        "화장대·콘솔",
+        {
+            "storage_type": "서랍형",
+            "has_mirror": "있음",
+        },
+    )
+
+    assert bed_descriptors == ["프레임·매트리스 구성"]
+    assert vanity_descriptors == [
+        "거울이 있는 구조",
+        "서랍형 수납 구조",
+    ]
 
 
 def test_validate_result_clears_invalid_sub_category() -> None:
@@ -178,11 +346,12 @@ def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
         )
     )
     image = PIL.Image.new("RGB", (20, 20))
-    service = gemini_service.GeminiService(_test_settings())
+    settings = _test_settings()
+    service = gemini_service.GeminiService(settings)
 
     with unittest.mock.patch.object(
-        gemini_service.genai,
-        "Client",
+        gemini_service.genai_client,
+        "create_client",
         return_value=client,
     ) as client_factory:
         result = service.extract_furniture_attributes(image, "의자")
@@ -192,7 +361,7 @@ def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
         sub_category="인테리어의자",
         attributes={"color": "베이지", "material": "패브릭"},
     )
-    client_factory.assert_called_once_with(api_key="test-key")
+    client_factory.assert_called_once_with(settings)
     call = client.models.generate_content.call_args
     assert call.kwargs["model"] == "gemini-test"
     assert call.kwargs["contents"][0] is image
@@ -202,9 +371,11 @@ def test_extract_furniture_attributes_normalizes_gemini_response() -> None:
         "additionalProperties"
         not in response_schema["properties"]["attributes"]
     )
-    context = json.loads(call.kwargs["contents"][2])
-    assert context["category"] == "의자"
-    assert context["attributes"]["category_specific"]["material"]
+    assert len(call.kwargs["contents"]) == 2
+    prompt = call.kwargs["contents"][1]
+    assert "- 고정 대분류: 의자" in prompt
+    assert '"material"' in prompt
+    assert '"has_armrest"' in prompt
 
 
 def test_extract_furniture_attributes_rejects_category_change() -> None:
@@ -219,8 +390,8 @@ def test_extract_furniture_attributes_rejects_category_change() -> None:
     service = gemini_service.GeminiService(_test_settings())
 
     with unittest.mock.patch.object(
-        gemini_service.genai,
-        "Client",
+        gemini_service.genai_client,
+        "create_client",
         return_value=client,
     ):
         try:

@@ -3,16 +3,17 @@
 Service for live Gemini model calls through Vertex AI or Developer API.
 """
 
+import dataclasses
 import io
-import json
 import logging
 import time
 import typing
-from collections.abc import Mapping
+import json
 
 from google.genai import errors, types
 from PIL import Image
 from pydantic import ValidationError
+from collections.abc import Mapping
 
 from app.core import catalog_spec, config, genai_client
 from app.schemas.furniture_attribute import FurnitureAttributeResult
@@ -20,17 +21,30 @@ from app.schemas.gemini_detection import (
     GeminiDetectionResult,
     GeminiModelDetectionResult,
 )
+from app.schemas.sku_rerank import SkuRerankResult
 from app.services.furniture_attribute_rules import (
     build_allowed_attribute_schema,
     build_attribute_response_schema,
     validate_attribute_result,
 )
-from app.services.genai_retry import call_with_rate_limit_retry
+from app.services.genai_retry import (
+    RateLimitCallback,
+    call_with_rate_limit_retry,
+)
 from app.services.prompt.attribute_prompt.furniture_attribute_prompt import (
-    FURNITURE_ATTRIBUTE_PROMPT,
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v1,
+)
+from app.services.prompt.attribute_prompt.furniture_attribute_prompt_v2 import (
+    build_furniture_attribute_prompt as build_furniture_attribute_prompt_v2,
 )
 from app.services.prompt.detect_prompt.furniture_detect_prompt import (
-    FURNITURE_DETECTION_PROMPT,
+    build_furniture_detection_prompt as build_furniture_detection_prompt_v1,
+)
+from app.services.prompt.detect_prompt.furniture_detect_prompt_v2 import (
+    build_furniture_detection_prompt as build_furniture_detection_prompt_v2,
+)
+from app.services.prompt.rerank_prompt.sku_rerank_prompt import (
+    SKU_RERANK_PROMPT,
 )
 
 
@@ -83,6 +97,25 @@ class GeminiEmbeddingError(RuntimeError):
     """Gemini 기반 임베딩 호출이 실패한 경우의 오류입니다."""
 
 
+PromptVersion = typing.Literal["v1", "v2"]
+
+
+@dataclasses.dataclass(frozen=True)
+class GeminiCallTelemetry:
+    """프롬프트 평가에 전달할 단일 Gemini 호출 계측값입니다."""
+
+    operation_name: str
+    prompt_version: PromptVersion
+    attempt_count: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    generation_succeeded: bool
+
+
+GeminiTelemetryCallback = typing.Callable[[GeminiCallTelemetry], None]
+
+
 def _contains_hangul(text: str) -> bool:
     """문자열에 한글 음절이 포함되어 있는지 반환합니다."""
     return any("\uac00" <= char <= "\ud7a3" for char in text)
@@ -93,16 +126,191 @@ def _fallback_evidence(category: str) -> str:
     return f"이미지에서 {category} 형태가 확인됩니다."
 
 
+def _build_rerank_contents(
+    query: str, candidates: list[dict[str, typing.Any]], top_k: int
+) -> list[types.ContentUnionDict]:
+    """SKU 재정렬 요청 본문을 만듭니다.
+
+    정답 SKU나 평가용 라벨은 절대 포함하지 않습니다 — 검색어와 candidates에
+    담긴 catalog 필드(sku_code/product_name/category/sub_category/
+    attributes/brand/price)만 모델에 전달합니다.
+
+    Args:
+        query: 검색 프롬프트입니다.
+        candidates: 1차 코사인 유사도로 뽑은 후보 SKU 목록입니다.
+        top_k: 반환받을 최대 sku_code 개수입니다.
+
+    Returns:
+        Gemini ``generate_content`` 호출에 넘길 contents 목록입니다.
+    """
+    payload = json.dumps(
+        {
+            "query": query,
+            "top_k": top_k,
+            "candidates": candidates,
+        },
+        ensure_ascii=False,
+        default=str,
+    )
+    return [SKU_RERANK_PROMPT, payload]
+
+
 class GeminiService:
     """VLM 및 임베딩 모델을 실제 Gemini API로 호출합니다."""
 
-    def __init__(self, settings: config.Settings) -> None:
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        settings: config.Settings,
+        *,
+        prompt_version: PromptVersion = "v2",
+        telemetry_callback: GeminiTelemetryCallback | None = None,
+        rate_limit_retry_delays_seconds: tuple[float, ...] | None = None,
+        rate_limit_retry_jitter_seconds: float = 0.0,
+        rate_limit_callback: RateLimitCallback | None = None,
+    ) -> None:
         """Gemini 서비스에 필요한 설정을 초기화합니다.
 
         Args:
             settings: API 키와 모델명이 담긴 애플리케이션 설정입니다.
+            prompt_version: 탐지·속성 추출에 적용할 프롬프트 버전입니다.
+            telemetry_callback: 생성 호출의 토큰·재시도 정보를 받을 함수입니다.
+            rate_limit_retry_delays_seconds: 429 응답의 재시도 간격입니다.
+            rate_limit_retry_jitter_seconds: 재시도 간격에 추가할 최대 난수입니다.
+            rate_limit_callback: 429 발생과 재시도 지연을 전달받을 함수입니다.
+
+        Raises:
+            ValueError: 프롬프트 버전 또는 재시도 설정이 유효하지 않은
+                경우입니다.
         """
+        if prompt_version not in ("v1", "v2"):
+            raise ValueError(
+                f"지원하지 않는 프롬프트 버전입니다: {prompt_version}"
+            )
+        if (
+            rate_limit_retry_jitter_seconds < 0
+            or rate_limit_retry_delays_seconds is not None
+            and any(delay < 0 for delay in rate_limit_retry_delays_seconds)
+        ):
+            raise ValueError("재시도 지연 시간은 0 이상이어야 합니다.")
         self._settings = settings
+        self._prompt_version = prompt_version
+        self._telemetry_callback = telemetry_callback
+        self._rate_limit_retry_delays_seconds = rate_limit_retry_delays_seconds
+        self._rate_limit_retry_jitter_seconds = rate_limit_retry_jitter_seconds
+        self._rate_limit_callback = rate_limit_callback
+
+    @property
+    def prompt_version(self) -> PromptVersion:
+        """현재 탐지·속성 추출 프롬프트 버전을 반환합니다."""
+        return self._prompt_version
+
+    def _build_detection_contents(
+        self,
+        image: Image.Image,
+    ) -> list[types.ContentUnionDict]:
+        """프롬프트 버전에 맞는 객체 탐지 입력을 생성합니다."""
+        if self._prompt_version == "v1":
+            return [
+                image,
+                build_furniture_detection_prompt_v1(
+                    allowed_categories=catalog_spec.CATEGORIES,
+                ),
+            ]
+
+        return [
+            image,
+            build_furniture_detection_prompt_v2(
+                allowed_categories=catalog_spec.CATEGORIES,
+            ),
+        ]
+
+    def _build_attribute_contents(
+        self,
+        image: Image.Image,
+        attribute_schema: Mapping[str, object],
+    ) -> list[types.ContentUnionDict]:
+        """프롬프트 버전에 맞는 속성 추출 입력을 생성합니다."""
+        if self._prompt_version == "v1":
+            return [
+                image,
+                build_furniture_attribute_prompt_v1(
+                    attribute_schema=attribute_schema,
+                ),
+            ]
+
+        return [
+            image,
+            build_furniture_attribute_prompt_v2(
+                attribute_schema=attribute_schema,
+            ),
+        ]
+
+    def _record_telemetry(
+        self,
+        *,
+        operation_name: str,
+        response: types.GenerateContentResponse | None,
+        attempt_count: int,
+        generation_succeeded: bool,
+    ) -> None:
+        """생성 응답의 토큰 사용량과 시도 횟수를 선택적으로 기록합니다."""
+        if self._telemetry_callback is None:
+            return
+
+        usage_metadata = getattr(response, "usage_metadata", None)
+
+        def _token_count(field_name: str) -> int:
+            value = getattr(usage_metadata, field_name, 0)
+            return value if isinstance(value, int) and value >= 0 else 0
+
+        self._telemetry_callback(
+            GeminiCallTelemetry(
+                operation_name=operation_name,
+                prompt_version=self._prompt_version,
+                attempt_count=attempt_count,
+                input_tokens=_token_count("prompt_token_count"),
+                output_tokens=_token_count("candidates_token_count"),
+                total_tokens=_token_count("total_token_count"),
+                generation_succeeded=generation_succeeded,
+            )
+        )
+
+    def _call_generation(
+        self,
+        operation: typing.Callable[[], types.GenerateContentResponse],
+        operation_name: str,
+    ) -> types.GenerateContentResponse:
+        """재시도 시도 횟수와 토큰을 기록하며 생성 호출을 실행합니다."""
+        attempt_count = 0
+
+        def _tracked_operation() -> types.GenerateContentResponse:
+            nonlocal attempt_count
+            attempt_count += 1
+            return operation()
+
+        try:
+            response = call_with_rate_limit_retry(
+                _tracked_operation,
+                operation_name=operation_name,
+                retry_delays_seconds=self._rate_limit_retry_delays_seconds,
+                jitter_seconds=self._rate_limit_retry_jitter_seconds,
+                rate_limit_callback=self._rate_limit_callback,
+            )
+        except Exception:
+            self._record_telemetry(
+                operation_name=operation_name,
+                response=None,
+                attempt_count=attempt_count,
+                generation_succeeded=False,
+            )
+            raise
+        self._record_telemetry(
+            operation_name=operation_name,
+            response=response,
+            attempt_count=attempt_count,
+            generation_succeeded=True,
+        )
+        return response
 
     @property
     def is_configured(self) -> bool:
@@ -175,19 +383,8 @@ class GeminiService:
 
         try:
             client = genai_client.create_client(self._settings)
-
-            category_context = json.dumps(
-                {"allowed_categories": catalog_spec.CATEGORIES},
-                ensure_ascii=False,
-            )
-
-            contents: list[types.ContentUnionDict] = [
-                image,
-                FURNITURE_DETECTION_PROMPT,
-                category_context,
-            ]
-
-            response = call_with_rate_limit_retry(
+            contents = self._build_detection_contents(image)
+            response = self._call_generation(
                 lambda: client.models.generate_content(
                     model=self._settings.gemini_vlm_model,
                     contents=contents,
@@ -196,7 +393,7 @@ class GeminiService:
                         response_schema=GeminiModelDetectionResult,
                     ),
                 ),
-                operation_name="detect_furniture",
+                "detect_furniture",
             )
             if not response.text:
                 raise GeminiResponseInvalidError(
@@ -290,17 +487,9 @@ class GeminiService:
 
         try:
             attribute_schema = build_allowed_attribute_schema(category)
-            attribute_context = json.dumps(attribute_schema, ensure_ascii=False)
-
             client = genai_client.create_client(self._settings)
-            contents: list[types.ContentUnionDict] = [
-                image,
-                FURNITURE_ATTRIBUTE_PROMPT,
-                attribute_context,
-            ]
-
-            # FurnitureAttributeResult를 Gemini SDK에 직접 전달 X
-            response = call_with_rate_limit_retry(
+            contents = self._build_attribute_contents(image, attribute_schema)
+            response = self._call_generation(
                 lambda: client.models.generate_content(
                     model=self._settings.gemini_vlm_model,
                     contents=contents,
@@ -311,7 +500,7 @@ class GeminiService:
                         ),
                     ),
                 ),
-                operation_name="extract_furniture_attributes",
+                "extract_furniture_attributes",
             )
 
             if not response.text:
@@ -353,6 +542,96 @@ class GeminiService:
         except Exception as error:
             raise GeminiInferenceError(
                 "Gemini 속성 추출 요청이 실패했습니다."
+            ) from error
+
+    def rerank_sku_candidates(
+        self,
+        query: str,
+        candidates: list[dict[str, typing.Any]],
+        top_k: int,
+    ) -> list[str]:
+        """검색어 의미에 맞게 후보 SKU 목록을 Gemini로 재정렬합니다.
+
+        1차 코사인 유사도로 뽑은 후보 풀의 순서를, 검색어와 각 후보의
+        catalog 필드(product_name/category/sub_category/attributes/
+        brand/price)를 비교해 다시 매깁니다. candidates에는 catalog
+        필드만 담아야 하며 정답이나 평가용 정보는 포함하지 않습니다.
+
+        Args:
+            query: 검색 프롬프트입니다.
+            candidates: 재정렬할 후보 SKU 목록입니다. 각 항목은 최소한
+                sku_code 키를 가져야 합니다.
+            top_k: 반환받을 최대 sku_code 개수입니다.
+
+        Returns:
+            검색어와 가장 잘 맞는 순서로 정렬된 sku_code 목록입니다
+            (최대 top_k개). candidates가 비어 있으면 빈 목록입니다.
+
+        Raises:
+            GeminiConfigurationError: Gemini API 키가 설정되지 않은
+                경우입니다.
+            GeminiApiError: Gemini API 호출 또는 응답 검증에 실패한
+                경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "Google Gen AI 인증 설정이 누락되었습니다."
+            )
+        if not candidates:
+            return []
+
+        try:
+            client = genai_client.create_client(self._settings)
+            contents = _build_rerank_contents(query, candidates, top_k)
+
+            response = client.models.generate_content(
+                model=self._settings.gemini_rerank_model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=SkuRerankResult,
+                    temperature=0.0,
+                ),
+            )
+
+            if not response.text:
+                raise GeminiResponseInvalidError(
+                    "Gemini 재정렬 응답이 비어 있습니다."
+                )
+
+            result = SkuRerankResult.model_validate_json(response.text)
+
+            valid_codes = {candidate["sku_code"] for candidate in candidates}
+            seen: set[str] = set()
+            ranked_codes: list[str] = []
+            for code in result.ranked_sku_codes:
+                if code in valid_codes and code not in seen:
+                    ranked_codes.append(code)
+                    seen.add(code)
+
+            return ranked_codes[:top_k]
+
+        except GeminiResponseInvalidError:
+            raise
+
+        except ValidationError as error:
+            raise GeminiResponseInvalidError(
+                "Gemini 재정렬 응답이 올바르지 않습니다."
+            ) from error
+
+        except errors.ClientError as error:
+            if getattr(error, "code", None) in (401, 403):
+                raise GeminiAuthenticationError(
+                    "Gemini 인증이 실패했습니다."
+                ) from error
+
+            raise GeminiInferenceError(
+                "Gemini 재정렬 요청이 실패했습니다."
+            ) from error
+
+        except Exception as error:
+            raise GeminiInferenceError(
+                "Gemini 재정렬 요청이 실패했습니다."
             ) from error
 
     def embed_image(self, image: Image.Image | bytes) -> list[float]:
@@ -451,15 +730,62 @@ class GeminiService:
                 f"Gemini 텍스트 임베딩에 실패했습니다: {error}"
             ) from error
 
-    def embed_with_attrs(
+    def embed_fused(
         self,
         image: Image.Image,
-        *,
-        category: str | None = None,
-        sub_category: str | None = None,
-        attrs: Mapping[str, str] | None = None,
+        metadata_text: str,
     ) -> list[float]:
-        """이미지와 추출 속성을 함께 임베딩합니다."""
-        raise NotImplementedError(
-            "하이브리드 임베딩 구현이 아직 연결되지 않았습니다."
-        )
+        """메타 텍스트·전처리 RGB·그레이스케일을 한 번에 임베딩합니다.
+
+        Args:
+            image: 전처리가 완료된 RGB 이미지입니다.
+            metadata_text: 카탈로그 스펙 순서로 정규화한 메타데이터입니다.
+
+        Returns:
+            세 입력을 융합한 임베딩 벡터입니다.
+
+        Raises:
+            GeminiConfigurationError: Gemini 인증이 설정되지 않은 경우입니다.
+            GeminiEmbeddingError: Gemini 융합 임베딩 호출이 실패한 경우입니다.
+        """
+        if not self.is_configured:
+            raise GeminiConfigurationError(
+                "Google Gen AI 인증 설정이 누락되었습니다."
+            )
+
+        try:
+            rgb = image.convert("RGB")
+            gray = rgb.convert("L").convert("RGB")
+            contents = [
+                "상품 메타데이터:\n" + (metadata_text or "(없음)"),
+                _image_part_as_png(rgb),
+                _image_part_as_png(gray),
+            ]
+            client = genai_client.create_client(self._settings)
+            response = client.models.embed_content(
+                model=self._settings.gemini_embedding_model,
+                contents=contents,  # type: ignore[arg-type]
+            )
+            embeddings = response.embeddings
+            if not embeddings or not embeddings[0].values:
+                raise GeminiEmbeddingError(
+                    "Gemini 융합 임베딩 응답이 비어 있습니다."
+                )
+            return embeddings[0].values
+        except GeminiEmbeddingError:
+            raise
+        except Exception as error:
+            logging.getLogger(__name__).exception("Gemini 융합 임베딩 실패")
+            raise GeminiEmbeddingError(
+                f"Gemini 융합 임베딩에 실패했습니다: {error}"
+            ) from error
+
+
+def _image_part_as_png(image: Image.Image) -> types.Part:
+    """Gemini interleaved 입력에 쓸 PNG Part를 생성합니다."""
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=False)
+    return types.Part.from_bytes(
+        data=buffer.getvalue(),
+        mime_type="image/png",
+    )

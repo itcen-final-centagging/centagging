@@ -57,14 +57,40 @@ export const useTaggingObjectEditor = ({
         updates.map((object) => [object.id, object.bbox]),
       );
       setDetectedObjects((objects) =>
-        objects.map((object) => ({
-          ...object,
-          bbox: nextBboxes.get(object.id) ?? object.bbox,
-        })),
+        objects.map((object) => {
+          const nextBbox = nextBboxes.get(object.id);
+          if (!nextBbox) return object;
+
+          return {
+            ...object,
+            attrsDirty: true,
+            bbox: nextBbox,
+            description: null,
+            metadata: {
+              ...object.metadata,
+              attributes: {},
+              description: null,
+              subCategory: null,
+              vlmMood: undefined,
+            },
+          };
+        }),
       );
       setSelectedObject((object) =>
         object && nextBboxes.has(object.id)
-          ? { ...object, bbox: nextBboxes.get(object.id) ?? object.bbox }
+          ? {
+              ...object,
+              attrsDirty: true,
+              bbox: nextBboxes.get(object.id) ?? object.bbox,
+              description: null,
+              metadata: {
+                ...object.metadata,
+                attributes: {},
+                description: null,
+                subCategory: null,
+                vlmMood: undefined,
+              },
+            }
           : object,
       );
     },
@@ -79,8 +105,17 @@ export const useTaggingObjectEditor = ({
           object.id === objectId
             ? {
                 ...object,
+                attrsDirty: true,
                 category: nextCategory,
-                metadata: { ...object.metadata, category: nextCategory },
+                description: null,
+                metadata: {
+                  ...object.metadata,
+                  attributes: {},
+                  category: nextCategory,
+                  description: null,
+                  subCategory: null,
+                  vlmMood: undefined,
+                },
                 name: nextCategory,
               }
             : object,
@@ -90,8 +125,17 @@ export const useTaggingObjectEditor = ({
         object?.id === objectId
           ? {
               ...object,
+              attrsDirty: true,
               category: nextCategory,
-              metadata: { ...object.metadata, category: nextCategory },
+              description: null,
+              metadata: {
+                ...object.metadata,
+                attributes: {},
+                category: nextCategory,
+                description: null,
+                subCategory: null,
+                vlmMood: undefined,
+              },
               name: nextCategory,
             }
           : object,
@@ -126,6 +170,7 @@ export const useTaggingObjectEditor = ({
     const object: FurnitureObject = {
       bbox: [350, 350, 650, 650],
       candidates: [],
+      attrsDirty: true,
       category,
       confidence: null,
       description: '사용자가 추가한 객체',

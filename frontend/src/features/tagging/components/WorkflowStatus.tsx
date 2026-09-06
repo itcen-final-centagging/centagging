@@ -1,11 +1,4 @@
-import { useState } from 'react';
-import {
-  ArrowLeft,
-  CheckCircle2,
-  CircleAlert,
-  LoaderCircle,
-  Search,
-} from 'lucide-react';
+import { CheckCircle2, CircleAlert, LoaderCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button } from '@/commons/components/Button';
@@ -25,62 +18,6 @@ export const LoadingPanel = ({ label, description }: LoadingPanelProps) => (
     <p className="mt-2 text-sm text-neutral-500">{description}</p>
   </div>
 );
-
-export const NoDetectionPanel = () => {
-  const { changeStage, redetect } = useTaggingWorkflow();
-  const [description, setDescription] = useState('');
-  const isValid = description.trim().length >= 2;
-
-  return (
-    <section className="mx-auto max-w-2xl">
-      <div className="studio-surface flex min-h-75 flex-col items-center justify-center px-7 text-center">
-        <span className="flex size-16 items-center justify-center rounded-full bg-primary-20 text-primary">
-          <Search size={28} />
-        </span>
-        <h2 className="mt-5 text-xl font-extrabold text-neutral-800">
-          탐지된 가구가 없습니다
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-neutral-500">
-          위치, 색상, 재질, 가구 종류를 함께 입력해 주세요.
-          <br />
-          예: 이미지 중앙의 회색 패브릭 소파
-        </p>
-      </div>
-      <label className="mt-6 block text-sm font-bold text-neutral-700">
-        찾으려는 가구 설명
-        <textarea
-          className="mt-2 min-h-25 w-full resize-y rounded-md border border-neutral-200 bg-white p-3 text-sm font-normal outline-none focus:border-primary focus:ring-3 focus:ring-primary-50"
-          maxLength={100}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="예: 이미지 중앙의 회색 패브릭 소파"
-          value={description}
-        />
-      </label>
-      {description && !isValid ? (
-        <p className="mt-2 text-xs text-danger-600">
-          찾으려는 가구를 2자 이상 입력해 주세요.
-        </p>
-      ) : null}
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <Button
-          fullWidth
-          onClick={() => changeStage('upload')}
-          startDecorator={<ArrowLeft size={17} />}
-          variant="neutral-outlined"
-        >
-          이전으로
-        </Button>
-        <Button
-          disabled={!isValid}
-          fullWidth
-          onClick={() => void redetect(description.trim())}
-        >
-          설명으로 재탐지
-        </Button>
-      </div>
-    </section>
-  );
-};
 
 export const SavedPanel = () => {
   const { confirmedSelections, resetWorkflow, uploadedImage } =
@@ -124,7 +61,7 @@ export const FailedPanel = () => {
           <CircleAlert size={28} />
         </span>
         <h2 className="mt-5 text-xl font-extrabold text-neutral-800">
-          가구를 찾지 못했어요
+          가구 분석을 완료하지 못했어요
         </h2>
         <p className="mt-2 text-sm leading-6 text-neutral-500">
           {workflowError ?? '잘못된 SKU 후보는 생성하지 않았습니다.'}

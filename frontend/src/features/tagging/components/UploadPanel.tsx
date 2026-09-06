@@ -9,7 +9,6 @@ import {
   ImagePlus,
   LoaderCircle,
   ShieldCheck,
-  Sparkles,
   UploadCloud,
 } from 'lucide-react';
 
@@ -25,7 +24,6 @@ export const UploadPanel = () => {
   const {
     beginAnalysis,
     clearUploadError,
-    loadDemoWorkflow,
     uploadError,
     uploadedImage,
     uploadImage,
@@ -67,10 +65,6 @@ export const UploadPanel = () => {
     void beginAnalysis();
   };
 
-  const handleDemoWorkflowStart = (): void => {
-    void loadDemoWorkflow();
-  };
-
   const isAnalyzing = false;
 
   return (
@@ -81,7 +75,7 @@ export const UploadPanel = () => {
             연출 이미지 업로드
           </h2>
           <p className="mt-1.5 text-sm text-neutral-500">
-            JPG 또는 PNG 형식, 최대 10MB, 최소 512 × 512px
+            JPG 또는 PNG 형식, 최대 10MB
           </p>
         </div>
         <div
@@ -166,19 +160,6 @@ export const UploadPanel = () => {
         >
           AI 분석 시작
         </Button>
-        <Button
-          className="mt-3"
-          fullWidth
-          onClick={handleDemoWorkflowStart}
-          size="lg"
-          startDecorator={<Sparkles size={18} />}
-          variant="neutral-outlined"
-        >
-          데모로 객체 · SKU 선택 보기
-        </Button>
-        <p className="mt-2 text-center text-xs leading-5 text-text-tertiary">
-          AI 호출 없이 소파 객체 선택과 SKU 후보 비교 화면을 바로 확인합니다.
-        </p>
       </section>
 
       <aside className="studio-surface h-fit p-6">

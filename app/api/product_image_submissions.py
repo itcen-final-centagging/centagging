@@ -5,9 +5,14 @@ import typing
 import fastapi
 
 from app import dependencies
+from app.core.error_codes import ErrorCode
 from app.schemas import common as common_schema
 from app.schemas import product_image_submission as submission_schema
 from app.services import image_validation, product_image_submission_service
+from app.services.gemini_service import (
+    GeminiConfigurationError,
+    GeminiEmbeddingError,
+)
 
 router = fastapi.APIRouter(
     prefix="/product-image-submissions",
@@ -259,6 +264,22 @@ async def approve_product_image_submission(
     ) as error:
         raise fastapi.HTTPException(
             status_code=409, detail="이미 사용 중인 SKU 코드입니다."
+        ) from error
+    except GeminiConfigurationError as error:
+        raise fastapi.HTTPException(
+            status_code=503,
+            detail={
+                "code": ErrorCode.SERVICE_UNAVAILABLE.value,
+                "message": "임베딩 기능이 아직 설정되지 않았습니다.",
+            },
+        ) from error
+    except GeminiEmbeddingError as error:
+        raise fastapi.HTTPException(
+            status_code=502,
+            detail={
+                "code": ErrorCode.UPSTREAM_ERROR.value,
+                "message": "등록 이미지 임베딩 중 오류가 발생했습니다.",
+            },
         ) from error
 
 
